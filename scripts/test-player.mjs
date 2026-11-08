@@ -1,0 +1,26 @@
+import assert from 'node:assert/strict';
+import { readFile } from 'node:fs/promises';
+import ts from 'typescript';
+async function source(name) {
+  const code = await readFile(new URL(`../src/player/${name}.ts`,import.meta.url),'utf8');
+  const js = ts.transpileModule(code,{compilerOptions:{module:ts.ModuleKind.ES2022,target:ts.ScriptTarget.ES2022}}).outputText;
+  return import(`data:text/javascript;base64,${Buffer.from(js).toString('base64')}`);
+}
+const {progressSession}=await source('progress-session');
+const sent=[];
+const old=progressSession('old-episode',()=>20,()=>false,value=>sent.push(value));
+old.report();old.report(true);old.report();old.report(true);
+const next=progressSession('next-episode',()=>5,()=>true,value=>sent.push(value));
+next.report();next.report(true);
+assert.deepEqual(sent.map(value=>[value.itemId,value.positionTicks,value.isStopped]),[['old-episode',200000000,false],['old-episode',200000000,true],['next-episode',50000000,false],['next-episode',50000000,true]]);
+const {playbackState}=await source('state');
+const state={stopped:false,error:false,loading:false,buffering:false,playing:true};
+assert.equal(playbackState(state),'playing');
+for(const [property,expected] of [['loading','loading'],['buffering','buffering'],['error','error'],['stopped','stopped']]) assert.equal(playbackState({...state,[property]:true}),expected);
+assert.equal(playbackState({...state,playing:false}),'paused');
+const {selectCastSubtitles}=await source('cast');
+const selected=[];
+const sdk={createRequest:ids=>ids,editTracks:request=>selected.push(request)};
+selectCastSubtitles(sdk,1);selectCastSubtitles(sdk,-1);
+assert.deepEqual(selected,[[2],[]]);
+console.info('Playback state, item-bound progress, and Cast track checks passed');

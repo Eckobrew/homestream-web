@@ -1,64 +1,19 @@
-# Multi-stage Dockerfile for HomeFlix (Next.js Standalone)
-# Optimized for Proxmox LXC Containers and lightweight deployments
-
-FROM node:22-alpine AS base
-
-# Install dependencies only when needed
-FROM base AS deps
-RUN apk add --no-cache libc6-compat
+# syntax=docker/dockerfile:1
+FROM node:22-alpine AS build
 WORKDIR /app
-
-COPY package.json package-lock.json* ./
-RUN npm_config_cache=/tmp/.npm-cache npm ci
-
-# Rebuild the source code only when needed
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+ARG NEXT_PUBLIC_APP_NAME=HomeStream
+ARG NEXT_PUBLIC_APP_URL=http://localhost:3000
+ENV NEXT_PUBLIC_APP_NAME=$NEXT_PUBLIC_APP_NAME NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL NEXT_TELEMETRY_DISABLED=1
 COPY . .
-
-# Environment variables for build
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV NODE_ENV=production
-ENV NODE_OPTIONS="--max-old-space-size=512"
-
-RUN npm_config_cache=/tmp/.npm-cache npm run build
-
-# Production image, copy all the files and run next
-FROM base AS runner
+RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then export NODE_EXTRA_CA_CERTS=/run/secrets/proxy_ca; fi; npm ci && npm run build && npm cache clean --force
+FROM node:22-alpine
 WORKDIR /app
-
-# Install runtime utilities for media inspection, live transcoding & hardware acceleration
-RUN apk add --no-cache \
-    ffmpeg \
-    libva-intel-driver \
-    intel-media-driver \
-    libva-utils
-
-ENV NODE_ENV=production
-ENV NEXT_TELEMETRY_DISABLED=1
-ENV PORT=3000
-ENV HOSTNAME="0.0.0.0"
-
-RUN addgroup --system --gid 1001 nodejs && \
-    adduser --system --uid 1001 nextjs
-
-COPY --from=builder /app/public ./public
-
-# Automatically leverage output traces to reduce image size
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-
-RUN mkdir -p /app/data && chown -R nextjs:nodejs /app/data
-ENV DATA_DIR="/app/data"
-
-COPY scripts/socket-identity.cjs ./socket-identity.cjs
-
-USER nextjs
-
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=5s --retries=3 \
-  CMD wget -q -O /dev/null http://127.0.0.1:3000/api/mobile/v1/discovery || exit 1
-
-CMD ["node", "--require", "./socket-identity.cjs", "server.js"]
+RUN addgroup -S -g 1001 homestream && adduser -S -u 1001 -G homestream homestream
+COPY --from=build --chown=homestream:homestream /app/.next/standalone ./
+COPY --from=build --chown=homestream:homestream /app/.next/static ./.next/static
+COPY --from=build --chown=homestream:homestream /app/public ./public
+USER homestream
+ENV NODE_ENV=production PORT=3002 HOSTNAME=0.0.0.0 NEXT_TELEMETRY_DISABLED=1
+EXPOSE 3002
+HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:3002/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+CMD ["node", "server.js"]

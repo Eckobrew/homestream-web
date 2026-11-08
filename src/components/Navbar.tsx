@@ -271,7 +271,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                     </div>
                     <div className="truncate">
                       <p className="text-white font-semibold text-sm truncate capitalize">
-                        {activeProfile?.name || 'HomeFlix User'}
+                        {activeProfile?.name || `${appName || 'HomeStream'} User`}
                       </p>
                       <p className="text-[11px] text-emerald-400 flex items-center space-x-1">
                         <span>{isExternal || !canSwitchProfile ? 'External Session' : 'Active Profile'}</span>

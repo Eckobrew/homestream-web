@@ -83,6 +83,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
         role="dialog"
+        aria-hidden={!isOpen}
+        inert={!isOpen}
         aria-label="Jellyfin Libraries Sidebar"
       >
         {/* Header */}

@@ -1,8 +1,10 @@
 import { MetadataRoute } from 'next';
-import { JellyfinClient } from '@/lib/jellyfin';
+import { headers } from 'next/headers';
+import type { MediaItem } from '@/types';
+export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://homeflix.eckonet.uk';
+  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
   const lastModified = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -33,14 +35,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   ];
 
   try {
-    const jellyfin = new JellyfinClient();
-    if (jellyfin.isConfigured()) {
-      const [movies, series] = await Promise.all([
-        jellyfin.getLatestMedia('Movie', 30),
-        jellyfin.getLatestMedia('Series', 30),
-      ]);
-
-      const mediaRoutes: MetadataRoute.Sitemap = [...movies, ...series].map((item) => ({
+    const incoming = await headers();
+    // A background metadata request must never gain access from the web server's LAN identity.
+    const cookie = incoming.get('cookie') || '';
+    if (cookie.includes('homeflix_session=')) {
+      const response = await fetch(`${process.env.HOMESTREAM_BACKEND_URL || 'http://127.0.0.1:3001'}/api/v1/catalog-links`, {
+        headers: { cookie, 'x-forwarded-for': '0.0.0.0' }, cache: 'no-store', signal: AbortSignal.timeout(5000),
+      });
+      if (!response.ok) return staticRoutes;
+      const { items } = await response.json() as { items: MediaItem[] };
+      const mediaRoutes: MetadataRoute.Sitemap = items.map((item) => ({
         url: `${siteUrl}/media/${item.id}`,
         lastModified,
         changeFrequency: 'weekly',

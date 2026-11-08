@@ -15,7 +15,7 @@ const geistMono = localFont({
   weight: "100 900",
 });
 
-const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://homeflix.eckonet.uk';
+const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
 const appName = process.env.APP_NAME || process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream';
 
 export const metadata: Metadata = {
@@ -28,7 +28,7 @@ export const metadata: Metadata = {
   keywords: [
     appName,
     "HomeStream",
-    "HomeFlix",
+    "HomeStream",
     "Jellyfin",
     "Overseerr",
     "Jellyseerr",
@@ -99,7 +99,7 @@ export default function RootLayout({
                   "@type": "WebSite",
                   "@id": `${siteUrl}/#website`,
                   "url": siteUrl,
-                  "name": "HomeFlix",
+                  "name": "HomeStream",
                   "description": "Modern Self-Hosted Streaming Client for Jellyfin and Seerr",
                   "potentialAction": {
                     "@type": "SearchAction",

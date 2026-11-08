@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { MediaItem } from '@/types';
@@ -47,7 +48,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
     setIsLoading(true);
     setError(null);
 
-    fetch(`/api/library/${libraryType}`)
+    apiFetch(`/api/library/${libraryType}`)
       .then((res) => {
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         return res.json();

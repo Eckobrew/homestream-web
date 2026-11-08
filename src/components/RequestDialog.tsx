@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect } from 'react';
 import { X, Download, CheckCircle, AlertCircle, Loader2, ChevronDown, Sliders } from 'lucide-react';
@@ -40,7 +41,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
     const controller = new AbortController();
     setQualityProfiles([{ id: -1, name: 'Server default (Radarr / Sonarr)', is4k: false }]);
     setSelectedProfileId(-1);
-    fetch(`/api/request?type=${type}`, { signal: controller.signal })
+    apiFetch(`/api/request?type=${type}`, { signal: controller.signal })
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.profiles && Array.isArray(data.profiles) && data.profiles.length > 0) {
@@ -82,7 +83,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
 
       const selectedProfile = qualityProfiles.find((p) => p.id === selectedProfileId);
 
-      const res = await fetch('/api/request', {
+      const res = await apiFetch('/api/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

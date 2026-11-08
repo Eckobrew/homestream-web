@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Plus, Check, ThumbsUp, ChevronDown, Download, Clock, Volume2, VolumeX } from 'lucide-react';
@@ -112,7 +113,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         // Fetch trailer for requests / un-downloaded items
         const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
         const type = item.type === 'Series' ? 'tv' : 'movie';
-        fetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
+        apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             if (data?.trailer?.key) {

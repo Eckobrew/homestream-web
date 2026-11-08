@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Play, RotateCcw, Info, Volume2, VolumeX, Plus, Check, ChevronLeft, ChevronRight, Download } from 'lucide-react';
@@ -69,7 +70,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       const tmdb = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
       const type = currentItem.type === 'Series' ? 'tv' : 'movie';
       let active = true;
-      fetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${currentItem.id}`)
+      apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${currentItem.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (active && data?.trailer?.key) {
@@ -311,7 +312,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
                 const restartItem = { ...currentItem, playbackPositionTicks: 0, progressPercent: 0 };
                 const targetId = restartItem.playableEpisodeId || (restartItem.type !== 'Series' ? restartItem.jellyfinId || restartItem.id : undefined);
                 if (targetId) {
-                  fetch('/api/playback/progress', {
+                  apiFetch('/api/playback/progress', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ itemId: targetId, positionTicks: 0, isPaused: false }),

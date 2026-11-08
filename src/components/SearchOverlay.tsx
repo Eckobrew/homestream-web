@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect } from 'react';
 import { Search, Play, Download, Clock, CheckCircle2, Film, Tv, Loader2 } from 'lucide-react';
@@ -33,7 +34,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     const timer = setTimeout(async () => {
       try {
         setIsLoading(true);
-        const res = await fetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
+        const res = await apiFetch(`/api/search?q=${encodeURIComponent(query)}`, { signal: controller.signal });
         if (res.ok && !controller.signal.aborted) {
           const data = await res.json();
           setResults(data.results || []);
@@ -53,7 +54,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     let isMounted = true;
     const pollDownloads = async () => {
       try {
-        const res = await fetch('/api/downloads');
+        const res = await apiFetch('/api/downloads');
         if (!res.ok) return;
         const data = await res.json();
         const dlList = data.items || [];
@@ -118,7 +119,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
       const tmdbId = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined) || (item.seerrId ? Number(item.seerrId) : undefined);
       if (tmdbId) {
-        fetch('/api/request', {
+        apiFetch('/api/request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

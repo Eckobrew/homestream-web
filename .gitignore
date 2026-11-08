@@ -40,3 +40,6 @@ next-env.d.ts
 /data/
 
 .next-mobile-test/
+
+playwright-report/
+test-results/

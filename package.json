@@ -1,18 +1,21 @@
 {
-  "name": "homestream",
-  "version": "0.1.0",
+  "name": "@eckobrew/homestream-web",
+  "version": "1.1.0",
   "private": true,
   "repository": {
     "type": "git",
-    "url": "https://github.com/Eckobrew/HomeStream.git"
+    "url": "https://github.com/Eckobrew/homestream-web.git"
   },
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint",
-    "test:mobile": "node scripts/test-mobile-api.mjs",
-    "test:playback": "node scripts/test-playback-capabilities.mjs"
+    "build": "next build && node scripts/prepare-standalone.mjs",
+    "start": "node .next/standalone/server.js",
+    "lint": "eslint .",
+    "test:playback": "node scripts/test-playback-capabilities.mjs",
+    "typecheck": "tsc --noEmit",
+    "test:contract": "node scripts/test-contract.mjs",
+    "test:e2e": "playwright test",
+    "test:player": "node scripts/test-player.mjs"
   },
   "dependencies": {
     "hls.js": "^1.7.4",
@@ -22,16 +25,19 @@
     "react-dom": "19.3.1"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.65.0",
     "@types/node": "^20",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
-    "eslint": "^8",
-    "eslint-config-next": "15.5.28",
+    "eslint": "^10.14.0",
     "postcss": "8.5.32",
     "tailwindcss": "^3.4.1",
-    "typescript": "^5"
+    "typescript": "^5",
+    "typescript-eslint": "^8.72.1"
   },
   "overrides": {
     "postcss": "$postcss"
-  }
+  },
+  "license": "MIT"
 }

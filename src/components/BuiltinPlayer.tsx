@@ -1,5 +1,14 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
+import { usePlaybackFallback } from '@/player/usePlaybackFallback';
+import { useMediaDelivery } from '@/player/useMediaDelivery';
+import { useCastSession } from '@/player/useCastSession';
+import { useSubtitles } from '@/player/useSubtitles';
+import { useProgress } from '@/player/useProgress';
+import { negotiatePlayback } from '@/player/transport';
+import { playbackState } from '@/player/state';
+import { selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { browserPlaybackParameters } from '@/lib/playback-capabilities';
@@ -53,6 +62,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
+  const [stopped, setStopped] = useState(false);
   const [isPlaying, setIsPlaying] = useState(true);
   const [autoplayEpisodes, setAutoplayEpisodes] = useState(true);
   const nextEpisodeHandler = useRef<() => void>(() => {});
@@ -110,7 +120,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     let isMounted = true;
     const poll = async () => {
       try {
-        const res = await fetch('/api/downloads');
+        const res = await apiFetch('/api/downloads');
         if (!res.ok) return;
         const data = await res.json();
         const cleanItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
@@ -154,10 +164,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [playbackDuration, setPlaybackDuration] = useState<number>(0);
 
   // Subtitles state
-  const [subtitles, setSubtitles] = useState<SubtitleTrack[]>([]);
-  const [selectedSubtitleId, setSelectedSubtitleId] = useState<string | null>(null);
   const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
-  const [isLoadingSubtitles, setIsLoadingSubtitles] = useState(false);
 
   // Chromecast / Remote Playback state
   const [isCastAvailable, setIsCastAvailable] = useState(false);
@@ -187,6 +194,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     (item.type !== 'Series' ? (item.jellyfinId || item.id) : undefined)
   );
 
+  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined));
+  const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef);
+  const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
+  const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
+
   const isJellyfinItem = Boolean(item.source === 'jellyfin' || item.jellyfinId);
 
   // Series playlist episodes
@@ -202,7 +214,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       (activeEpisode?.durationMinutes && activeEpisode.durationMinutes > 0);
 
     if (!hasDuration && item.id) {
-      fetch(`/api/media/${item.id}`)
+      apiFetch(`/api/media/${item.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.item?.durationMinutes) {
@@ -226,7 +238,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         (item.videoStreamUrl?.match(/hash=([^&]+)/)?.[1]);
 
       if (hash) {
-        fetch(`/api/stream/download?hash=${hash}&probe=1`)
+        apiFetch(`/api/stream/download?hash=${hash}&probe=1`)
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             if (data?.durationSeconds && data.durationSeconds > 0) {
@@ -258,7 +270,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       }
 
       setIsLoadingEpisode(true);
-      fetch(`/api/media/${item.id}`)
+      apiFetch(`/api/media/${item.id}`)
         .then((res) => res.json())
         .then((data) => {
           const media = data.item;
@@ -299,41 +311,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return null;
   }, [seriesEpisodes, activeEpisode, activePlayableId]);
 
-  // Fetch available subtitles for active playable ID
-  useEffect(() => {
-    if (!activePlayableId) return;
-    setIsLoadingSubtitles(true);
-    fetch(`/api/subtitles?itemId=${activePlayableId}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (Array.isArray(data.subtitles)) {
-          setSubtitles(data.subtitles);
-          // If a track is marked default, select it
-          const def = data.subtitles.find((s: SubtitleTrack) => s.isDefault && !s.isForced);
-          if (def) {
-            setSelectedSubtitleId(def.id);
-          }
-        }
-      })
-      .catch((err) => console.error('Failed to load subtitles:', err))
-      .finally(() => setIsLoadingSubtitles(false));
-  }, [activePlayableId]);
-
-  // Synchronize textTracks mode with selectedSubtitleId
-  useEffect(() => {
-    if (!videoRef.current || !videoRef.current.textTracks) return;
-    const tracks = videoRef.current.textTracks;
-    for (let i = 0; i < tracks.length; i++) {
-      const track = tracks[i];
-      const match = subtitles.find((s) => s.id === selectedSubtitleId);
-      if (match && track.label === match.title) {
-        track.mode = 'showing';
-      } else {
-        track.mode = 'disabled';
-      }
-    }
-  }, [selectedSubtitleId, subtitles]);
-
   const currentTitle = useMemo(() => {
     return activeEpisode
       ? `${item.title}: S${activeEpisode.seasonNumber}E${activeEpisode.episodeNumber} - ${activeEpisode.name}`
@@ -358,12 +335,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 activeTrackIds = [subIdx + 1];
               }
             }
-            const tracksRequest = new (window as any).chrome.cast.media.EditTracksInfoRequest(activeTrackIds);
-            media.editTracksInfo(
-              tracksRequest,
-              () => console.log('Chromecast subtitle track updated:', activeTrackIds),
-              (err: any) => console.warn('Failed to update Chromecast subtitle track:', err)
-            );
+            selectCastSubtitles({ createRequest: ids => new (window as any).chrome.cast.media.EditTracksInfoRequest(ids), editTracks: (request, success, failure) => media.editTracksInfo(request, success, failure) }, activeTrackIds.length ? activeTrackIds[0] - 1 : -1);
           }
         } catch (e) {
           console.warn('Chromecast subtitle edit exception:', e);
@@ -393,7 +365,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
       if (!isItemDownloading && targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', videoCodecs: compatible ? 'h264' : 'h264,hevc,vp8,vp9,av1', audioCodecs: 'aac,mp3,opus,vorbis', maxWidth: compatible ? '1920' : '3840', maxHeight: compatible ? '1080' : '2160', forceTranscode: String(compatible) });
-        const response = await fetch(`/api/playback?${params}`);
+        const response = await apiFetch(`/api/playback?${params}`);
         if (!response.ok) throw new Error('Cast stream negotiation failed');
         const result = await response.json();
         rawUrl = result.streamUrl;
@@ -517,9 +489,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       window.location.hostname !== '127.0.0.1'
     ) {
       setIsCastConnecting(false);
-      const httpsUrl = `https://homeflix.eckonet.uk${window.location.pathname}${window.location.search}`;
+      const httpsUrl = `https://${window.location.host}${window.location.pathname}${window.location.search}`;
       const confirmed = window.confirm(
-        'Chromecast casting is disabled by Google Chrome on unencrypted HTTP.\n\nWould you like to switch to HTTPS at https://homeflix.eckonet.uk now?'
+        'Chromecast casting is disabled by Google Chrome on unencrypted HTTP.\n\nWould you like to switch to HTTPS on this server now?'
       );
       if (confirmed) {
         window.location.href = httpsUrl;
@@ -567,183 +539,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
     setIsCastConnecting(false);
     alert(
-      'To cast to Chromecast or Google TV:\n• Open HomeFlix via HTTPS: https://homeflix.eckonet.uk\n• Ensure your phone/Mac is on the same Wi-Fi as your Chromecast.\n• Use Google Chrome or Samsung Internet.'
+      'To cast to Chromecast or Google TV:\n• Open HomeStream using your server’s HTTPS address\n• Ensure your phone/Mac is on the same Wi-Fi as your Chromecast.\n• Use Google Chrome or Samsung Internet.'
     );
   }, [isCasting, handleDisconnectCast]);
 
-  // Initialize Google Cast SDK & HTMLMediaElement Remote Playback
-  useEffect(() => {
-    let disposed = false;
-    const cleanup: Array<() => void> = [];
-    // 1. Check Native Remote Playback API
-    const video = videoRef.current;
-    if (video && 'remote' in video && (video as any).remote) {
-      const remote = (video as any).remote;
-
-      const handleConnecting = () => {
-        setIsCastConnecting(true);
-        setIsCasting(false);
-      };
-      const handleConnect = () => {
-        setIsCastConnecting(false);
-        setIsCasting(true);
-      };
-      const handleDisconnect = () => {
-        setIsCastConnecting(false);
-        setIsCasting(false);
-      };
-
-      remote.addEventListener('connecting', handleConnecting);
-      remote.addEventListener('connect', handleConnect);
-      remote.addEventListener('disconnect', handleDisconnect);
-      cleanup.push(() => { remote.removeEventListener('connecting', handleConnecting); remote.removeEventListener('connect', handleConnect); remote.removeEventListener('disconnect', handleDisconnect); });
-
-      if (remote.watchAvailability) {
-        remote
-          .watchAvailability((available: boolean) => {
-            if (available) setIsCastAvailable(true);
-          })
-          .then((id: number) => {
-            const cancel = () => { void remote.cancelWatchAvailability(id); };
-            if (disposed) cancel(); else cleanup.push(cancel);
-          })
-          .catch(() => {
-            if (disposed) return;
-            setIsCastAvailable(true);
-          });
-      } else {
-        setIsCastAvailable(true);
-      }
-    }
-
-    // 2. Initialize Google Cast Framework
-    const initCastFramework = () => {
-      if (disposed) return;
-      try {
-        if (typeof window === 'undefined' || !(window as any).cast?.framework) return;
-        const castContext = (window as any).cast.framework.CastContext.getInstance();
-        const listen = (type: string, listener: (event: any) => void) => {
-          castContext.addEventListener(type, listener);
-          cleanup.push(() => castContext.removeEventListener(type, listener));
-        };
-        castContext.setOptions({
-          receiverApplicationId: (window as any).chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID || 'CC1AD845',
-          autoJoinPolicy: (window as any).chrome?.cast?.AutoJoinPolicy?.ORIGIN_SCOPED,
-        });
-
-        const CastState = (window as any).cast.framework.CastState;
-        const currentCastState = castContext.getCastState();
-        if (currentCastState && currentCastState !== CastState.NO_DEVICES_AVAILABLE) {
-          setIsCastAvailable(true);
-        }
-        if (currentCastState === CastState.CONNECTED) {
-          setIsCasting(true);
-          const dev = castContext.getCurrentSession()?.getCastDevice()?.friendlyName;
-          if (dev) setCastDeviceName(dev);
-        }
-
-        listen(
-          (window as any).cast.framework.CastContextEventType.CAST_STATE_CHANGED,
-          (event: any) => {
-            if (event.castState === CastState.CONNECTED) {
-              setIsCasting(true);
-              setIsCastConnecting(false);
-            } else if (event.castState === CastState.CONNECTING) {
-              setIsCastConnecting(true);
-            } else {
-              setIsCasting(false);
-              setIsCastConnecting(false);
-            }
-            if (event.castState !== CastState.NO_DEVICES_AVAILABLE) {
-              setIsCastAvailable(true);
-            }
-          }
-        );
-
-        listen(
-          (window as any).cast.framework.CastContextEventType.SESSION_STATE_CHANGED,
-          (event: any) => {
-            const SessionState = (window as any).cast.framework.SessionState;
-            if (
-              event.sessionState === SessionState.SESSION_STARTED ||
-              event.sessionState === SessionState.SESSION_RESUMED
-            ) {
-              setIsCasting(true);
-              setIsCastConnecting(false);
-              const session = castContext.getCurrentSession();
-              const dev = session?.getCastDevice()?.friendlyName;
-              if (dev) setCastDeviceName(dev);
-              loadCastMedia();
-            } else if (event.sessionState === SessionState.SESSION_ENDED) {
-              setIsCasting(false);
-              setIsCastConnecting(false);
-              setCastDeviceName('');
-              lastCastedUrlRef.current = '';
-              lastCastedKeyRef.current = '';
-            }
-          }
-        );
-      } catch (err) {
-        console.warn('Cast framework initialization error:', err);
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      if ((window as any).cast?.framework) {
-        initCastFramework();
-      } else {
-        const prevOnGCast = (window as any).__onGCastApiAvailable;
-        const available = (isAvailable: boolean) => {
-          if (prevOnGCast) prevOnGCast(isAvailable);
-          if (isAvailable) initCastFramework();
-        };
-        (window as any).__onGCastApiAvailable = available;
-        cleanup.push(() => { if ((window as any).__onGCastApiAvailable === available) (window as any).__onGCastApiAvailable = prevOnGCast; });
-      }
-    }
-    return () => { disposed = true; cleanup.forEach(stop => stop()); };
-  }, [loadCastMedia]);
-
-  // Google Cast receiver position polling & playback state sync
-  useEffect(() => {
-    let interval: NodeJS.Timeout | null = null;
-    if (isCasting) {
-      interval = setInterval(() => {
-        if (typeof window !== 'undefined' && (window as any).cast?.framework) {
-          try {
-            const session = (window as any).cast.framework.CastContext.getInstance().getCurrentSession();
-            const media = session?.getMediaSession();
-            if (media) {
-              const estimatedTime = media.getEstimatedTime();
-              if (typeof estimatedTime === 'number' && !isScrubbing && estimatedTime > 0) {
-                setCurrentTime(estimatedTime);
-              }
-              const playerState = media.playerState;
-              if (playerState === 'IDLE' && media.idleReason === 'ERROR' && !castCompatibilityRef.current) {
-                castCompatibilityRef.current = true;
-                void castLoadRef.current(true);
-              }
-              if (playerState === 'IDLE' && media.idleReason === 'FINISHED') {
-                const key = String(media.mediaSessionId);
-                if (castFinishedItem.current !== key) {
-                  castFinishedItem.current = key;
-                  if (autoplayEpisodes) nextEpisodeHandler.current();
-                }
-              }
-              if (playerState === 'PLAYING') {
-                setIsPlaying(true);
-              } else if (playerState === 'PAUSED') {
-                setIsPlaying(false);
-              }
-            }
-          } catch (e) {}
-        }
-      }, 1000);
-    }
-    return () => {
-      if (interval) clearInterval(interval);
-    };
-  }, [isCasting, isScrubbing, autoplayEpisodes]);
+  useCastSession({videoRef, loadCastMedia, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying});
 
   // Auto-reload on Chromecast ONLY when media/episode actually changes while casting
   useEffect(() => {
@@ -797,15 +597,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setStreamError(false);
     setHasTriedFallbackTranscode(false);
 
-    // Detect browser HEVC capability
-    const canPlayHevc = typeof document !== 'undefined' && (
-      document.createElement('video').canPlayType('video/mp4; codecs="hvc1.1.6.L93.B0"') === 'probably' ||
-      document.createElement('video').canPlayType('video/mp4; codecs="hev1.1.6.L93.B0"') === 'probably'
-    );
-
+    const controller = new AbortController();
     let isMounted = true;
-    fetch(`/api/playback?itemId=${targetId}&canPlayHevc=${canPlayHevc}&${browserPlaybackParameters(mime => videoRef.current?.canPlayType(mime) || '')}`)
-      .then((res) => res.json())
+    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal)
       .then((data) => {
         if (!isMounted) return;
         if (data.streamUrl) {
@@ -817,22 +611,20 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             setDuration(data.durationSeconds);
           }
         } else {
-          const cleanUrl = jellyfinServerUrl?.replace(/\/+$/, '') || '';
-          setStreamUrl(`${cleanUrl}/Videos/${targetId}/stream.mp4?api_key=${jellyfinApiKey}`);
+          setStreamError(true);
         }
       })
       .catch((err) => {
         console.error('Failed to negotiate playback stream:', err);
         if (!isMounted) return;
-        const cleanUrl = jellyfinServerUrl?.replace(/\/+$/, '') || '';
-        setStreamUrl(`${cleanUrl}/Videos/${targetId}/stream.mp4?api_key=${jellyfinApiKey}`);
+        setStreamError(true);
       })
       .finally(() => {
         if (isMounted) setIsLoadingStream(false);
       });
 
     return () => {
-      isMounted = false;
+      isMounted = false; controller.abort();
     };
   }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode]);
 
@@ -844,35 +636,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       setHasTriedFallbackTranscode(true);
       setIsLoadingStream(true);
 
-      fetch(`/api/playback?itemId=${targetId}&forceTranscode=true`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.streamUrl) {
-            setStreamDelivery({ url: data.streamUrl, type: data.contentType || '' });
-            setStreamUrl(data.streamUrl);
-            setIsTranscoding(true);
-            setStreamError(false);
-            if (data.durationSeconds && data.durationSeconds > 0) {
-              setPlaybackDuration(data.durationSeconds);
-              setDuration(data.durationSeconds);
-            }
-            if (videoRef.current) {
-              videoRef.current.load();
-              videoRef.current.play().catch(console.error);
-            }
-          } else {
-            setStreamError(true);
-            setIsPlaying(false);
-          }
-        })
-        .catch((err) => {
-          console.error('Failed fallback transcoding:', err);
-          setStreamError(true);
-          setIsPlaying(false);
-        })
-        .finally(() => {
-          setIsLoadingStream(false);
-        });
+      void fallbackPlayback({
+        ready: data => {
+          setStreamDelivery({url:data.streamUrl,type:data.contentType || ''});
+          setStreamUrl(data.streamUrl);setIsTranscoding(true);setStreamError(false);
+          if(data.durationSeconds){setPlaybackDuration(data.durationSeconds);setDuration(data.durationSeconds);}
+        },
+        failed: () => {setStreamError(true);setIsPlaying(false);},
+        finished: () => setIsLoadingStream(false),
+      });
       return;
     }
 
@@ -886,25 +658,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setIsLoadingStream(true);
 
     if (isJellyfinItem && targetId) {
-      fetch(`/api/playback?itemId=${targetId}&forceTranscode=true`)
-        .then((res) => res.json())
-        .then((data) => {
-          if (data.streamUrl) {
-            setStreamDelivery({ url: data.streamUrl, type: data.contentType || '' });
-            setStreamUrl(data.streamUrl);
-            setIsTranscoding(true);
-            if (data.durationSeconds && data.durationSeconds > 0) {
-              setPlaybackDuration(data.durationSeconds);
-              setDuration(data.durationSeconds);
-            }
-            if (videoRef.current) {
-              videoRef.current.load();
-              videoRef.current.play().catch(console.error);
-            }
-          }
-        })
-        .catch(console.error)
-        .finally(() => setIsLoadingStream(false));
+      void fallbackPlayback({
+        ready: data => {
+          setStreamDelivery({url:data.streamUrl,type:data.contentType || ''});
+          setStreamUrl(data.streamUrl);setIsTranscoding(true);setStreamError(false);
+          if(data.durationSeconds){setPlaybackDuration(data.durationSeconds);setDuration(data.durationSeconds);}
+        },
+        failed: () => {setStreamError(true);setIsPlaying(false);},
+        finished: () => setIsLoadingStream(false),
+      });
     } else {
       if (videoRef.current) {
         videoRef.current.load();
@@ -934,98 +696,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     };
   }, [resetControlsTimer]);
 
-  // Attach media stream via Hls.js or native HTML5 video
-  useEffect(() => {
-    if (!streamUrl || !videoRef.current) return;
-    const video = videoRef.current;
-
-    if (hlsRef.current) {
-      hlsRef.current.destroy();
-      hlsRef.current = null;
-    }
-
-    // Determine target resume position in seconds
-    let resumeSeconds = 0;
-    if (activeEpisode?.playbackPositionTicks && activeEpisode.playbackPositionTicks > 0) {
-      resumeSeconds = Math.floor(activeEpisode.playbackPositionTicks / 10000000);
-    } else if (item.playbackPositionTicks && item.playbackPositionTicks > 0) {
-      resumeSeconds = Math.floor(item.playbackPositionTicks / 10000000);
-    }
-
-    const isHls = (streamDelivery?.url === streamUrl && /mpegurl/i.test(streamDelivery.type)) || streamUrl.includes('.m3u8');
-
-    if (isHls && Hls.isSupported()) {
-      const hls = new Hls({
-        enableWorker: true,
-        lowLatencyMode: false,
-        backBufferLength: 90,
-      });
-      hlsRef.current = hls;
-
-      hls.loadSource(streamUrl);
-      hls.attachMedia(video);
-
-      hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        setIsLoadingStream(false);
-        if (resumeSeconds > 0) {
-          video.currentTime = resumeSeconds;
-          setCurrentTime(resumeSeconds);
-        }
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-      });
-
-      hls.on(Hls.Events.ERROR, (_event, data) => {
-        if (data.fatal) {
-          switch (data.type) {
-            case Hls.ErrorTypes.NETWORK_ERROR:
-              hls.startLoad();
-              break;
-            case Hls.ErrorTypes.MEDIA_ERROR:
-              hls.recoverMediaError();
-              break;
-            default:
-              handlePlaybackError();
-              break;
-          }
-        }
-      });
-    } else if (isHls && video.canPlayType('application/vnd.apple.mpegurl')) {
-      // Native Safari HLS
-      video.src = streamUrl;
-      const onLoaded = () => {
-        setIsLoadingStream(false);
-        if (resumeSeconds > 0) {
-          video.currentTime = resumeSeconds;
-          setCurrentTime(resumeSeconds);
-        }
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        video.removeEventListener('loadedmetadata', onLoaded);
-      };
-      video.addEventListener('loadedmetadata', onLoaded);
-      video.load();
-    } else {
-      // Direct MP4 video stream
-      video.src = streamUrl;
-      const onLoaded = () => {
-        setIsLoadingStream(false);
-        if (resumeSeconds > 0) {
-          video.currentTime = resumeSeconds;
-          setCurrentTime(resumeSeconds);
-        }
-        video.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));
-        video.removeEventListener('loadedmetadata', onLoaded);
-      };
-      video.addEventListener('loadedmetadata', onLoaded);
-      video.load();
-    }
-
-    return () => {
-      if (hlsRef.current) {
-        hlsRef.current.destroy();
-        hlsRef.current = null;
-      }
-    };
-  }, [streamUrl, streamDelivery]);
+  useMediaDelivery({
+    url: streamUrl, contentType: streamDelivery?.url === streamUrl ? streamDelivery.type : '', itemId: activePlayableId,
+    resumeSeconds: (activeEpisode ? activeEpisode.playbackPositionTicks || 0 : item.playbackPositionTicks || 0) / 10000000,
+    videoRef, hlsRef, revision: streamDelivery, setIsLoadingStream, setIsPlaying, setCurrentTime, onError: handlePlaybackError,
+  });
 
   // Video event handlers
   const updateBufferState = () => {
@@ -1222,33 +897,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     }
   };
 
-  // Report playback progress back to Jellyfin for Resume / Continue Watching tracking
-  const reportProgress = useCallback((isStopped = false, overrideTicks?: number) => {
-    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
-    if (!targetId || !videoRef.current) return;
-
-    const currentSecs = videoRef.current.currentTime;
-    const positionTicks = typeof overrideTicks === 'number' ? overrideTicks : Math.round(currentSecs * 10000000);
-    if (positionTicks < 0) return;
-
-    const payload = JSON.stringify({
-      itemId: targetId,
-      positionTicks,
-      isPaused: !isPlaying,
-      isStopped,
-    });
-
-    if (isStopped && typeof navigator !== 'undefined' && navigator.sendBeacon) {
-      navigator.sendBeacon('/api/playback/progress', payload);
-    } else {
-      fetch('/api/playback/progress', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: payload,
-      }).catch(() => {});
-    }
-  }, [activePlayableId, item, isPlaying]);
-
   const handleRestart = () => {
     if (isCasting && typeof window !== 'undefined' && (window as any).cast?.framework) {
       try {
@@ -1309,16 +957,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   nextEpisodeHandler.current = handleNextEpisode;
 
-  // Periodic progress reporting every 10 seconds while playing
-  useEffect(() => {
-    if (!isPlaying) return;
-    const interval = setInterval(() => {
-      reportProgress(false);
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [isPlaying, reportProgress]);
-
   const handleClose = () => {
+    setStopped(true);
     reportProgress(true);
     if (isCasting) {
       handleDisconnectCast();
@@ -1367,7 +1007,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   return (
     <div
-      ref={containerRef}
+      ref={containerRef} data-playback-state={state}
       onMouseMove={resetControlsTimer}
       onClick={resetControlsTimer}
       className="fixed inset-0 z-50 bg-black flex items-center justify-center select-none overflow-hidden cursor-auto"
@@ -1445,7 +1085,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           onProgress={handleProgress}
           onWaiting={() => setIsMidStreamBuffering(true)}
           onStalled={() => setIsMidStreamBuffering(true)}
-          onPlaying={() => { setIsLoadingStream(false); setIsMidStreamBuffering(false); }}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onPlaying={() => { setIsPlaying(true); setIsLoadingStream(false); setIsMidStreamBuffering(false); }}
           onCanPlay={() => setIsMidStreamBuffering(false)}
           onLoadedMetadata={handleLoadedMetadata}
           onError={handlePlaybackError}

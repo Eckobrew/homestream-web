@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect } from 'react';
 import { useProfile } from '@/context/ProfileContext';
@@ -32,9 +33,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   initialStep = 1,
 }) => {
   const {
+    appName,
     profiles,
     needsSetup,
     importProfiles,
+    createProfile,
     fetchAvailableJellyfinUsers,
   } = useProfile();
 
@@ -85,13 +88,14 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [availableUsers, setAvailableUsers] = useState<any[]>([]);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [newProfileName, setNewProfileName] = useState('');
   const [isImporting, setIsImporting] = useState(false);
   const [importError, setImportError] = useState('');
 
   // Load existing server config on open
   useEffect(() => {
     if (isOpen) {
-      fetch('/api/config')
+      apiFetch('/api/config')
         .then((res) => res.json())
         .then((cfg) => {
           if (cfg.jellyfinUrl) setJellyfinUrl(cfg.jellyfinUrl);
@@ -145,7 +149,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setIsTestingJellyfin(true);
     setJellyfinTestStatus(null);
     try {
-      const res = await fetch('/api/config?action=test-jellyfin', {
+      const res = await apiFetch('/api/config?action=test-jellyfin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: jellyfinUrl.trim(), apiKey: jellyfinApiKey.trim() }),
@@ -165,7 +169,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setIsTestingSeerr(true);
     setSeerrTestStatus(null);
     try {
-      const res = await fetch('/api/config?action=test-seerr', {
+      const res = await apiFetch('/api/config?action=test-seerr', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ url: seerrUrl.trim(), apiKey: seerrApiKey.trim() }),
@@ -185,7 +189,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setIsTestingQbittorrent(true);
     setQbittorrentTestStatus(null);
     try {
-      const res = await fetch('/api/config?action=test-qbittorrent', {
+      const res = await apiFetch('/api/config?action=test-qbittorrent', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,17 +219,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       setIsSavingConfig(true);
       setConfigError('');
 
-      const res = await fetch('/api/config?action=save', {
+      const res = await apiFetch('/api/config?action=save', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           jellyfinUrl: jellyfinUrl.trim(),
-          jellyfinApiKey: jellyfinApiKey.trim(),
+          ...(jellyfinApiKey.trim() ? { jellyfinApiKey: jellyfinApiKey.trim() } : {}),
           seerrUrl: seerrUrl.trim(),
-          seerrApiKey: seerrApiKey.trim(),
+          ...(seerrApiKey.trim() ? { seerrApiKey: seerrApiKey.trim() } : {}),
           qbittorrentUrl: qbittorrentUrl.trim(),
           qbittorrentUsername: qbittorrentUsername.trim(),
-          qbittorrentPassword: qbittorrentPassword.trim(),
+          ...(qbittorrentPassword.trim() ? { qbittorrentPassword: qbittorrentPassword.trim() } : {}),
           downloadsPath: downloadsPath.trim(),
         }),
       });
@@ -233,6 +237,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
       if (!res.ok) {
         throw new Error('Failed to save configuration');
       }
+
+      const check = await apiFetch('/api/config?action=test-jellyfin', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ url: jellyfinUrl.trim(), ...(jellyfinApiKey.trim() ? { apiKey: jellyfinApiKey.trim() } : {}) }) });
+      const connection = await check.json();
+      if (!check.ok || !connection.success) throw new Error('Could not connect to Jellyfin. Check the URL and API key, then try again.');
 
       // Move to step 2 (Profile setup)
       setStep(2);
@@ -247,6 +255,17 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     setSelectedUserIds((prev) =>
       prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
     );
+  };
+
+  const handleCreateProfile = async () => {
+    if (!newProfileName.trim()) return;
+    setIsImporting(true); setImportError('');
+    try {
+      const profile = await createProfile(newProfileName.trim());
+      if (!profile) throw new Error('Could not create profile. Please try again.');
+      onComplete?.(); onClose();
+    } catch (error) { setImportError(error instanceof Error ? error.message : 'Could not create profile'); }
+    finally { setIsImporting(false); }
   };
 
   const handleFinishProfileImport = async () => {
@@ -276,7 +295,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
+    <div role="dialog" aria-modal="true" aria-label="Server and profile setup" className="fixed inset-0 z-50 flex items-center justify-center bg-black/92 backdrop-blur-md p-4 overflow-y-auto animate-in fade-in duration-200">
       {/* Dismiss button (only enabled if not fresh first run) */}
       {!needsSetup && profiles.length > 0 && (
         <button
@@ -307,8 +326,8 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               </h1>
               <p className="text-xs sm:text-sm text-neutral-400 mt-0.5">
                 {step === 1
-                  ? `Connect ${process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream'} to your Jellyfin library and optional Overseerr gateway.`
-                  : `Select which Jellyfin user account(s) you would like to import into ${process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream'}.`}
+                  ? `Connect ${appName} to your Jellyfin library and optional Overseerr gateway.`
+                  : `Select which Jellyfin user account(s) you would like to import into ${appName}.`}
               </p>
             </div>
 
@@ -712,7 +731,11 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
               </span>
             </div>
 
-            {isLoadingUsers ? (
+            <div className="flex gap-2 mb-4">
+            <input aria-label="New profile name" value={newProfileName} onChange={e => setNewProfileName(e.target.value)} placeholder="New profile name" className="bg-neutral-900 border border-neutral-700 rounded px-3 py-2" />
+            <button type="button" disabled={isImporting || !newProfileName.trim()} onClick={handleCreateProfile}>Create profile</button>
+          </div>
+          {isLoadingUsers ? (
               <div className="py-16 flex flex-col items-center justify-center space-y-3">
                 <Loader2 size={36} className="animate-spin text-red-600" />
                 <p className="text-xs text-neutral-400 font-medium">

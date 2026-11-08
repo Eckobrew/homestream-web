@@ -20,6 +20,7 @@ export const ProfileSelectorModal: React.FC = () => {
   const {
     profiles,
     activeProfile,
+    appName,
     isSelectorOpen,
     needsSetup,
     canSwitchProfile,
@@ -50,7 +51,7 @@ export const ProfileSelectorModal: React.FC = () => {
     }
   }, [needsSetup, fetchAvailableJellyfinUsers]);
 
-  // Unimported Jellyfin users (available on Jellyfin but not yet added in HomeFlix)
+  // Unimported Jellyfin users (available on Jellyfin but not yet added in HomeStream)
   const unimportedJellyfinUsers = useMemo(() => {
     return availableJellyfinUsers.filter(
       (jUser) =>
@@ -68,7 +69,7 @@ export const ProfileSelectorModal: React.FC = () => {
     }
   }, [needsSetup, availableJellyfinUsers, selectedImportIds.length]);
 
-  if (!isSelectorOpen || !canSwitchProfile || isExternal) return null;
+  if (needsSetup || !isSelectorOpen || !canSwitchProfile || isExternal) return null;
 
   const toggleImportSelection = (id: string) => {
     setSelectedImportIds((prev) =>
@@ -186,8 +187,8 @@ export const ProfileSelectorModal: React.FC = () => {
 
           <p className="text-xs sm:text-sm text-neutral-400 max-w-lg mx-auto">
             {needsSetup
-              ? 'Welcome to HomeFlix! Select which Jellyfin user profile(s) you would like to import into HomeFlix:'
-              : 'Select existing Jellyfin user profile(s) to add to HomeFlix:'}
+              ? `Welcome to ${appName}! Select which Jellyfin user profile(s) you would like to import into ${appName}:`
+              : `Select existing Jellyfin user profile(s) to add to ${appName}:`}
           </p>
 
           {/* Jellyfin Users List */}

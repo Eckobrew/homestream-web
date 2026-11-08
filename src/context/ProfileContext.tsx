@@ -1,9 +1,11 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { UserProfile } from '@/types';
 
 interface ProfileContextType {
+  appName: string;
   profiles: UserProfile[];
   activeProfile: UserProfile | null;
   isLoadingProfiles: boolean;
@@ -25,6 +27,12 @@ interface ProfileContextType {
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
 
 export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const [appName,setAppName] = useState(process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream');
+  useEffect(() => {
+    const controller = new AbortController();
+    apiFetch('/api/mobile/v1/discovery',{signal:controller.signal}).then(response=>response.json()).then(data=>{if(!controller.signal.aborted&&data.appName)setAppName(data.appName);}).catch(()=>{});
+    return()=>controller.abort();
+  },[]);
   const [profiles, setProfiles] = useState<UserProfile[]>([]);
   const [activeProfile, setActiveProfile] = useState<UserProfile | null>(null);
   const [isLoadingProfiles, setIsLoadingProfiles] = useState<boolean>(true);
@@ -37,7 +45,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const fetchProfiles = useCallback(async () => {
     try {
       setIsLoadingProfiles(true);
-      const res = await fetch('/api/profiles?includeAvailable=true');
+      const res = await apiFetch('/api/profiles?includeAvailable=true');
       if (res.ok) {
         const data = await res.json();
         const loadedProfiles: UserProfile[] = data.profiles || [];
@@ -51,7 +59,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setAvailableJellyfinUsers(data.availableJellyfinUsers || []);
 
         if (data.needsSetup && !isExt) {
-          setIsSelectorOpen(true);
+          setIsSelectorOpen(false);
         } else if (isExt) {
           setIsSelectorOpen(false);
         }
@@ -87,7 +95,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
       document.cookie = `homeflix_profile_id=${target.id}; path=/; max-age=31536000; SameSite=Lax`;
 
       try {
-        await fetch('/api/profiles', {
+        await apiFetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'select', profileId: target.id }),
@@ -111,7 +119,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const createProfile = useCallback(
     async (name: string, paletteIndex?: number): Promise<UserProfile | null> => {
       try {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'create', name, paletteIndex }),
@@ -147,7 +155,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const importProfiles = useCallback(
     async (userIds: string[]): Promise<boolean> => {
       try {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'import', userIds }),
@@ -186,7 +194,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const deleteProfile = useCallback(
     async (profileId: string): Promise<boolean> => {
       try {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ action: 'delete', profileId }),
@@ -223,7 +231,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const fetchAvailableJellyfinUsers = useCallback(async (): Promise<UserProfile[]> => {
     try {
-      const res = await fetch('/api/profiles?includeAvailable=true');
+      const res = await apiFetch('/api/profiles?includeAvailable=true');
       if (res.ok) {
         const data = await res.json();
         const available = data.availableJellyfinUsers || [];
@@ -251,6 +259,7 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <ProfileContext.Provider
       value={{
+        appName,
         profiles,
         activeProfile,
         isLoadingProfiles,

@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
@@ -48,7 +49,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
     // 1. Fetch full details & seasons
     const type = item.type === 'Series' ? 'tv' : 'movie';
-    fetch(`/api/media/${item.id}?type=${type}`)
+    apiFetch(`/api/media/${item.id}?type=${type}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.item) {
@@ -62,7 +63,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
     // 2. Fetch trailer for movie or series
     const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
-    fetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
+    apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.trailer?.key) {
@@ -73,7 +74,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
     // 3. Fetch recommended movies / titles based on this particular film
     setIsLoadingRecs(true);
-    fetch(`/api/media/${item.id}/recommendations?type=${type}&tmdbId=${tmdb || ''}`)
+    apiFetch(`/api/media/${item.id}/recommendations?type=${type}&tmdbId=${tmdb || ''}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
         if (data?.recommendations && Array.isArray(data.recommendations)) {
@@ -90,7 +91,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
     let isMounted = true;
     const pollDl = async () => {
       try {
-        const res = await fetch('/api/downloads');
+        const res = await apiFetch('/api/downloads');
         if (!res.ok) return;
         const data = await res.json();
         const dlList = data.items || [];
@@ -153,7 +154,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
         return;
       }
 
-      const res = await fetch('/api/request', {
+      const res = await apiFetch('/api/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -191,7 +192,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
       const targetId = restartEp?.jellyfinId || restartEp?.id || currentItem.playableEpisodeId || currentItem.jellyfinId || currentItem.id;
       if (targetId) {
-        fetch('/api/playback/progress', {
+        apiFetch('/api/playback/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: targetId, positionTicks: 0, isPaused: false }),
@@ -206,7 +207,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
       };
       const targetId = currentItem.jellyfinId || currentItem.id;
       if (targetId) {
-        fetch('/api/playback/progress', {
+        apiFetch('/api/playback/progress', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ itemId: targetId, positionTicks: 0, isPaused: false }),
@@ -337,7 +338,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     onClick={() => {
                       const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
                       if (tmdbId) {
-                        fetch('/api/request', {
+                        apiFetch('/api/request', {
                           method: 'POST',
                           headers: { 'Content-Type': 'application/json' },
                           body: JSON.stringify({
@@ -707,7 +708,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   const restartEp: Episode = { ...ep, playbackPositionTicks: 0 };
-                                  fetch('/api/playback/progress', {
+                                  apiFetch('/api/playback/progress', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ itemId: ep.jellyfinId || ep.id, positionTicks: 0, isPaused: false }),

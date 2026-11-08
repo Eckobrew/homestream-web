@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect } from 'react';
 import { Lock, User, Eye, EyeOff, AlertCircle, ShieldCheck, Globe, Loader2 } from 'lucide-react';
@@ -28,7 +29,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
 
   useEffect(() => {
     // Fetch Jellyfin users for quick profile login
-    fetch('/api/auth?action=users')
+    apiFetch('/api/auth?action=users')
       .then((res) => res.json())
       .then((data) => {
         if (data.users && Array.isArray(data.users) && data.users.length > 0) {
@@ -50,7 +51,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
     setError(null);
 
     try {
-      const res = await fetch('/api/auth', {
+      const res = await apiFetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

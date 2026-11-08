@@ -1,0 +1,49 @@
+name: Web
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run test:player
+      - run: npm run test:contract
+      - run: npm run test:playback
+      - run: npm run build
+      - run: docker build -t homestream-web:test .
+  integration:
+    if: vars.HOMESTREAM_BACKEND_REF != ''
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: homestream-web
+      - uses: actions/checkout@v4
+        with:
+          repository: Eckobrew/homestream-backend
+          ref: ${{ vars.HOMESTREAM_BACKEND_REF }}
+          path: homestream-backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci && npm run build
+        working-directory: homestream-backend
+      - run: npm ci && npm run build
+        working-directory: homestream-web
+      - run: sudo apt-get update && sudo apt-get install -y ffmpeg
+      - run: npx playwright install --with-deps chromium
+        working-directory: homestream-web
+      - run: npm run test:e2e
+        working-directory: homestream-web
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-test-results
+          path: homestream-web/test-results

@@ -1,4 +1,5 @@
 'use client';
+import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Navbar } from '@/components/Navbar';
@@ -17,7 +18,7 @@ import { InitialSetupModal } from '@/components/InitialSetupModal';
 import { AuthModal } from '@/components/AuthModal';
 
 export default function Home() {
-  const { activeProfile, refreshProfiles } = useProfile();
+  const { appName: configuredAppName, activeProfile, refreshProfiles } = useProfile();
   const [hero, setHero] = useState<MediaItem | null>(null);
   const [heroItems, setHeroItems] = useState<MediaItem[]>([]);
   const [sections, setSections] = useState<MediaRowSection[]>([]);
@@ -55,6 +56,8 @@ export default function Home() {
     hasJellyfinKey: false,
   });
 
+  useEffect(() => { setServerConfig(previous => ({...previous,appName:configuredAppName})); },[configuredAppName]);
+
   // Local/Tailscale vs External Internet Authentication State
   const [authStatus, setAuthStatus] = useState<{
     requiresAuth: boolean;
@@ -68,7 +71,7 @@ export default function Home() {
 
   const checkAuth = useCallback(async () => {
     try {
-      const res = await fetch('/api/auth');
+      const res = await apiFetch('/api/auth');
       if (res.ok) {
         const data = await res.json();
         setAuthStatus({
@@ -84,7 +87,7 @@ export default function Home() {
 
   const handleLogout = async () => {
     try {
-      await fetch('/api/auth', {
+      await apiFetch('/api/auth', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'logout' }),
@@ -99,7 +102,7 @@ export default function Home() {
 
   const fetchCategories = useCallback(async (type: 'movies' | 'series' | 'requests') => {
     try {
-      const res = await fetch(`/api/categories/${type}`);
+      const res = await apiFetch(`/api/categories/${type}`);
       if (res.ok) {
         const data = await res.json();
         if (type === 'movies') {
@@ -115,16 +118,18 @@ export default function Home() {
     }
   }, []);
 
+  const [loadError, setLoadError] = useState('');
   const loadHomeData = useCallback(async (userId?: string) => {
     try {
-      setLoading(true);
+      setLoading(true); setLoadError('');
       const targetUserId = userId || activeProfile?.id;
       const homeUrl = targetUserId ? `/api/home?userId=${targetUserId}` : '/api/home';
       const [homeRes, configRes] = await Promise.all([
-        fetch(homeUrl),
-        fetch('/api/config'),
+        apiFetch(homeUrl),
+        apiFetch('/api/config'),
       ]);
 
+      if (!homeRes.ok) { const error = await homeRes.json(); setLoadError(error.error || 'Your media server is unavailable. Please try again.'); setSections([]); setHero(null); setHeroItems([]); setRequestSections([]); }
       if (homeRes.ok) {
         const homeData = await homeRes.json();
         setHero(homeData.hero || null);
@@ -179,7 +184,7 @@ export default function Home() {
 
     const mediaParam = searchParams.get('media');
     if (mediaParam) {
-      fetch(`/api/media/${mediaParam}`)
+      apiFetch(`/api/media/${mediaParam}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.item) {
@@ -191,7 +196,7 @@ export default function Home() {
 
     const watchParam = searchParams.get('watch');
     if (watchParam) {
-      fetch(`/api/media/${watchParam}`)
+      apiFetch(`/api/media/${watchParam}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.item) {
@@ -473,7 +478,7 @@ export default function Home() {
     <main className="min-h-screen bg-[#141414] text-white selection:bg-red-600 selection:text-white">
       {/* Navigation Header */}
       <Navbar
-        appName={serverConfig.appName}
+        appName={configuredAppName}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isDemoMode={isDemoMode}
@@ -496,7 +501,7 @@ export default function Home() {
           setActiveLibrary(lib);
           setIsSidebarOpen(false);
         }}
-        appName={serverConfig.appName}
+        appName={configuredAppName}
       />
 
       {/* Main Content Area */}
@@ -523,7 +528,7 @@ export default function Home() {
         <div className="h-screen w-full flex flex-col items-center justify-center space-y-4">
           <Loader2 size={48} className="animate-spin text-red-600" />
           <p className="text-sm font-semibold tracking-wide text-neutral-400 uppercase">
-            Loading HomeFlix...
+            Loading {serverConfig.appName || 'HomeStream'}...
           </p>
         </div>
       ) : (
@@ -615,6 +620,8 @@ export default function Home() {
         />
       )}
 
+      {loadError && !isServerSetupOpen && !authStatus.requiresAuth && <div role="alert" className="fixed bottom-8 left-8 right-8 z-40 rounded-lg bg-neutral-900 p-5 border border-red-800"><p>{loadError}</p><button onClick={() => loadHomeData()}>Try again</button></div>}
+
       {/* Initial Setup & Server Settings Modal */}
       <InitialSetupModal
         isOpen={isServerSetupOpen}
@@ -625,7 +632,7 @@ export default function Home() {
       {/* External Authentication Modal (Jellyfin Auth Wall) */}
       {authStatus.requiresAuth && !authStatus.isAuthenticated && (
         <AuthModal
-          appName={serverConfig.appName}
+          appName={configuredAppName}
           onSuccess={() => {
             checkAuth();
             refreshProfiles();
