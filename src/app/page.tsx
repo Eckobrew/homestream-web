@@ -2,6 +2,10 @@
 import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { DiscoverHub } from '@/components/DiscoverHub';
+import { RequestedPanel } from '@/components/RequestedPanel';
+import { AdminIntegrations } from '@/components/AdminIntegrations';
+import { MusicPlayer } from '@/components/MusicPlayer';
 import { Navbar } from '@/components/Navbar';
 import { HeroBanner } from '@/components/HeroBanner';
 import { MediaRow } from '@/components/MediaRow';
@@ -11,7 +15,7 @@ import { RequestDialog } from '@/components/RequestDialog';
 import { SearchOverlay } from '@/components/SearchOverlay';
 import { Sidebar } from '@/components/Sidebar';
 import { LibraryCatalog } from '@/components/LibraryCatalog';
-import { MediaItem, MediaRowSection, Episode } from '@/types';
+import { MediaItem, MediaRowSection, Episode, MusicTrack } from '@/types';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
 import { InitialSetupModal } from '@/components/InitialSetupModal';
@@ -28,6 +32,9 @@ export default function Home() {
   const [jellyfinConnected, setJellyfinConnected] = useState(false);
   const [seerrConnected, setSeerrConnected] = useState(false);
   const [activeTab, setActiveTab] = useState('home');
+  const [music,setMusic]=useState<{tracks:MusicTrack[];index:number}|null>(null);
+  const [canManageIntegrations,setCanManageIntegrations]=useState(false);
+  useEffect(()=>{setMusic(null);},[activeProfile?.id]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isServerSetupOpen, setIsServerSetupOpen] = useState(false);
 
@@ -74,6 +81,7 @@ export default function Home() {
       const res = await apiFetch('/api/auth');
       if (res.ok) {
         const data = await res.json();
+        setCanManageIntegrations(Boolean(data.canManageIntegrations));
         setAuthStatus({
           requiresAuth: Boolean(data.requiresAuth),
           isLocalOrTailscale: Boolean(data.isLocalOrTailscale),
@@ -172,14 +180,16 @@ export default function Home() {
     return () => window.removeEventListener('homeflix-profile-changed', handleProfileChanged);
   }, [loadHomeData]);
 
+  useEffect(()=>{const changed=()=>{void loadHomeData();void refreshProfiles();};window.addEventListener('homestream-integrations-updated',changed);return()=>window.removeEventListener('homestream-integrations-updated',changed);},[loadHomeData,refreshProfiles]);
+
   // Deep linking and SEO routing on initial URL mount
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const searchParams = new URLSearchParams(window.location.search);
 
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['home', 'series', 'movies', 'requests'].includes(tabParam)) {
-      setActiveTab(tabParam);
+    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin'].includes(tabParam)) {
+      setActiveTab(tabParam==='requests'?'discover':tabParam);
     }
 
     const mediaParam = searchParams.get('media');
@@ -233,10 +243,11 @@ export default function Home() {
   // Handlers with URL synchronization
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
+    setSearchQuery('');
     setActiveLibrary(null); // Exit A-Z sidebar view and return to standard tab streaming rows
     if (tab === 'movies') fetchCategories('movies');
     if (tab === 'series') fetchCategories('series');
-    if (tab === 'requests') fetchCategories('requests');
+    if (tab === 'discover') fetchCategories('requests');
     if (typeof window !== 'undefined') {
       const url = tab === 'home' ? '/' : `/?tab=${tab}`;
       window.history.pushState(null, '', url);
@@ -244,6 +255,7 @@ export default function Home() {
   };
 
   const handlePlay = (item: MediaItem, episode?: Episode) => {
+    setMusic(null);
     setPlayingState({ item, episode });
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', `/?watch=${item.id}`);
@@ -384,7 +396,7 @@ export default function Home() {
       return res;
     }
 
-    if (activeTab === 'requests') {
+    if (activeTab === 'discover') {
       const res: MediaRowSection[] = [];
 
       // 1. Recommended for You (based on profile's watched content)
@@ -421,25 +433,6 @@ export default function Home() {
         res.push(...requestCategories);
       }
 
-      // 6. Active / in-progress user downloads and requests placed at the VERY BOTTOM of Request tab
-      const myReqSec = requestSections.find((s) => s.id === 'my-requests');
-      if (myReqSec && myReqSec.items.length > 0) {
-        res.push(myReqSec);
-      } else {
-        const allRequested = [...sections, ...requestSections]
-          .flatMap((s) => s.items)
-          .filter((i) => i.status === 'requested' || i.status === 'processing' || i.isDownloading);
-        const uniqueRequested = Array.from(new Map(allRequested.map((i) => [i.id, i])).values());
-
-        if (uniqueRequested.length > 0) {
-          res.push({
-            id: 'my-requests',
-            title: '⚡ Your Requested Media (Downloading & In-Progress)',
-            items: uniqueRequested,
-          });
-        }
-      }
-
       return res;
     }
 
@@ -449,7 +442,7 @@ export default function Home() {
 
   // Dynamic 5 rotating Hero Items for the active tab (random load + cycle)
   const displayedHeroItems = useMemo(() => {
-    if (activeTab === 'requests') {
+    if (activeTab === 'discover') {
       const recommendedSec = requestSections.find((s) => s.id === 'requests-recommended');
       if (recommendedSec && recommendedSec.items.length > 0) {
         const candidates = recommendedSec.items.filter((i) => i.backdropUrl && i.overview);
@@ -484,9 +477,10 @@ export default function Home() {
         isDemoMode={isDemoMode}
         jellyfinConnected={jellyfinConnected}
         seerrConnected={seerrConnected}
+        canManageIntegrations={canManageIntegrations && !activeProfile?.isKids}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onOpenServerSetup={() => setIsServerSetupOpen(true)}
+        onOpenServerSetup={canManageIntegrations && !activeProfile?.isKids ? ()=>handleTabChange('admin') : undefined}
         isExternal={!authStatus.isLocalOrTailscale}
         onLogout={handleLogout}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
@@ -523,6 +517,12 @@ export default function Home() {
           onBackToHome={() => setActiveLibrary(null)}
           onRequest={handleRequest}
         />
+      ) : activeTab==='requested' ? (
+        <RequestedPanel key={activeProfile?.id || 'default'} onDiscover={()=>handleTabChange('discover')} onOpenMedia={handleOpenModal}/>
+      ) : activeTab==='admin' ? (
+        <AdminIntegrations key={activeProfile?.id || 'default'}/>
+      ) : activeTab==='discover' ? (
+        <DiscoverHub key={activeProfile?.id || 'default'} sections={displayedSections} onPlay={handlePlay} onOpenModal={handleOpenModal} onRequest={handleRequest} onMusic={(tracks,index)=>{setPlayingState(null);setMusic({tracks,index});}} onAdmin={()=>handleTabChange('admin')}/>
       ) : loading ? (
         /* Loading Skeleton */
         <div className="h-screen w-full flex flex-col items-center justify-center space-y-4">
@@ -586,6 +586,7 @@ export default function Home() {
         </div>
       )}
 
+      {music && !activeProfile?.isKids && <MusicPlayer tracks={music.tracks} startIndex={music.index} onClose={()=>setMusic(null)}/>}
       {/* Media Detail Modal */}
       {modalItem && (
         <MediaModal

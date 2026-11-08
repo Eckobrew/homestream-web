@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu } from 'lucide-react';
+import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
 
 interface NavbarProps {
@@ -12,6 +12,7 @@ interface NavbarProps {
   jellyfinConnected: boolean;
   seerrConnected: boolean;
   activeTab: string;
+  canManageIntegrations?: boolean;
   onTabChange: (tab: string) => void;
   onOpenServerSetup?: () => void;
   isExternal?: boolean;
@@ -26,6 +27,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   jellyfinConnected,
   seerrConnected,
   activeTab,
+  canManageIntegrations,
   onTabChange,
   onOpenServerSetup,
   isExternal,
@@ -139,15 +141,17 @@ export const Navbar: React.FC<NavbarProps> = ({
               Movies
             </button>
             <button
-              onClick={() => onTabChange('requests')}
+              onClick={() => onTabChange('discover')}
               className={`transition-colors ${
-                activeTab === 'requests'
+                activeTab === 'discover'
                   ? 'text-white font-bold'
                   : 'text-gray-300 hover:text-gray-100'
               }`}
             >
-              Request Content
+              Discover
             </button>
+            <button onClick={()=>onTabChange('requested')} className={'transition-colors '+(activeTab==='requested'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Requested</button>
+            {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'transition-colors '+(activeTab==='admin'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Admin</button>}
           </div>
         </div>
 
@@ -385,7 +389,7 @@ export const Navbar: React.FC<NavbarProps> = ({
       </nav>
 
       {/* Mobile Bottom Navigation Bar (Pixel 8a / Samsung S26) */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 border-t border-neutral-800/80 backdrop-blur-lg flex items-center justify-around py-1.5 px-2 pb-safe shadow-[0_-10px_25px_rgba(0,0,0,0.8)]">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 border-t border-neutral-800/80 backdrop-blur-lg flex items-center justify-around gap-1 overflow-x-auto py-1.5 px-1 pb-safe shadow-[0_-10px_25px_rgba(0,0,0,0.8)]">
         <button
           onClick={() => {
             onTabChange('home');
@@ -426,33 +430,20 @@ export const Navbar: React.FC<NavbarProps> = ({
         </button>
 
         <button
-          onClick={() => onTabChange('requests')}
+          onClick={() => onTabChange('discover')}
           className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
-            activeTab === 'requests'
+            activeTab === 'discover'
               ? 'text-red-500 font-bold'
               : 'text-neutral-400 hover:text-white'
           }`}
         >
-          <Download size={19} />
-          <span className="text-[10px] tracking-tight">Requests</span>
+          <Compass size={19} />
+          <span className="text-[10px] tracking-tight">Discover</span>
         </button>
+        <button onClick={()=>onTabChange('requested')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='requested'?'text-red-500 font-bold':'text-neutral-400')}><ListChecks size={19}/><span className="text-[10px]">Requested</span></button>
+        {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='admin'?'text-red-500 font-bold':'text-neutral-400')}><ShieldCheck size={19}/><span className="text-[10px]">Admin</span></button>}
 
-        <button
-          onClick={openSelector}
-          className="flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors text-neutral-400 hover:text-white"
-          title="Switch Profile"
-        >
-          <div
-            className={`w-5 h-5 rounded flex items-center justify-center text-[9px] font-bold text-white bg-gradient-to-br ${
-              activeProfile?.avatarColor || 'from-red-600 to-red-800'
-            }`}
-          >
-            {activeProfile?.initials || <User size={13} />}
-          </div>
-          <span className="text-[10px] tracking-tight capitalize truncate max-w-[48px]">
-            {activeProfile?.name || 'Profile'}
-          </span>
-        </button>
+
       </div>
     </>
   );

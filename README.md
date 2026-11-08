@@ -37,3 +37,9 @@ Successful `main` CI runs publish Linux amd64 images to `ghcr.io/eckobrew/homest
 Pushing a `vX.Y.Z` tag publishes the corresponding version; stable version tags also update `latest`, while prereleases do not. Each publishing workflow starts the built image as UID 1001 and checks readiness before pushing that exact image. Authentication uses the workflow's short-lived `GITHUB_TOKEN`, with `packages: write` scoped to publishing; no personal token secret is required.
 
 Use a commit tag or image digest for controlled deployments. `edge` tracks tested main and is not an automatic production redeployment. Pair tested backend/web revisions before upgrading. Newly created GHCR packages default to private; package visibility must be public to permit anonymous pulls.
+
+## Discover, Requested, music and Admin
+
+Discover replaces the Requests tab and combines movie/TV discovery with DroppedNeedle music search and library browsing. Requested tracks all media types with source status, download progress and release dates. Music plays in a persistent queue using authenticated HomeStream audio URLs. Admin configures/tests Jellyfin, Seerr, qBittorrent and DroppedNeedle; blank saved credentials are preserved and existing secrets are never returned. The backend enforces admin and Kids restrictions.
+
+[Android handoff](HANDOFF.md) points to the maintained backend implementation guide and contract 1.2.0. No Android source was changed here.

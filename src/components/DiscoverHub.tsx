@@ -1,0 +1,9 @@
+'use client';
+import React,{useState} from 'react';
+import type {MediaRowSection,MediaItem,MusicTrack} from '@/types';
+import {MediaRow} from './MediaRow';
+import {MusicBrowser} from './MusicBrowser';
+export function DiscoverHub({sections,onPlay,onOpenModal,onRequest,onMusic,onAdmin}:{sections:MediaRowSection[];onPlay:(i:MediaItem)=>void;onOpenModal:(i:MediaItem)=>void;onRequest:(i:MediaItem)=>void;onMusic:(tracks:MusicTrack[],index:number)=>void;onAdmin:()=>void}) {
+ const [filter,setFilter]=useState('all');const rows=sections.filter(s=>s.id!=='my-requests').map(s=>({...s,items:s.items.filter(i=>filter==='movies'?i.type==='Movie':filter==='tv'?i.type!=='Movie':true)})).filter(s=>s.items.length);
+ return <main className="pt-28 md:pt-32 pb-40"><header className="px-4 md:px-12 mb-8"><p className="text-red-400 text-xs uppercase tracking-widest font-bold mb-3">Find your next favourite</p><h1 className="text-3xl md:text-4xl font-bold">Discover</h1><p className="text-neutral-400 mt-3">Explore movies, TV, and music. Request something new and track it in Requested.</p><div className="flex flex-wrap gap-2 mt-6" aria-label="Discover media filters">{[['all','All media'],['movies','Movies'],['tv','TV'],['music','Music']].map(([id,label])=><button key={id} onClick={()=>setFilter(id)} aria-pressed={filter===id} className={'rounded-full px-4 py-2 text-sm '+(filter===id?'bg-white text-black':'bg-neutral-900 text-neutral-300')}>{label}</button>)}</div></header>{filter!=='music' && <div className="space-y-6">{rows.map(s=><MediaRow key={s.id} title={s.title} items={s.items} onPlay={onPlay} onOpenModal={onOpenModal} onRequest={onRequest}/>)}{!rows.length && <p className="px-4 md:px-12 text-neutral-400">Connect Seerr in Admin to discover and request movies and TV.</p>}</div>}{(filter==='all'||filter==='music') && <MusicBrowser onPlay={onMusic} onAdmin={onAdmin}/>}</main>;
+}
