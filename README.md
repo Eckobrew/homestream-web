@@ -29,3 +29,11 @@ Browser integration checks: install Chromium with `npx playwright install chromi
 To enable cross-repository browser checks in GitHub Actions, set `HOMESTREAM_BACKEND_REF` to a tested backend release tag or commit. Ordinary web builds remain independent when this optional integration job is disabled.
 
 Version 1.1 unifies first-run setup, separates playback responsibilities into `src/player`, fixes per-episode progress/cancellation, and uses local demo artwork. Demo mode must be enabled on the backend. Lint enforcement covers extracted modules; the backend repository documents SQLite migration and generated Kotlin clients.
+
+## Docker image publishing
+
+Successful `main` CI runs publish Linux amd64 images to `ghcr.io/eckobrew/homestream-web` with `edge` and full `sha-<commit>` tags. Main publication waits for verification (and enabled browser integration checks in the web repository). Pull requests do not receive registry write access or publish images.
+
+Pushing a `vX.Y.Z` tag publishes the corresponding version; stable version tags also update `latest`, while prereleases do not. Each publishing workflow starts the built image as UID 1001 and checks readiness before pushing that exact image. Authentication uses the workflow's short-lived `GITHUB_TOKEN`, with `packages: write` scoped to publishing; no personal token secret is required.
+
+Use a commit tag or image digest for controlled deployments. `edge` tracks tested main and is not an automatic production redeployment. Pair tested backend/web revisions before upgrading. Newly created GHCR packages default to private; package visibility must be public to permit anonymous pulls.
