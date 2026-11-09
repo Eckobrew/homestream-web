@@ -578,59 +578,63 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
       </header>
 
       {/* Main Content Area */}
-      <main className="px-4 md:px-12 mt-6">
-        {/* VIEW: HOME & EXPLORE */}
-        {currentView === 'home' && (
-          <div className="space-y-10">
-            {/* Featured Hero Banner */}
-            {heroVideo && (
-              <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl">
-                <div className="relative aspect-[21/9] max-h-[460px] w-full overflow-hidden">
-                  <img
-                    src={heroVideo.thumbnailUrl}
-                    alt={heroVideo.title}
-                    className="w-full h-full object-cover filter brightness-75 scale-105"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
-                  <div className="absolute inset-0 bg-gradient-to-r from-black via-black/30 to-transparent" />
+      {currentView === 'home' ? (
+        <div>
+          {/* Full-bleed Edge-to-Edge Hero Banner matching Movies & TV Shows layout */}
+          {heroVideo && (
+            <div className="relative w-full h-[65vh] md:h-[80vh] select-none overflow-hidden group/hero">
+              <div
+                className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
+                style={{ backgroundImage: `url(${heroVideo.thumbnailUrl})` }}
+              />
+              {/* Cinematic Scrims matching HeroBanner */}
+              <div className="absolute inset-0 bg-gradient-to-t from-black via-[#141414]/50 to-transparent pointer-events-none" />
+              <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent w-full md:w-3/4 pointer-events-none" />
 
-                  <div className="absolute bottom-6 left-6 right-6 md:bottom-10 md:left-10 md:right-10 flex flex-col items-start max-w-2xl">
-                    <span className="px-3 py-1 rounded-full bg-red-600 text-[11px] font-bold tracking-wider uppercase mb-3 shadow-md">
-                      Featured Pick
-                    </span>
-                    <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white line-clamp-2 drop-shadow-md">
-                      {heroVideo.title}
-                    </h2>
-                    <p className="text-sm md:text-base text-neutral-300 mt-2 font-medium flex items-center gap-3">
-                      <span>{heroVideo.channelTitle}</span>
-                      {heroVideo.durationFormatted && (
-                        <>
-                          <span>•</span>
-                          <span className="text-neutral-400">{heroVideo.durationFormatted}</span>
-                        </>
-                      )}
-                    </p>
-                    <div className="flex items-center gap-3 mt-5">
-                      <button
-                        onClick={() => handlePlayVideo(heroVideo)}
-                        className="flex items-center gap-2 bg-white text-black hover:bg-neutral-200 px-6 py-2.5 rounded-full font-bold text-sm transition shadow-lg"
-                      >
-                        <Play size={18} className="fill-black" />
-                        <span>Play Now</span>
-                      </button>
-                      <button
-                        onClick={() => handleQueueDownload(heroVideo)}
-                        className="flex items-center gap-2 bg-neutral-800/80 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-full font-semibold text-sm transition border border-neutral-700 backdrop-blur-md"
-                      >
-                        <Download size={16} />
-                        <span>Save to NAS</span>
-                      </button>
-                    </div>
-                  </div>
+              {/* Content Container */}
+              <div className="relative z-30 h-full flex flex-col justify-end px-4 md:px-12 pb-20 md:pb-28 max-w-3xl space-y-3 pointer-events-none">
+                <div className="flex items-center space-x-2 text-xs font-bold tracking-widest text-red-500 uppercase pointer-events-auto">
+                  <span className="bg-red-600 text-white px-2 py-0.5 rounded text-[10px] font-black">
+                    YOUTUBE
+                  </span>
+                  <span className="text-neutral-300 font-semibold">• {heroVideo.channelTitle}</span>
+                  {heroVideo.durationFormatted && (
+                    <span className="text-neutral-400 font-normal">• {heroVideo.durationFormatted}</span>
+                  )}
+                </div>
+
+                <h1 className="text-3xl sm:text-5xl md:text-6xl font-black text-white drop-shadow-md tracking-tight leading-tight line-clamp-2 pointer-events-auto">
+                  {heroVideo.title}
+                </h1>
+
+                {heroVideo.description && (
+                  <p className="text-sm md:text-base text-gray-200 line-clamp-3 leading-relaxed drop-shadow max-w-xl pointer-events-auto">
+                    {heroVideo.description}
+                  </p>
+                )}
+
+                <div className="flex items-center gap-3 pt-2 pointer-events-auto">
+                  <button
+                    onClick={() => handlePlayVideo(heroVideo)}
+                    className="flex items-center gap-2 bg-white text-black hover:bg-neutral-200 px-6 py-2.5 rounded-md font-bold text-sm transition shadow-lg hover:scale-105 active:scale-95"
+                  >
+                    <Play size={18} className="fill-black" />
+                    <span>Play Now</span>
+                  </button>
+                  <button
+                    onClick={() => handleQueueDownload(heroVideo)}
+                    className="flex items-center gap-2 bg-neutral-800/80 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-md font-semibold text-sm transition border border-neutral-700 backdrop-blur-md hover:scale-105 active:scale-95"
+                  >
+                    <Download size={16} />
+                    <span>Save to NAS</span>
+                  </button>
                 </div>
               </div>
-            )}
+            </div>
+          )}
 
+          {/* Media Rows overlapping or under Hero */}
+          <div className={`relative z-20 ${heroVideo ? '-mt-12 md:-mt-20' : 'mt-6'} px-4 md:px-12 space-y-8 pb-16`}>
             {/* Continue Watching Row */}
             {continueWatching.length > 0 && (
               <section className="space-y-3">
@@ -746,9 +750,10 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
               ))
             )}
           </div>
-        )}
-
-        {/* VIEW: SEARCH RESULTS */}
+        </div>
+      ) : (
+        <main className="px-4 md:px-12 mt-6">
+          {/* VIEW: SEARCH RESULTS */}
         {currentView === 'search' && (
           <div className="space-y-6">
             <div className="flex items-center justify-between flex-wrap gap-3">
@@ -992,6 +997,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
           </div>
         )}
       </main>
+      )}
 
       {/* YouTube Account Auth Modal */}
       {isAuthModalOpen && (
