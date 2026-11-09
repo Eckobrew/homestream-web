@@ -17,6 +17,8 @@ import {
   EyeOff,
   Sparkles,
   Download,
+  Film,
+  Tv,
 } from 'lucide-react';
 
 interface InitialSetupModalProps {
@@ -57,6 +59,28 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
   const [qbittorrentPassword, setQbittorrentPassword] = useState('');
   const [showQbittorrentPassword, setShowQbittorrentPassword] = useState(false);
   const [downloadsPath, setDownloadsPath] = useState('/downloads');
+
+  // Radarr form state
+  const [radarrUrl, setRadarrUrl] = useState('');
+  const [radarrApiKey, setRadarrApiKey] = useState('');
+  const [showRadarrKey, setShowRadarrKey] = useState(false);
+  const [isTestingRadarr, setIsTestingRadarr] = useState(false);
+  const [radarrTestStatus, setRadarrTestStatus] = useState<{
+    success?: boolean;
+    version?: string;
+    error?: string;
+  } | null>(null);
+
+  // Sonarr form state
+  const [sonarrUrl, setSonarrUrl] = useState('');
+  const [sonarrApiKey, setSonarrApiKey] = useState('');
+  const [showSonarrKey, setShowSonarrKey] = useState(false);
+  const [isTestingSonarr, setIsTestingSonarr] = useState(false);
+  const [sonarrTestStatus, setSonarrTestStatus] = useState<{
+    success?: boolean;
+    version?: string;
+    error?: string;
+  } | null>(null);
 
   // Test status states
   const [isTestingJellyfin, setIsTestingJellyfin] = useState(false);
@@ -103,6 +127,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           if (cfg.qbittorrentUrl) setQbittorrentUrl(cfg.qbittorrentUrl);
           if (cfg.qbittorrentUsername) setQbittorrentUsername(cfg.qbittorrentUsername);
           if (cfg.downloadsPath) setDownloadsPath(cfg.downloadsPath);
+          if (cfg.radarrUrl) setRadarrUrl(cfg.radarrUrl);
+          if (cfg.sonarrUrl) setSonarrUrl(cfg.sonarrUrl);
+          if (cfg.hasRadarrKey) setRadarrTestStatus({ success: true });
+          if (cfg.hasSonarrKey) setSonarrTestStatus({ success: true });
           if (cfg.hasJellyfinKey) {
             setJellyfinTestStatus({ success: true, serverName: 'Configured' });
           }
@@ -207,6 +235,46 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  // Test Radarr connection
+  const handleTestRadarr = async () => {
+    if (!radarrUrl.trim()) return;
+    setIsTestingRadarr(true);
+    setRadarrTestStatus(null);
+    try {
+      const res = await apiFetch('/api/config?action=test-radarr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: radarrUrl.trim(), apiKey: radarrApiKey.trim() }),
+      });
+      const data = await res.json();
+      setRadarrTestStatus(data);
+    } catch {
+      setRadarrTestStatus({ success: false, error: 'Connection failed' });
+    } finally {
+      setIsTestingRadarr(false);
+    }
+  };
+
+  // Test Sonarr connection
+  const handleTestSonarr = async () => {
+    if (!sonarrUrl.trim()) return;
+    setIsTestingSonarr(true);
+    setSonarrTestStatus(null);
+    try {
+      const res = await apiFetch('/api/config?action=test-sonarr', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: sonarrUrl.trim(), apiKey: sonarrApiKey.trim() }),
+      });
+      const data = await res.json();
+      setSonarrTestStatus(data);
+    } catch {
+      setSonarrTestStatus({ success: false, error: 'Connection failed' });
+    } finally {
+      setIsTestingSonarr(false);
+    }
+  };
+
   // Save server configuration and move to Step 2 (Profiles)
   const handleSaveServers = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -231,6 +299,10 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           qbittorrentUsername: qbittorrentUsername.trim(),
           ...(qbittorrentPassword.trim() ? { qbittorrentPassword: qbittorrentPassword.trim() } : {}),
           downloadsPath: downloadsPath.trim(),
+          radarrUrl: radarrUrl.trim(),
+          ...(radarrApiKey.trim() ? { radarrApiKey: radarrApiKey.trim() } : {}),
+          sonarrUrl: sonarrUrl.trim(),
+          ...(sonarrApiKey.trim() ? { sonarrApiKey: sonarrApiKey.trim() } : {}),
         }),
       });
 
@@ -671,6 +743,200 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       </>
                     ) : (
                       <span>Test qBittorrent Connection</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Radarr Movie Indexer Integration */}
+            <div className="bg-neutral-950/70 border border-neutral-800/90 rounded-xl p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-600/20 text-amber-400 flex items-center justify-center font-bold">
+                    <Film size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      Radarr Movies <span className="text-neutral-500 text-xs font-normal">(Optional - Direct Swarm Streaming)</span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-400">
+                      Enables streaming movies instantly without enqueuing downloads to qBittorrent.
+                    </p>
+                  </div>
+                </div>
+
+                {radarrTestStatus && (
+                  <div
+                    className={`flex items-center space-x-1 text-xs px-2.5 py-1 rounded-full border ${
+                      radarrTestStatus.success
+                        ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+                        : 'bg-red-950/60 border-red-800/80 text-red-300'
+                    }`}
+                  >
+                    {radarrTestStatus.success ? (
+                      <>
+                        <CheckCircle2 size={13} className="text-emerald-400" />
+                        <span>Connected {radarrTestStatus.version ? `(v${radarrTestStatus.version})` : ''}</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={13} className="text-red-400" />
+                        <span>Failed</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                    Radarr URL
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="http://192.168.1.146:7878"
+                    value={radarrUrl}
+                    onChange={(e) => setRadarrUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-white text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 placeholder-neutral-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                    Radarr API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showRadarrKey ? 'text' : 'password'}
+                      placeholder="e.g. bb133d9730..."
+                      value={radarrApiKey}
+                      onChange={(e) => setRadarrApiKey(e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-white text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 placeholder-neutral-500 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowRadarrKey(!showRadarrKey)}
+                      className="absolute right-3 top-3 text-neutral-400 hover:text-white"
+                      tabIndex={-1}
+                    >
+                      {showRadarrKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestRadarr}
+                    disabled={isTestingRadarr || !radarrUrl.trim()}
+                    className="px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
+                  >
+                    {isTestingRadarr ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Testing...</span>
+                      </>
+                    ) : (
+                      <span>Test Radarr Connection</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Sonarr Series Indexer Integration */}
+            <div className="bg-neutral-950/70 border border-neutral-800/90 rounded-xl p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-sky-600/20 text-sky-400 flex items-center justify-center font-bold">
+                    <Tv size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      Sonarr TV Series <span className="text-neutral-500 text-xs font-normal">(Optional - Direct Swarm Streaming)</span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-400">
+                      Enables streaming TV episodes and season packs directly on demand.
+                    </p>
+                  </div>
+                </div>
+
+                {sonarrTestStatus && (
+                  <div
+                    className={`flex items-center space-x-1 text-xs px-2.5 py-1 rounded-full border ${
+                      sonarrTestStatus.success
+                        ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+                        : 'bg-red-950/60 border-red-800/80 text-red-300'
+                    }`}
+                  >
+                    {sonarrTestStatus.success ? (
+                      <>
+                        <CheckCircle2 size={13} className="text-emerald-400" />
+                        <span>Connected {sonarrTestStatus.version ? `(v${sonarrTestStatus.version})` : ''}</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={13} className="text-red-400" />
+                        <span>Failed</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                    Sonarr URL
+                  </label>
+                  <input
+                    type="url"
+                    placeholder="http://192.168.1.146:8989"
+                    value={sonarrUrl}
+                    onChange={(e) => setSonarrUrl(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-white text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 placeholder-neutral-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                    Sonarr API Key
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showSonarrKey ? 'text' : 'password'}
+                      placeholder="e.g. 04a58bd621..."
+                      value={sonarrApiKey}
+                      onChange={(e) => setSonarrApiKey(e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-white text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 placeholder-neutral-500 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowSonarrKey(!showSonarrKey)}
+                      className="absolute right-3 top-3 text-neutral-400 hover:text-white"
+                      tabIndex={-1}
+                    >
+                      {showSonarrKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestSonarr}
+                    disabled={isTestingSonarr || !sonarrUrl.trim()}
+                    className="px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
+                  >
+                    {isTestingSonarr ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Testing...</span>
+                      </>
+                    ) : (
+                      <span>Test Sonarr Connection</span>
                     )}
                   </button>
                 </div>
