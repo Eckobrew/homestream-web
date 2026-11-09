@@ -1,13 +1,13 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server } from 'lucide-react';
+import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server, Music } from 'lucide-react';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeLibrary: 'movies' | 'tv' | 'youtube' | null;
-  onSelectLibrary: (lib: 'movies' | 'tv' | 'youtube' | null) => void;
+  activeLibrary: 'movies' | 'tv' | 'youtube' | 'music' | null;
+  onSelectLibrary: (lib: 'movies' | 'tv' | 'youtube' | 'music' | null) => void;
   appName?: string;
 }
 
@@ -63,6 +63,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
       icon: PlaySquare,
       badge: 'Hub',
       color: 'from-red-600 to-rose-700',
+    },
+    {
+      id: 'music' as const,
+      name: 'Music Hub',
+      description: 'Spotify-style personal music library',
+      icon: Music,
+      badge: 'Spotify',
+      color: 'from-emerald-600 to-green-700',
     },
   ];
 

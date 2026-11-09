@@ -6,6 +6,7 @@ import { DiscoverHub } from '@/components/DiscoverHub';
 import { RequestedPanel } from '@/components/RequestedPanel';
 import { AdminIntegrations } from '@/components/AdminIntegrations';
 import { MusicPlayer } from '@/components/MusicPlayer';
+import { MusicBrowser } from '@/components/MusicBrowser';
 import { Navbar } from '@/components/Navbar';
 import { HeroBanner } from '@/components/HeroBanner';
 import { MediaRow } from '@/components/MediaRow';
@@ -41,7 +42,7 @@ export default function Home() {
 
   // Dedicated Hideable Sidebar & A-Z Library Catalog States
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeLibrary, setActiveLibrary] = useState<'movies' | 'tv' | 'youtube' | null>(null);
+  const [activeLibrary, setActiveLibrary] = useState<'movies' | 'tv' | 'youtube' | 'music' | null>(null);
 
   // Netflix-style Category Rows for Movies and TV Shows Pages
   const [movieCategories, setMovieCategories] = useState<MediaRowSection[]>([]);
@@ -515,6 +516,16 @@ export default function Home() {
           onPlay={handlePlay}
           onBackToHome={() => setActiveLibrary(null)}
         />
+      ) : activeLibrary === 'music' ? (
+        /* Dedicated Spotify-Styled Music Hub */
+        <div className="pt-24 min-h-screen">
+          <MusicBrowser
+            onPlay={(t, i) => setMusic({ tracks: t, index: i })}
+            onAdmin={() => setIsServerSetupOpen(true)}
+            activeProfileId={activeProfile?.id}
+            onBackToHome={() => setActiveLibrary(null)}
+          />
+        </div>
       ) : activeLibrary ? (
         /* Dedicated A-Z Jellyfin Library Page (Movies / TV Shows) */
         <LibraryCatalog
