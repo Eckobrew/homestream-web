@@ -57,20 +57,20 @@ export const Sidebar: React.FC<SidebarProps> = ({
       color: 'from-purple-600 to-pink-700',
     },
     {
-      id: 'youtube' as const,
-      name: 'YouTube',
-      description: 'Search, stream, subscribe & archive',
-      icon: PlaySquare,
-      badge: 'Hub',
-      color: 'from-red-600 to-rose-700',
-    },
-    {
       id: 'music' as const,
       name: 'Music Hub',
       description: 'Personal music library & streaming',
       icon: Music,
       badge: 'Hub',
       color: 'from-emerald-600 to-green-700',
+    },
+    {
+      id: 'youtube' as const,
+      name: 'YouTube',
+      description: 'Search, stream, subscribe & archive',
+      icon: PlaySquare,
+      badge: 'Hub',
+      color: 'from-red-600 to-rose-700',
     },
   ];
 
