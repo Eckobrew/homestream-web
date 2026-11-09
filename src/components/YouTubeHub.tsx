@@ -20,6 +20,12 @@ import {
   X,
   PlaySquare,
   Sparkles,
+  UserCheck,
+  LogIn,
+  Key,
+  Flame,
+  Film,
+  History,
 } from 'lucide-react';
 import { MediaItem } from '@/types';
 
@@ -86,6 +92,18 @@ export interface YouTubeArchiveItem {
   streamUrl: string;
 }
 
+export interface YouTubeContinueItem {
+  videoId: string;
+  title: string;
+  channelName?: string;
+  thumbnailUrl: string;
+  positionSeconds: number;
+  durationSeconds: number;
+  progressPercent: number;
+  streamUrl: string;
+  updatedAt: string;
+}
+
 interface YouTubeHubProps {
   onPlay: (item: MediaItem) => void;
   onBackToHome: () => void;
@@ -109,43 +127,91 @@ function formatDurationSeconds(sec?: number): string {
 }
 
 export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) => {
-  const [activeTab, setActiveTab] = useState<'search' | 'subscriptions' | 'queue' | 'archive'>('search');
+  const [currentView, setCurrentView] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
+
+  // Home / Discovery State
+  const [heroVideo, setHeroVideo] = useState<YouTubeSearchResult | null>(null);
+  const [sections, setSections] = useState<Array<{ id: string; title: string; items: YouTubeSearchResult[] }>>([]);
+  const [continueWatching, setContinueWatching] = useState<YouTubeContinueItem[]>([]);
+  const [isLoadingHome, setIsLoadingHome] = useState(false);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<YouTubeSearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchFilter, setSearchFilter] = useState<'all' | 'podcasts' | 'longform'>('all');
-  const [resolvingStreamId, setResolvingStreamId] = useState<string | null>(null);
 
   // Subscriptions State
   const [subscriptions, setSubscriptions] = useState<YouTubeSubscription[]>([]);
   const [isLoadingSubs, setIsLoadingSubs] = useState(false);
   const [isAddSubModalOpen, setIsAddSubModalOpen] = useState(false);
   const [newSubChannelInput, setNewSubChannelInput] = useState('');
-  const [newSubMinDuration, setNewSubMinDuration] = useState(30); // 30 mins
+  const [newSubMinDuration, setNewSubMinDuration] = useState(30);
   const [newSubExcludeKeywords, setNewSubExcludeKeywords] = useState('shorts,clip,teaser,trailer,highlight');
   const [newSubIncludeKeywords, setNewSubIncludeKeywords] = useState('');
   const [newSubAutoDownload, setNewSubAutoDownload] = useState(true);
   const [newSubIgnoreShorts, setNewSubIgnoreShorts] = useState(true);
   const [isSubmittingSub, setIsSubmittingSub] = useState(false);
   const [subModalError, setSubModalError] = useState<string | null>(null);
-  const [checkingChannelId, setCheckingChannelId] = useState<string | null>(null);
 
   // Queue State
   const [downloadQueue, setDownloadQueue] = useState<YouTubeDownloadItem[]>([]);
-  const [isLoadingQueue, setIsLoadingQueue] = useState(false);
 
   // Archive State
   const [archiveItems, setArchiveItems] = useState<YouTubeArchiveItem[]>([]);
   const [isLoadingArchive, setIsLoadingArchive] = useState(false);
-  const [archiveChannelFilter, setArchiveChannelFilter] = useState<string>('all');
 
-  // Toast / notification message
+  // YouTube Account Auth State
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authStatus, setAuthStatus] = useState<{ connected: boolean; accountName?: string }>({ connected: false });
+  const [cookiesInput, setCookiesInput] = useState('');
+  const [accountNameInput, setAccountNameInput] = useState('');
+  const [isSavingAuth, setIsSavingAuth] = useState(false);
+
+  // Toast / feedback message
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 4000);
+  }, []);
+
+  // Fetch Auth Status
+  const loadAuthStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/youtube/auth');
+      if (res.ok) {
+        const data = await res.json();
+        setAuthStatus(data);
+      }
+    } catch {}
+  }, []);
+
+  // Fetch Continue Watching
+  const loadContinueWatching = useCallback(async () => {
+    try {
+      const res = await apiFetch('/api/youtube/continue-watching');
+      if (res.ok) {
+        const data = await res.json();
+        setContinueWatching(data.items || []);
+      }
+    } catch {}
+  }, []);
+
+  // Fetch Recommendations & Media Sections
+  const loadHomeRecommendations = useCallback(async () => {
+    setIsLoadingHome(true);
+    try {
+      const res = await apiFetch('/api/youtube/recommendations');
+      if (res.ok) {
+        const data = await res.json();
+        setHeroVideo(data.hero || null);
+        setSections(data.sections || []);
+      }
+    } catch (err) {
+      console.error('Failed fetching YouTube recommendations:', err);
+    } finally {
+      setIsLoadingHome(false);
+    }
   }, []);
 
   // Fetch Subscriptions
@@ -172,9 +238,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
         const data = await res.json();
         setDownloadQueue(data.queue || []);
       }
-    } catch (err) {
-      console.error('Failed fetching download queue:', err);
-    }
+    } catch {}
   }, []);
 
   // Fetch Archive
@@ -186,21 +250,22 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
         const data = await res.json();
         setArchiveItems(data.items || []);
       }
-    } catch (err) {
-      console.error('Failed fetching archive:', err);
-    } finally {
+    } catch {} finally {
       setIsLoadingArchive(false);
     }
   }, []);
 
   // Initial load
   useEffect(() => {
+    loadAuthStatus();
+    loadContinueWatching();
+    loadHomeRecommendations();
     loadSubscriptions();
     loadQueue();
     loadArchive();
-  }, [loadSubscriptions, loadQueue, loadArchive]);
+  }, [loadAuthStatus, loadContinueWatching, loadHomeRecommendations, loadSubscriptions, loadQueue, loadArchive]);
 
-  // Periodic polling for queue if active items exist
+  // Periodic polling for queue & continue watching
   useEffect(() => {
     const hasActive = downloadQueue.some((q) => q.status === 'downloading' || q.status === 'queued');
     const interval = setInterval(() => {
@@ -208,7 +273,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
       if (hasActive) {
         loadArchive();
       }
-    }, hasActive ? 3000 : 10000);
+    }, hasActive ? 3000 : 12000);
 
     return () => clearInterval(interval);
   }, [downloadQueue, loadQueue, loadArchive]);
@@ -218,6 +283,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
     if (e) e.preventDefault();
     if (!searchQuery.trim()) return;
 
+    setCurrentView('search');
     setIsSearching(true);
     try {
       const res = await apiFetch(`/api/youtube/search?q=${encodeURIComponent(searchQuery.trim())}`);
@@ -233,48 +299,55 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
     }
   };
 
-  // Filtered search results
-  const filteredSearchResults = useMemo(() => {
-    if (searchFilter === 'podcasts') {
-      return searchResults.filter((r) => r.durationSeconds >= 20 * 60);
-    }
-    if (searchFilter === 'longform') {
-      return searchResults.filter((r) => r.durationSeconds >= 60 * 60);
-    }
-    return searchResults;
-  }, [searchResults, searchFilter]);
+  // Stream Resolution & Play (Direct via proxy-stream for 100% reliable playback)
+  const handlePlayVideo = (video: { id: string; title: string; thumbnailUrl?: string; durationSeconds?: number; channelTitle?: string; description?: string }) => {
+    const videoStreamUrl = `/api/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`;
 
-  // Stream Resolution & Play
-  const handlePlayStream = async (video: YouTubeSearchResult | { id: string; title: string; thumbnailUrl?: string; durationSeconds?: number }) => {
-    setResolvingStreamId(video.id);
+    const mediaItem: MediaItem = {
+      id: `yt-${video.id}`,
+      title: video.title,
+      overview: video.description || `Channel: ${video.channelTitle || 'YouTube'}`,
+      type: 'Movie',
+      posterUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+      backdropUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
+      durationMinutes: video.durationSeconds ? Math.round(video.durationSeconds / 60) : 0,
+      genres: ['YouTube', video.channelTitle || 'YouTube'],
+      source: 'youtube' as any,
+      status: 'available',
+      videoStreamUrl,
+    };
+
+    onPlay(mediaItem);
+  };
+
+  // Resume Continue Watching
+  const handleResumeContinueWatching = (item: YouTubeContinueItem) => {
+    const mediaItem: MediaItem = {
+      id: `yt-${item.videoId}`,
+      title: item.title,
+      overview: item.channelName || 'YouTube',
+      type: 'Movie',
+      posterUrl: item.thumbnailUrl,
+      backdropUrl: item.thumbnailUrl,
+      durationMinutes: item.durationSeconds ? Math.round(item.durationSeconds / 60) : 0,
+      playbackPositionTicks: Math.round(item.positionSeconds * 10000000),
+      genres: ['YouTube', item.channelName || 'YouTube'],
+      source: 'youtube' as any,
+      status: 'available',
+      videoStreamUrl: item.streamUrl || `/api/youtube/stream-video?videoId=${encodeURIComponent(item.videoId)}`,
+    };
+
+    onPlay(mediaItem);
+  };
+
+  // Dismiss Continue Watching item
+  const handleDismissContinue = async (e: React.MouseEvent, videoId: string) => {
+    e.stopPropagation();
     try {
-      const res = await apiFetch(`/api/youtube/stream?videoId=${encodeURIComponent(video.id)}`);
-      if (!res.ok) throw new Error('Could not resolve stream');
-      const data = await res.json();
-      if (!data.streamUrl) throw new Error('No stream URL available');
-
-      // Create a transient MediaItem to play inside BuiltinPlayer
-      const mediaItem: MediaItem = {
-        id: `yt-${video.id}`,
-        title: video.title,
-        overview: (video as any).description || 'YouTube Stream',
-        type: 'Movie',
-        posterUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
-        backdropUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
-        durationMinutes: video.durationSeconds ? Math.round(video.durationSeconds / 60) : 0,
-        genres: ['YouTube', (video as any).channelTitle || 'YouTube'],
-        source: 'demo' as any,
-        status: 'available',
-        videoStreamUrl: data.streamUrl,
-      };
-
-      onPlay(mediaItem);
-    } catch (err) {
-      console.error('Failed playing YouTube video:', err);
-      showToast('Failed to stream video. It may be restricted.');
-    } finally {
-      setResolvingStreamId(null);
-    }
+      await apiFetch(`/api/youtube/progress?videoId=${encodeURIComponent(videoId)}`, { method: 'DELETE' });
+      setContinueWatching((prev) => prev.filter((p) => p.videoId !== videoId));
+      showToast('Removed from continue watching');
+    } catch {}
   };
 
   // Play from Archive (local NAS storage)
@@ -287,7 +360,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
       posterUrl: item.thumbnailUrl || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
       backdropUrl: item.thumbnailUrl || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`,
       genres: ['YouTube', item.channelName],
-      source: 'demo' as any,
+      source: 'youtube' as any,
       status: 'available',
       videoStreamUrl: item.streamUrl,
     };
@@ -295,7 +368,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
     onPlay(mediaItem);
   };
 
-  // Queue Video Download
+  // Queue Video Download to NAS
   const handleQueueDownload = async (video: YouTubeSearchResult) => {
     try {
       const res = await apiFetch('/api/youtube/download', {
@@ -313,17 +386,63 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
       });
 
       if (res.ok) {
-        showToast(`Queued "${video.title.slice(0, 35)}..." for download`);
+        showToast(`Queued "${video.title}" for download to NAS`);
         loadQueue();
       } else {
-        showToast('Could not queue download');
+        const err = await res.json();
+        showToast(err.error || 'Failed to queue download');
       }
     } catch {
       showToast('Failed to queue download');
     }
   };
 
-  // Add Subscription
+  // Save YouTube Auth (Cookies / Session)
+  const handleSaveAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!cookiesInput.trim()) return;
+
+    setIsSavingAuth(true);
+    try {
+      const res = await apiFetch('/api/youtube/auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          cookiesText: cookiesInput.trim(),
+          accountName: accountNameInput.trim() || undefined,
+        }),
+      });
+
+      if (res.ok) {
+        showToast('YouTube account connected! Syncing recommendations...');
+        setIsAuthModalOpen(false);
+        setCookiesInput('');
+        loadAuthStatus();
+        loadHomeRecommendations();
+      } else {
+        showToast('Failed saving YouTube account credentials.');
+      }
+    } catch {
+      showToast('Failed connecting YouTube account.');
+    } finally {
+      setIsSavingAuth(false);
+    }
+  };
+
+  // Disconnect YouTube Auth
+  const handleDisconnectAuth = async () => {
+    try {
+      await apiFetch('/api/youtube/auth', { method: 'DELETE' });
+      setAuthStatus({ connected: false });
+      showToast('YouTube account disconnected.');
+      setIsAuthModalOpen(false);
+      loadHomeRecommendations();
+    } catch {
+      showToast('Failed to disconnect.');
+    }
+  };
+
+  // Submit Add Subscription
   const handleAddSubscription = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newSubChannelInput.trim()) return;
@@ -339,902 +458,712 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
           channelUrlOrHandle: newSubChannelInput.trim(),
           autoDownload: newSubAutoDownload,
           minDurationSeconds: newSubMinDuration * 60,
-          excludeKeywords: newSubExcludeKeywords
-            .split(',')
-            .map((k) => k.trim())
-            .filter(Boolean),
-          includeKeywords: newSubIncludeKeywords
-            .split(',')
-            .map((k) => k.trim())
-            .filter(Boolean),
+          excludeKeywords: newSubExcludeKeywords.split(',').map((s) => s.trim()).filter(Boolean),
+          includeKeywords: newSubIncludeKeywords.split(',').map((s) => s.trim()).filter(Boolean),
           ignoreShorts: newSubIgnoreShorts,
         }),
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        showToast(`Subscribed to ${data.subscription.title}`);
+      if (!res.ok) {
+        setSubModalError(data.error || 'Failed to subscribe to channel');
+      } else {
+        showToast(`Subscribed to ${data.subscription?.title || 'channel'}`);
         setIsAddSubModalOpen(false);
         setNewSubChannelInput('');
         loadSubscriptions();
-      } else {
-        setSubModalError(data.error || 'Failed to add subscription');
       }
     } catch (err: any) {
-      setSubModalError(err?.message || 'Network error adding subscription');
+      setSubModalError(err.message || 'Error subscribing to channel');
     } finally {
       setIsSubmittingSub(false);
     }
   };
 
-  // Check Channel New Uploads
-  const handleCheckChannel = async (channelId?: string) => {
-    setCheckingChannelId(channelId || 'all');
-    try {
-      const res = await apiFetch('/api/youtube/subscriptions/check', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(channelId ? { channelId } : {}),
-      });
-
-      const data = await res.json();
-      if (res.ok) {
-        showToast(
-          channelId
-            ? `Checked channel: ${data.downloadedCount || 0} new episode(s) queued`
-            : 'Polled all channel subscriptions'
-        );
-        loadQueue();
-        loadSubscriptions();
-      } else {
-        showToast('Failed checking channel');
-      }
-    } catch {
-      showToast('Error checking channel uploads');
-    } finally {
-      setCheckingChannelId(null);
-    }
-  };
-
-  // Delete Subscription
-  const handleDeleteSubscription = async (id: string, title: string) => {
-    if (!confirm(`Are you sure you want to unsubscribe from "${title}"?`)) return;
-
-    try {
-      const res = await apiFetch(`/api/youtube/subscriptions?id=${encodeURIComponent(id)}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        showToast(`Unsubscribed from ${title}`);
-        loadSubscriptions();
-      }
-    } catch {
-      showToast('Failed to unsubscribe');
-    }
-  };
-
-  // Cancel Download
-  const handleCancelDownload = async (videoId: string) => {
-    try {
-      const res = await apiFetch(`/api/youtube/queue?videoId=${encodeURIComponent(videoId)}`, {
-        method: 'DELETE',
-      });
-      if (res.ok) {
-        showToast('Removed from download queue');
-        loadQueue();
-      }
-    } catch {
-      showToast('Failed to cancel download');
-    }
-  };
-
-  // Distinct channels in archive
-  const archiveChannels = useMemo(() => {
-    const set = new Set<string>();
-    archiveItems.forEach((item) => set.add(item.channelName));
-    return ['all', ...Array.from(set)];
-  }, [archiveItems]);
-
-  // Filtered archive items
-  const filteredArchiveItems = useMemo(() => {
-    if (archiveChannelFilter === 'all') return archiveItems;
-    return archiveItems.filter((i) => i.channelName === archiveChannelFilter);
-  }, [archiveItems, archiveChannelFilter]);
-
-  // Total archive stats
-  const archiveTotalBytes = useMemo(() => {
-    return archiveItems.reduce((acc, cur) => acc + cur.fileSize, 0);
-  }, [archiveItems]);
-
   return (
-    <div className="min-h-screen bg-[#141414] text-white pt-20 pb-24 px-4 sm:px-8 max-w-7xl mx-auto">
+    <div className="min-h-screen bg-black text-white pb-32">
       {/* Toast Notification */}
       {toastMessage && (
-        <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 border border-neutral-700 px-5 py-3 rounded-xl shadow-2xl flex items-center space-x-3 text-sm font-medium animate-in fade-in slide-in-from-bottom-2">
-          <Sparkles size={18} className="text-red-500 shrink-0" />
-          <span>{toastMessage}</span>
+        <div className="fixed bottom-24 right-6 z-50 bg-neutral-900 border border-neutral-700 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center gap-3 animate-fade-in">
+          <Sparkles size={18} className="text-red-500 animate-pulse" />
+          <span className="text-sm font-medium">{toastMessage}</span>
         </div>
       )}
 
-      {/* Top Bar with Back Button & Title */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8 pb-6 border-b border-neutral-800">
-        <div className="flex items-center space-x-4">
-          <button
-            onClick={onBackToHome}
-            className="p-2.5 rounded-full bg-neutral-900/80 hover:bg-neutral-800 border border-neutral-800 transition text-neutral-300 hover:text-white"
-            title="Back to Home"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <div>
-            <div className="flex items-center space-x-2.5">
-              <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center shadow-lg shadow-red-950/40">
+      {/* Top Header / Navigation Bar */}
+      <header className="sticky top-0 z-40 bg-black/90 backdrop-blur-md border-b border-neutral-800/80 px-4 md:px-12 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <button
+              onClick={onBackToHome}
+              className="p-2 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition"
+              title="Back to Home"
+            >
+              <ArrowLeft size={20} />
+            </button>
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center shadow-lg shadow-red-900/40">
                 <PlaySquare size={18} className="text-white fill-white" />
               </div>
-              <h1 className="text-2xl font-black tracking-tight text-white">YouTube Hub</h1>
-              <span className="text-[11px] font-bold uppercase tracking-wider bg-red-950/80 text-red-400 border border-red-800/60 px-2 py-0.5 rounded-full">
-                Dedicated
-              </span>
-            </div>
-            <p className="text-xs text-neutral-400 mt-1">
-              Search & stream public YouTube videos, subscribe to podcast channels, and manage local downloads
-            </p>
-          </div>
-        </div>
-
-        {/* Sub-Navigation Tabs */}
-        <div className="flex items-center bg-neutral-900/90 border border-neutral-800 p-1 rounded-xl self-start md:self-auto">
-          <button
-            onClick={() => setActiveTab('search')}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'search'
-                ? 'bg-red-600 text-white shadow-md'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <Search size={14} />
-            <span>Search & Stream</span>
-          </button>
-          <button
-            onClick={() => setActiveTab('subscriptions')}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'subscriptions'
-                ? 'bg-red-600 text-white shadow-md'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <Radio size={14} />
-            <span>Subscriptions</span>
-            {subscriptions.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-black/40 rounded-full text-[10px]">
-                {subscriptions.length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('queue')}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'queue'
-                ? 'bg-red-600 text-white shadow-md'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <Download size={14} />
-            <span>Queue</span>
-            {downloadQueue.filter((q) => q.status === 'downloading' || q.status === 'queued').length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-amber-500 text-black font-extrabold rounded-full text-[10px]">
-                {downloadQueue.filter((q) => q.status === 'downloading' || q.status === 'queued').length}
-              </span>
-            )}
-          </button>
-          <button
-            onClick={() => setActiveTab('archive')}
-            className={`flex items-center space-x-2 px-3.5 py-1.5 rounded-lg text-xs font-bold transition ${
-              activeTab === 'archive'
-                ? 'bg-red-600 text-white shadow-md'
-                : 'text-neutral-400 hover:text-neutral-200'
-            }`}
-          >
-            <HardDrive size={14} />
-            <span>Archive</span>
-            {archiveItems.length > 0 && (
-              <span className="ml-1 px-1.5 py-0.2 bg-black/40 rounded-full text-[10px]">
-                {archiveItems.length}
-              </span>
-            )}
-          </button>
-        </div>
-      </div>
-
-      {/* TAB 1: Search & Stream */}
-      {activeTab === 'search' && (
-        <div className="space-y-6">
-          {/* Search Box & Filters */}
-          <div className="bg-neutral-900/60 border border-neutral-800 p-4 rounded-2xl">
-            <form onSubmit={handleSearch} className="flex gap-2.5">
-              <div className="relative flex-1">
-                <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search YouTube videos, podcasts, shows (e.g. Joe Rogan, Lex Fridman, Huberman)..."
-                  className="w-full pl-10 pr-4 py-2.5 bg-neutral-950 border border-neutral-700/80 rounded-xl text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 transition"
-                />
-              </div>
-              <button
-                type="submit"
-                disabled={isSearching || !searchQuery.trim()}
-                className="px-5 py-2.5 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl font-bold text-sm flex items-center space-x-2 transition shrink-0 shadow-lg shadow-red-950/40"
-              >
-                {isSearching ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                <span>Search</span>
-              </button>
-            </form>
-
-            {/* Quick Filter Pills */}
-            <div className="flex items-center space-x-2 mt-3 pt-3 border-t border-neutral-800/60 text-xs font-semibold">
-              <span className="text-neutral-500 text-[11px] uppercase tracking-wider">Duration Filter:</span>
-              <button
-                onClick={() => setSearchFilter('all')}
-                className={`px-3 py-1 rounded-full transition ${
-                  searchFilter === 'all'
-                    ? 'bg-neutral-200 text-black font-bold'
-                    : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-                }`}
-              >
-                All Videos
-              </button>
-              <button
-                onClick={() => setSearchFilter('podcasts')}
-                className={`px-3 py-1 rounded-full transition flex items-center space-x-1 ${
-                  searchFilter === 'podcasts'
-                    ? 'bg-red-600 text-white font-bold'
-                    : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-                }`}
-              >
-                <span>🎙️ Full Podcasts (≥ 20m)</span>
-              </button>
-              <button
-                onClick={() => setSearchFilter('longform')}
-                className={`px-3 py-1 rounded-full transition flex items-center space-x-1 ${
-                  searchFilter === 'longform'
-                    ? 'bg-red-600 text-white font-bold'
-                    : 'bg-neutral-800/80 text-neutral-400 hover:text-white'
-                }`}
-              >
-                <span>⏳ Longform (≥ 60m)</span>
-              </button>
+              <span className="text-xl font-bold tracking-tight">YouTube Hub</span>
             </div>
           </div>
 
-          {/* Search Results Grid */}
-          {isSearching ? (
-            <div className="py-24 flex flex-col items-center justify-center space-y-3">
-              <Loader2 size={36} className="animate-spin text-red-600" />
-              <p className="text-xs text-neutral-400 font-semibold tracking-wide uppercase">
-                Searching YouTube...
-              </p>
+          {/* Search Input Bar */}
+          <form onSubmit={handleSearch} className="flex-1 max-w-xl mx-2">
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search videos, podcasts, channels..."
+                className="w-full bg-neutral-900 border border-neutral-700/80 rounded-full pl-10 pr-4 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500 transition"
+              />
             </div>
-          ) : filteredSearchResults.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredSearchResults.map((video) => {
-                const isResolving = resolvingStreamId === video.id;
-                const isQueued = downloadQueue.some(
-                  (q) => q.videoId === video.id && (q.status === 'queued' || q.status === 'downloading')
-                );
-                const isDownloaded = video.isDownloaded || archiveItems.some((a) => a.id === video.id);
+          </form>
 
-                return (
-                  <div
-                    key={video.id}
-                    className="group bg-neutral-900/50 hover:bg-neutral-900 border border-neutral-800/80 hover:border-neutral-700 rounded-xl overflow-hidden flex flex-col transition duration-200 shadow-lg"
-                  >
-                    {/* Thumbnail + Duration Badge */}
-                    <div className="relative aspect-video bg-neutral-950 overflow-hidden">
-                      <img
-                        src={video.thumbnailUrl}
-                        alt={video.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                        loading="lazy"
-                      />
-                      <div className="absolute bottom-2 right-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 rounded text-[11px] font-bold text-white tracking-wide">
-                        {video.durationFormatted}
-                      </div>
-                      {video.isShort && (
-                        <div className="absolute top-2 left-2 bg-red-600 px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider text-white">
-                          Short
-                        </div>
+          {/* Account Login Button */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsAuthModalOpen(true)}
+              className={`flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold transition border ${
+                authStatus.connected
+                  ? 'bg-neutral-900 text-emerald-400 border-emerald-500/40'
+                  : 'bg-neutral-900 hover:bg-neutral-800 text-neutral-300 border-neutral-700'
+              }`}
+            >
+              {authStatus.connected ? (
+                <>
+                  <UserCheck size={14} className="text-emerald-400" />
+                  <span>{authStatus.accountName || 'YouTube Connected'}</span>
+                </>
+              ) : (
+                <>
+                  <LogIn size={14} className="text-red-500" />
+                  <span>Connect YouTube</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* View Switcher Subtabs */}
+        <div className="flex items-center gap-2 mt-3 pt-2 border-t border-neutral-900 overflow-x-auto no-scrollbar">
+          {[
+            { id: 'home', label: 'Home & Explore', icon: Film },
+            { id: 'search', label: 'Search Results', icon: Search },
+            { id: 'subscriptions', label: `Subscriptions (${subscriptions.length})`, icon: Radio },
+            { id: 'queue', label: `Queue (${downloadQueue.filter((q) => q.status === 'downloading' || q.status === 'queued').length})`, icon: Download },
+            { id: 'archive', label: `Saved NAS Archive (${archiveItems.length})`, icon: HardDrive },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isSelected = currentView === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setCurrentView(tab.id as any)}
+                className={`flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition ${
+                  isSelected
+                    ? 'bg-white text-black shadow-md'
+                    : 'bg-neutral-900/80 hover:bg-neutral-800 text-neutral-400 hover:text-white'
+                }`}
+              >
+                <Icon size={14} />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="px-4 md:px-12 mt-6">
+        {/* VIEW: HOME & EXPLORE */}
+        {currentView === 'home' && (
+          <div className="space-y-10">
+            {/* Featured Hero Banner */}
+            {heroVideo && (
+              <div className="relative rounded-2xl overflow-hidden bg-neutral-900 border border-neutral-800 shadow-2xl">
+                <div className="relative aspect-[21/9] max-h-[460px] w-full overflow-hidden">
+                  <img
+                    src={heroVideo.thumbnailUrl}
+                    alt={heroVideo.title}
+                    className="w-full h-full object-cover filter brightness-75 scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-r from-black via-black/30 to-transparent" />
+
+                  <div className="absolute bottom-6 left-6 right-6 md:bottom-10 md:left-10 md:right-10 flex flex-col items-start max-w-2xl">
+                    <span className="px-3 py-1 rounded-full bg-red-600 text-[11px] font-bold tracking-wider uppercase mb-3 shadow-md">
+                      Featured Pick
+                    </span>
+                    <h2 className="text-2xl md:text-4xl font-extrabold tracking-tight text-white line-clamp-2 drop-shadow-md">
+                      {heroVideo.title}
+                    </h2>
+                    <p className="text-sm md:text-base text-neutral-300 mt-2 font-medium flex items-center gap-3">
+                      <span>{heroVideo.channelTitle}</span>
+                      {heroVideo.durationFormatted && (
+                        <>
+                          <span>•</span>
+                          <span className="text-neutral-400">{heroVideo.durationFormatted}</span>
+                        </>
                       )}
-                      {isDownloaded && (
-                        <div className="absolute top-2 right-2 bg-emerald-600/90 backdrop-blur-sm px-2 py-0.5 rounded text-[10px] font-bold text-white flex items-center space-x-1">
-                          <Check size={12} />
-                          <span>On NAS</span>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Metadata & Actions */}
-                    <div className="p-3.5 flex flex-col flex-1 justify-between space-y-3">
-                      <div>
-                        <h3 className="text-sm font-bold text-white line-clamp-2 leading-snug group-hover:text-red-400 transition">
-                          {video.title}
-                        </h3>
-                        <div className="flex items-center space-x-2 mt-2">
-                          {video.channelAvatarUrl && (
-                            <img
-                              src={video.channelAvatarUrl}
-                              alt={video.channelTitle}
-                              className="w-5 h-5 rounded-full object-cover"
-                            />
-                          )}
-                          <span className="text-xs text-neutral-400 font-medium truncate">
-                            {video.channelTitle}
-                          </span>
-                        </div>
-                        <div className="text-[11px] text-neutral-500 mt-1">
-                          {video.viewCount && <span>{video.viewCount}</span>}
-                          {video.viewCount && video.uploadDate && <span> • </span>}
-                          {video.uploadDate && <span>{video.uploadDate}</span>}
-                        </div>
-                      </div>
-
-                      {/* Action Buttons */}
-                      <div className="flex items-center space-x-2 pt-2 border-t border-neutral-800/80">
-                        <button
-                          onClick={() => handlePlayStream(video)}
-                          disabled={isResolving}
-                          className="flex-1 py-1.5 px-3 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition"
-                        >
-                          {isResolving ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <Play size={14} className="fill-white" />
-                          )}
-                          <span>Stream</span>
-                        </button>
-                        <button
-                          onClick={() => handleQueueDownload(video)}
-                          disabled={isQueued || isDownloaded}
-                          className={`p-2 rounded-lg text-xs font-semibold border transition ${
-                            isDownloaded
-                              ? 'bg-emerald-950/40 border-emerald-800 text-emerald-400 opacity-60 cursor-default'
-                              : isQueued
-                              ? 'bg-amber-950/40 border-amber-800 text-amber-400 opacity-80 cursor-default'
-                              : 'bg-neutral-800 hover:bg-neutral-700 border-neutral-700 text-neutral-200 hover:text-white'
-                          }`}
-                          title={
-                            isDownloaded
-                              ? 'Already in NAS Archive'
-                              : isQueued
-                              ? 'In Download Queue'
-                              : 'Download to NAS'
-                          }
-                        >
-                          {isDownloaded ? <Check size={14} /> : <Download size={14} />}
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-20 text-center text-neutral-500 space-y-2">
-              <PlaySquare size={44} className="mx-auto text-neutral-700" />
-              <p className="text-sm font-semibold text-neutral-400">Search for any YouTube video or podcast</p>
-              <p className="text-xs text-neutral-500 max-w-md mx-auto">
-                Stream videos directly without ads or queue full podcast episodes to download directly to your NAS storage mount.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 2: Subscriptions */}
-      {activeTab === 'subscriptions' && (
-        <div className="space-y-6">
-          {/* Subscriptions Header with Add & Poll Buttons */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-900/60 border border-neutral-800 p-4 rounded-2xl">
-            <div>
-              <h2 className="text-base font-bold text-white">Channel Subscriptions</h2>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Automatically monitor channels and download new podcast episodes matching your duration and keyword filters.
-              </p>
-            </div>
-            <div className="flex items-center space-x-2 shrink-0">
-              <button
-                onClick={() => handleCheckChannel()}
-                disabled={checkingChannelId !== null}
-                className="px-3.5 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-bold rounded-xl flex items-center space-x-1.5 transition border border-neutral-700"
-              >
-                <RefreshCw size={14} className={checkingChannelId === 'all' ? 'animate-spin' : ''} />
-                <span>Check All</span>
-              </button>
-              <button
-                onClick={() => setIsAddSubModalOpen(true)}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl flex items-center space-x-1.5 transition shadow-lg shadow-red-950/40"
-              >
-                <Plus size={15} />
-                <span>Add Channel</span>
-              </button>
-            </div>
-          </div>
-
-          {/* Subscriptions Grid */}
-          {isLoadingSubs ? (
-            <div className="py-20 text-center">
-              <Loader2 size={32} className="animate-spin text-red-600 mx-auto" />
-            </div>
-          ) : subscriptions.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {subscriptions.map((sub) => {
-                const isCheckingThis = checkingChannelId === sub.id;
-                return (
-                  <div
-                    key={sub.id}
-                    className="bg-neutral-900/60 border border-neutral-800 hover:border-neutral-700 rounded-2xl p-4 flex flex-col justify-between space-y-4 shadow-lg transition"
-                  >
-                    <div>
-                      {/* Avatar + Title */}
-                      <div className="flex items-start space-x-3">
-                        <img
-                          src={sub.avatarUrl || 'https://www.youtube.com/s/desktop/f1725cfb/img/logos/favicon_144x144.png'}
-                          alt={sub.title}
-                          className="w-12 h-12 rounded-full object-cover border border-neutral-700 bg-neutral-950 shrink-0"
-                        />
-                        <div className="min-w-0 flex-1">
-                          <h3 className="text-sm font-bold text-white truncate">{sub.title}</h3>
-                          {sub.handle && <p className="text-xs text-neutral-400 truncate">{sub.handle}</p>}
-                          <div className="flex items-center space-x-2 mt-1">
-                            <span
-                              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                                sub.autoDownload
-                                  ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
-                                  : 'bg-neutral-800 text-neutral-400'
-                              }`}
-                            >
-                              {sub.autoDownload ? 'Auto-Download: Active' : 'Auto-Download: Paused'}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Filter Badges */}
-                      <div className="mt-3.5 pt-3 border-t border-neutral-800/80 space-y-1.5 text-xs text-neutral-300">
-                        <div className="flex items-center space-x-2 text-[11px] text-neutral-400">
-                          <Clock size={13} className="text-neutral-500 shrink-0" />
-                          <span>
-                            Min Duration:{' '}
-                            <strong className="text-white">
-                              {Math.round(sub.minDurationSeconds / 60)} minutes
-                            </strong>
-                          </span>
-                        </div>
-                        {sub.ignoreShorts && (
-                          <div className="flex items-center space-x-2 text-[11px] text-neutral-400">
-                            <Check size={13} className="text-emerald-500 shrink-0" />
-                            <span>Shorts Skipped Automatically</span>
-                          </div>
-                        )}
-                        {sub.excludeKeywords && sub.excludeKeywords.length > 0 && (
-                          <div className="text-[11px] text-neutral-400 line-clamp-1">
-                            <span>Excludes: </span>
-                            <span className="text-neutral-300">
-                              {sub.excludeKeywords.slice(0, 3).join(', ')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex items-center justify-between pt-3 border-t border-neutral-800/80">
-                      <button
-                        onClick={() => handleCheckChannel(sub.id)}
-                        disabled={isCheckingThis}
-                        className="px-3 py-1.5 bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-neutral-200 rounded-lg flex items-center space-x-1.5 transition"
-                      >
-                        <RefreshCw size={12} className={isCheckingThis ? 'animate-spin' : ''} />
-                        <span>Check Uploads</span>
-                      </button>
-                      <button
-                        onClick={() => handleDeleteSubscription(sub.id, sub.title)}
-                        className="p-1.5 text-neutral-500 hover:text-red-400 transition rounded-lg hover:bg-red-950/30"
-                        title="Unsubscribe"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-20 text-center text-neutral-500 space-y-3">
-              <Radio size={44} className="mx-auto text-neutral-700" />
-              <p className="text-sm font-semibold text-neutral-400">No channel subscriptions yet</p>
-              <p className="text-xs text-neutral-500 max-w-md mx-auto">
-                Subscribe to your favorite podcast channels (e.g. Joe Rogan, Huberman Lab, Lex Fridman). When they post new episodes longer than your set threshold, HomeStream will automatically download them to your NAS storage.
-              </p>
-              <button
-                onClick={() => setIsAddSubModalOpen(true)}
-                className="mt-2 px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-xs font-bold rounded-xl inline-flex items-center space-x-1.5 transition"
-              >
-                <Plus size={15} />
-                <span>Subscribe to a Channel</span>
-              </button>
-            </div>
-          )}
-
-          {/* Add Channel Modal */}
-          {isAddSubModalOpen && (
-            <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-              <div className="bg-[#181818] border border-neutral-800 rounded-2xl w-full max-w-md p-6 shadow-2xl relative">
-                <button
-                  onClick={() => setIsAddSubModalOpen(false)}
-                  className="absolute top-4 right-4 text-neutral-400 hover:text-white"
-                >
-                  <X size={18} />
-                </button>
-
-                <h3 className="text-lg font-bold text-white mb-1">Add Channel Subscription</h3>
-                <p className="text-xs text-neutral-400 mb-4">
-                  Enter a channel handle or URL to automatically monitor uploads
-                </p>
-
-                {subModalError && (
-                  <div className="mb-4 p-3 bg-red-950/80 border border-red-800/80 rounded-xl text-xs text-red-300 flex items-center space-x-2">
-                    <AlertCircle size={16} className="shrink-0" />
-                    <span>{subModalError}</span>
-                  </div>
-                )}
-
-                <form onSubmit={handleAddSubscription} className="space-y-4">
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1.5">
-                      Channel Handle or URL
-                    </label>
-                    <input
-                      type="text"
-                      value={newSubChannelInput}
-                      onChange={(e) => setNewSubChannelInput(e.target.value)}
-                      placeholder="@joerogan, @lexfridman, or youtube.com/..."
-                      required
-                      className="w-full px-3.5 py-2.5 bg-neutral-900 border border-neutral-700 rounded-xl text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500"
-                    />
-                  </div>
-
-                  {/* Preset Button: Full Podcast Episodes */}
-                  <div className="p-3 bg-neutral-900/80 border border-neutral-800 rounded-xl flex items-center justify-between">
-                    <div>
-                      <div className="text-xs font-bold text-white flex items-center space-x-1">
-                        <span>🎙️ Podcast Filter Preset</span>
-                      </div>
-                      <div className="text-[11px] text-neutral-400">
-                        Min 30 min • Skip shorts • Exclude clips
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setNewSubMinDuration(30);
-                        setNewSubIgnoreShorts(true);
-                        setNewSubExcludeKeywords('shorts,clip,teaser,trailer,highlight');
-                      }}
-                      className="px-2.5 py-1 bg-red-600/30 hover:bg-red-600 text-red-300 hover:text-white border border-red-700/50 rounded-lg text-xs font-semibold transition"
-                    >
-                      Apply
-                    </button>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-1">
-                      <label className="text-xs font-bold text-neutral-300 uppercase tracking-wider">
-                        Minimum Duration Threshold
-                      </label>
-                      <span className="text-xs font-bold text-red-400">{newSubMinDuration} mins</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={0}
-                      max={120}
-                      step={5}
-                      value={newSubMinDuration}
-                      onChange={(e) => setNewSubMinDuration(Number(e.target.value))}
-                      className="w-full accent-red-600"
-                    />
-                    <p className="text-[11px] text-neutral-500 mt-0.5">
-                      Videos shorter than this threshold (like 5-minute clips) are ignored.
                     </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-neutral-300 uppercase tracking-wider mb-1">
-                      Exclude Keywords (comma-separated)
-                    </label>
-                    <input
-                      type="text"
-                      value={newSubExcludeKeywords}
-                      onChange={(e) => setNewSubExcludeKeywords(e.target.value)}
-                      placeholder="shorts, clip, teaser, highlight"
-                      className="w-full px-3.5 py-2 bg-neutral-900 border border-neutral-700 rounded-xl text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-red-500"
-                    />
-                  </div>
-
-                  <div className="flex items-center space-x-3 pt-2">
-                    <label className="flex items-center space-x-2 text-xs text-neutral-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newSubIgnoreShorts}
-                        onChange={(e) => setNewSubIgnoreShorts(e.target.checked)}
-                        className="rounded accent-red-600"
-                      />
-                      <span>Ignore YouTube Shorts</span>
-                    </label>
-                    <label className="flex items-center space-x-2 text-xs text-neutral-300 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={newSubAutoDownload}
-                        onChange={(e) => setNewSubAutoDownload(e.target.checked)}
-                        className="rounded accent-red-600"
-                      />
-                      <span>Auto-Download Matching Videos</span>
-                    </label>
-                  </div>
-
-                  <div className="flex items-center justify-end space-x-2 pt-4 border-t border-neutral-800">
-                    <button
-                      type="button"
-                      onClick={() => setIsAddSubModalOpen(false)}
-                      className="px-4 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl text-xs font-bold transition"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={isSubmittingSub}
-                      className="px-5 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center space-x-1.5 transition"
-                    >
-                      {isSubmittingSub ? <Loader2 size={14} className="animate-spin" /> : <Plus size={14} />}
-                      <span>Subscribe</span>
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 3: Download Queue */}
-      {activeTab === 'queue' && (
-        <div className="space-y-6">
-          <div className="flex items-center justify-between bg-neutral-900/60 border border-neutral-800 p-4 rounded-2xl">
-            <div>
-              <h2 className="text-base font-bold text-white">Download Queue</h2>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Active and queued video downloads to the local `/youtube` mount
-              </p>
-            </div>
-            <button
-              onClick={loadQueue}
-              className="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl transition"
-              title="Refresh queue"
-            >
-              <RefreshCw size={15} />
-            </button>
-          </div>
-
-          {downloadQueue.length > 0 ? (
-            <div className="space-y-3">
-              {downloadQueue.map((item) => {
-                const isDownloading = item.status === 'downloading';
-                const isCompleted = item.status === 'completed';
-                const isFailed = item.status === 'failed';
-
-                return (
-                  <div
-                    key={item.videoId}
-                    className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-lg"
-                  >
-                    <div className="flex items-center space-x-3.5 min-w-0 flex-1">
-                      {item.thumbnailUrl && (
-                        <img
-                          src={item.thumbnailUrl}
-                          alt={item.title}
-                          className="w-24 aspect-video rounded-lg object-cover bg-neutral-950 shrink-0"
-                        />
-                      )}
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center space-x-2">
-                          <span
-                            className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${
-                              isDownloading
-                                ? 'bg-blue-950 text-blue-400 border border-blue-800/60 animate-pulse'
-                                : isCompleted
-                                ? 'bg-emerald-950 text-emerald-400 border border-emerald-800/60'
-                                : isFailed
-                                ? 'bg-red-950 text-red-400 border border-red-800/60'
-                                : 'bg-neutral-800 text-neutral-400'
-                            }`}
-                          >
-                            {item.status}
-                          </span>
-                          {item.channelTitle && (
-                            <span className="text-xs text-neutral-400 font-medium truncate">
-                              {item.channelTitle}
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="text-sm font-bold text-white truncate mt-1">{item.title}</h4>
-
-                        {/* Progress Bar for Downloading or Queued */}
-                        {(isDownloading || item.status === 'queued') && (
-                          <div className="mt-2 space-y-1">
-                            <div className="w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                              <div
-                                className="h-full bg-red-600 transition-all duration-300"
-                                style={{ width: `${Math.max(item.progressPercent || 0, isDownloading ? 5 : 0)}%` }}
-                              />
-                            </div>
-                            <div className="flex justify-between text-[11px] text-neutral-400">
-                              <span>{Math.round(item.progressPercent || 0)}%</span>
-                              {item.etaSeconds ? <span>ETA: {formatDurationSeconds(item.etaSeconds)}</span> : null}
-                            </div>
-                          </div>
-                        )}
-
-                        {isFailed && item.errorMessage && (
-                          <p className="text-[11px] text-red-400 mt-1">{item.errorMessage}</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="flex items-center space-x-2 self-end sm:self-auto shrink-0">
-                      {isCompleted ? (
-                        <button
-                          onClick={() => {
-                            const found = archiveItems.find((a) => a.id === item.videoId);
-                            if (found) handlePlayArchiveItem(found);
-                            else handlePlayStream(item as any);
-                          }}
-                          className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold flex items-center space-x-1.5 transition"
-                        >
-                          <Play size={13} className="fill-white" />
-                          <span>Play</span>
-                        </button>
-                      ) : (
-                        <button
-                          onClick={() => handleCancelDownload(item.videoId)}
-                          className="p-2 text-neutral-500 hover:text-red-400 rounded-lg hover:bg-neutral-800 transition"
-                          title="Cancel Download"
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="py-20 text-center text-neutral-500 space-y-2">
-              <Download size={44} className="mx-auto text-neutral-700" />
-              <p className="text-sm font-semibold text-neutral-400">Download queue is empty</p>
-              <p className="text-xs text-neutral-500 max-w-md mx-auto">
-                Search for videos or subscribe to channels to automatically queue episodes.
-              </p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* TAB 4: Archive (Local NAS Storage) */}
-      {activeTab === 'archive' && (
-        <div className="space-y-6">
-          {/* Archive Header */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-neutral-900/60 border border-neutral-800 p-4 rounded-2xl">
-            <div>
-              <div className="flex items-center space-x-2">
-                <h2 className="text-base font-bold text-white">Local Archive Library</h2>
-                <span className="text-xs font-bold bg-neutral-800 text-neutral-300 px-2.5 py-0.5 rounded-full">
-                  {archiveItems.length} videos • {formatBytes(archiveTotalBytes)}
-                </span>
-              </div>
-              <p className="text-xs text-neutral-400 mt-0.5">
-                Saved files on `/youtube` mount available for instant streaming and offline playback
-              </p>
-            </div>
-
-            <button
-              onClick={loadArchive}
-              className="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-xl transition self-start sm:self-auto"
-              title="Rescan storage"
-            >
-              <RefreshCw size={15} />
-            </button>
-          </div>
-
-          {/* Channel Filters */}
-          {archiveChannels.length > 2 && (
-            <div className="flex items-center space-x-2 overflow-x-auto pb-1 text-xs font-medium scrollbar-none">
-              {archiveChannels.map((ch) => (
-                <button
-                  key={ch}
-                  onClick={() => setArchiveChannelFilter(ch)}
-                  className={`px-3 py-1.5 rounded-xl whitespace-nowrap transition ${
-                    archiveChannelFilter === ch
-                      ? 'bg-red-600 text-white font-bold'
-                      : 'bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-white'
-                  }`}
-                >
-                  {ch === 'all' ? 'All Channels' : ch}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {/* Archive Grid */}
-          {isLoadingArchive ? (
-            <div className="py-20 text-center">
-              <Loader2 size={32} className="animate-spin text-red-600 mx-auto" />
-            </div>
-          ) : filteredArchiveItems.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              {filteredArchiveItems.map((item) => (
-                <div
-                  key={item.id + item.filePath}
-                  className="group bg-neutral-900/50 hover:bg-neutral-900 border border-neutral-800/80 hover:border-neutral-700 rounded-xl overflow-hidden flex flex-col justify-between transition duration-200 shadow-lg cursor-pointer"
-                  onClick={() => handlePlayArchiveItem(item)}
-                >
-                  <div className="relative aspect-video bg-neutral-950 overflow-hidden">
-                    <img
-                      src={item.thumbnailUrl || `https://i.ytimg.com/vi/${item.id}/hqdefault.jpg`}
-                      alt={item.title}
-                      className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
-                      loading="lazy"
-                    />
-                    <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
-                      <div className="w-12 h-12 rounded-full bg-red-600 text-white flex items-center justify-center shadow-xl">
-                        <Play size={20} className="fill-white ml-0.5" />
-                      </div>
-                    </div>
-                    <div className="absolute bottom-2 right-2 bg-black/85 backdrop-blur-sm px-2 py-0.5 rounded text-[11px] font-bold text-white tracking-wide">
-                      {formatBytes(item.fileSize)}
-                    </div>
-                  </div>
-
-                  <div className="p-3.5 flex flex-col flex-1 justify-between">
-                    <div>
-                      <h4 className="text-sm font-bold text-white line-clamp-2 leading-snug group-hover:text-red-400 transition">
-                        {item.title}
-                      </h4>
-                      <p className="text-xs text-neutral-400 font-medium truncate mt-1">
-                        {item.channelName}
-                      </p>
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-neutral-500 pt-2.5 mt-2.5 border-t border-neutral-800/80">
-                      <span>{new Date(item.modifiedAt).toLocaleDateString()}</span>
-                      <span className="text-emerald-400 font-semibold flex items-center space-x-1">
-                        <Check size={11} />
-                        <span>Ready</span>
-                      </span>
+                    <div className="flex items-center gap-3 mt-5">
+                      <button
+                        onClick={() => handlePlayVideo(heroVideo)}
+                        className="flex items-center gap-2 bg-white text-black hover:bg-neutral-200 px-6 py-2.5 rounded-full font-bold text-sm transition shadow-lg"
+                      >
+                        <Play size={18} className="fill-black" />
+                        <span>Play Now</span>
+                      </button>
+                      <button
+                        onClick={() => handleQueueDownload(heroVideo)}
+                        className="flex items-center gap-2 bg-neutral-800/80 hover:bg-neutral-700 text-white px-5 py-2.5 rounded-full font-semibold text-sm transition border border-neutral-700 backdrop-blur-md"
+                      >
+                        <Download size={16} />
+                        <span>Save to NAS</span>
+                      </button>
                     </div>
                   </div>
                 </div>
-              ))}
+              </div>
+            )}
+
+            {/* Continue Watching Row */}
+            {continueWatching.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <History size={18} className="text-red-500" />
+                  <h3 className="text-lg md:text-xl font-bold tracking-tight">Continue Watching</h3>
+                </div>
+                <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                  {continueWatching.map((item) => (
+                    <div
+                      key={item.videoId}
+                      onClick={() => handleResumeContinueWatching(item)}
+                      className="group relative flex-none w-64 md:w-72 bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 hover:border-neutral-600 cursor-pointer transition duration-200"
+                    >
+                      <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
+                        <img
+                          src={item.thumbnailUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        <div className="absolute inset-0 bg-black/30 group-hover:bg-black/10 transition" />
+                        <button
+                          onClick={(e) => handleDismissContinue(e, item.videoId)}
+                          className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition"
+                          title="Remove from continue watching"
+                        >
+                          <X size={14} />
+                        </button>
+                        {/* Play Button Overlay */}
+                        <div className="absolute inset-0 flex items-center justify-center">
+                          <div className="w-10 h-10 rounded-full bg-red-600/90 text-white flex items-center justify-center shadow-lg group-hover:scale-110 transition">
+                            <Play size={16} className="fill-white ml-0.5" />
+                          </div>
+                        </div>
+                        {/* Progress Bar */}
+                        <div className="absolute bottom-0 inset-x-0 h-1.5 bg-neutral-800">
+                          <div
+                            className="h-full bg-red-600 transition-all duration-300"
+                            style={{ width: `${item.progressPercent}%` }}
+                          />
+                        </div>
+                      </div>
+                      <div className="p-3">
+                        <h4 className="text-xs font-semibold text-white line-clamp-2 leading-tight">
+                          {item.title}
+                        </h4>
+                        <div className="flex items-center justify-between mt-2 text-[11px] text-neutral-400">
+                          <span className="truncate">{item.channelName || 'YouTube'}</span>
+                          <span>{formatDurationSeconds(item.positionSeconds)} left</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            {/* Media Rows */}
+            {isLoadingHome ? (
+              <div className="flex items-center justify-center py-20 text-neutral-500 gap-3">
+                <Loader2 size={24} className="animate-spin text-red-500" />
+                <span>Loading YouTube rows...</span>
+              </div>
+            ) : (
+              sections.map((section) => (
+                <section key={section.id} className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg md:text-xl font-bold tracking-tight">{section.title}</h3>
+                  </div>
+                  <div className="flex gap-4 overflow-x-auto pb-4 no-scrollbar">
+                    {section.items.map((video) => (
+                      <div
+                        key={video.id}
+                        onClick={() => handlePlayVideo(video)}
+                        className="group relative flex-none w-60 md:w-68 bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800/80 hover:border-neutral-600 cursor-pointer transition duration-200"
+                      >
+                        <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
+                          <img
+                            src={video.thumbnailUrl}
+                            alt={video.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                          />
+                          {video.durationFormatted && (
+                            <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono font-bold text-white">
+                              {video.durationFormatted}
+                            </span>
+                          )}
+                          {/* Quick Download Overlay */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleQueueDownload(video);
+                            }}
+                            className="absolute top-2 right-2 p-1.5 rounded-full bg-black/60 hover:bg-neutral-800 text-white opacity-0 group-hover:opacity-100 transition"
+                            title="Download to NAS"
+                          >
+                            <Download size={14} />
+                          </button>
+                        </div>
+                        <div className="p-3">
+                          <h4 className="text-xs font-semibold text-white line-clamp-2 leading-tight">
+                            {video.title}
+                          </h4>
+                          <div className="flex items-center justify-between mt-2 text-[11px] text-neutral-400">
+                            <span className="truncate">{video.channelTitle}</span>
+                            {video.uploadDate && <span>{video.uploadDate}</span>}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* VIEW: SEARCH RESULTS */}
+        {currentView === 'search' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <h3 className="text-xl font-bold tracking-tight">
+                Search Results for &ldquo;{searchQuery}&rdquo;
+              </h3>
+              <div className="flex items-center gap-2">
+                {[
+                  { id: 'all', label: 'All Results' },
+                  { id: 'podcasts', label: 'Podcasts (≥20m)' },
+                  { id: 'longform', label: 'Longform (≥60m)' },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setSearchFilter(f.id as any)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      searchFilter === f.id
+                        ? 'bg-white text-black'
+                        : 'bg-neutral-900 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          ) : (
-            <div className="py-20 text-center text-neutral-500 space-y-2">
-              <HardDrive size={44} className="mx-auto text-neutral-700" />
-              <p className="text-sm font-semibold text-neutral-400">No videos in archive</p>
-              <p className="text-xs text-neutral-500 max-w-md mx-auto">
-                Completed downloads will appear here for fast local streaming and seeking.
-              </p>
+
+            {isSearching ? (
+              <div className="flex items-center justify-center py-20 text-neutral-500 gap-3">
+                <Loader2 size={24} className="animate-spin text-red-500" />
+                <span>Searching YouTube with yt-dlp...</span>
+              </div>
+            ) : searchResults.length === 0 ? (
+              <div className="text-center py-20 text-neutral-500">
+                <AlertCircle size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No results found. Try adjusting your search query.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {searchResults
+                  .filter((v) => {
+                    if (searchFilter === 'podcasts') return v.durationSeconds >= 20 * 60;
+                    if (searchFilter === 'longform') return v.durationSeconds >= 60 * 60;
+                    return true;
+                  })
+                  .map((video) => (
+                    <div
+                      key={video.id}
+                      onClick={() => handlePlayVideo(video)}
+                      className="group bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 hover:border-neutral-600 cursor-pointer transition flex flex-col justify-between"
+                    >
+                      <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
+                        <img
+                          src={video.thumbnailUrl}
+                          alt={video.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                        />
+                        {video.durationFormatted && (
+                          <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono font-bold text-white">
+                            {video.durationFormatted}
+                          </span>
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleQueueDownload(video);
+                          }}
+                          className="absolute top-2 right-2 p-2 rounded-full bg-black/70 hover:bg-red-600 text-white opacity-0 group-hover:opacity-100 transition shadow-lg"
+                          title="Save to NAS"
+                        >
+                          <Download size={14} />
+                        </button>
+                      </div>
+                      <div className="p-3">
+                        <h4 className="text-xs font-semibold text-white line-clamp-2 leading-tight">
+                          {video.title}
+                        </h4>
+                        <p className="text-[11px] text-neutral-400 mt-1 truncate">{video.channelTitle}</p>
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW: SUBSCRIPTIONS */}
+        {currentView === 'subscriptions' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold tracking-tight">Channel Subscriptions</h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Channels automatically checked for new podcast episodes.
+                </p>
+              </div>
+              <button
+                onClick={() => setIsAddSubModalOpen(true)}
+                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-full text-xs font-bold transition shadow-lg shadow-red-900/30"
+              >
+                <Plus size={16} />
+                <span>Add Channel</span>
+              </button>
             </div>
-          )}
+
+            {subscriptions.length === 0 ? (
+              <div className="text-center py-20 text-neutral-500">
+                <Radio size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No channels subscribed yet.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {subscriptions.map((sub) => (
+                  <div
+                    key={sub.id}
+                    className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-start gap-4"
+                  >
+                    <div className="w-12 h-12 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0">
+                      {sub.avatarUrl ? (
+                        <img src={sub.avatarUrl} alt={sub.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <Radio size={24} className="m-3 text-neutral-600" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="text-sm font-bold text-white truncate">{sub.title}</h4>
+                      <p className="text-xs text-neutral-400 truncate">{sub.handle || sub.id}</p>
+                      <div className="flex items-center gap-2 mt-3 text-[11px] text-neutral-500">
+                        <span>Min {Math.round(sub.minDurationSeconds / 60)}m</span>
+                        <span>•</span>
+                        <span>{sub.autoDownload ? 'Auto-Download' : 'Manual'}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW: DOWNLOAD QUEUE */}
+        {currentView === 'queue' && (
+          <div className="space-y-6">
+            <h3 className="text-xl font-bold tracking-tight">NAS Download Queue</h3>
+            {downloadQueue.length === 0 ? (
+              <div className="text-center py-20 text-neutral-500">
+                <Download size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No active or recent downloads.</p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {downloadQueue.map((item) => (
+                  <div
+                    key={item.videoId}
+                    className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-4"
+                  >
+                    <div className="flex items-center gap-4 min-w-0 flex-1">
+                      <div className="w-20 aspect-video rounded-lg bg-neutral-950 overflow-hidden flex-shrink-0">
+                        {item.thumbnailUrl && (
+                          <img src={item.thumbnailUrl} alt={item.title} className="w-full h-full object-cover" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h4 className="text-xs md:text-sm font-semibold text-white truncate">{item.title}</h4>
+                        <div className="flex items-center gap-3 text-[11px] text-neutral-400 mt-1">
+                          <span className="capitalize text-red-400 font-semibold">{item.status}</span>
+                          {item.status === 'downloading' && (
+                            <>
+                              <span>•</span>
+                              <span>{item.progressPercent.toFixed(0)}%</span>
+                              <span>•</span>
+                              <span>{formatBytes(item.speedBytes)}/s</span>
+                            </>
+                          )}
+                        </div>
+                        {item.status === 'downloading' && (
+                          <div className="w-full h-1.5 bg-neutral-800 rounded-full mt-2 overflow-hidden">
+                            <div
+                              className="h-full bg-red-600 transition-all duration-300"
+                              style={{ width: `${item.progressPercent}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW: SAVED ARCHIVE */}
+        {currentView === 'archive' && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-xl font-bold tracking-tight">Saved NAS Archive</h3>
+                <p className="text-xs text-neutral-400 mt-1">
+                  Stored directly on /mnt/pve/nas-youtube for instant local playback.
+                </p>
+              </div>
+            </div>
+
+            {archiveItems.length === 0 ? (
+              <div className="text-center py-20 text-neutral-500">
+                <HardDrive size={32} className="mx-auto mb-2 opacity-50" />
+                <p>No saved videos found in /youtube NAS storage.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                {archiveItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => handlePlayArchiveItem(item)}
+                    className="group bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 hover:border-neutral-600 cursor-pointer transition flex flex-col justify-between"
+                  >
+                    <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
+                      <img
+                        src={item.thumbnailUrl}
+                        alt={item.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                      <div className="absolute top-2 left-2 px-2 py-0.5 rounded bg-emerald-600/90 text-[10px] font-bold text-white uppercase tracking-wider">
+                        NAS Archive
+                      </div>
+                      <div className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono text-neutral-300">
+                        {formatBytes(item.fileSize)}
+                      </div>
+                    </div>
+                    <div className="p-3">
+                      <h4 className="text-xs font-semibold text-white line-clamp-2 leading-tight">
+                        {item.title}
+                      </h4>
+                      <p className="text-[11px] text-neutral-400 mt-1 truncate">{item.channelName}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </main>
+
+      {/* YouTube Account Auth Modal */}
+      {isAuthModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-lg w-full space-y-5 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-red-600 flex items-center justify-center">
+                  <Key size={16} className="text-white" />
+                </div>
+                <h3 className="text-lg font-bold">Connect YouTube Account</h3>
+              </div>
+              <button onClick={() => setIsAuthModalOpen(false)} className="text-neutral-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-xs text-neutral-400">
+              Connect your YouTube session cookies to receive your personalized subscriptions, recommended feed, and continue watching history.
+            </p>
+
+            {authStatus.connected ? (
+              <div className="p-4 rounded-xl bg-emerald-950/40 border border-emerald-800/60 space-y-3">
+                <div className="flex items-center gap-2 text-emerald-400 font-bold text-sm">
+                  <Check size={18} />
+                  <span>Connected as {authStatus.accountName || 'YouTube User'}</span>
+                </div>
+                <p className="text-xs text-neutral-400">
+                  Your YouTube session is active for this profile.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleDisconnectAuth}
+                  className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition"
+                >
+                  Disconnect YouTube Account
+                </button>
+              </div>
+            ) : (
+              <form onSubmit={handleSaveAuth} className="space-y-4">
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                    Account Name / Label (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    value={accountNameInput}
+                    onChange={(e) => setAccountNameInput(e.target.value)}
+                    placeholder="e.g. Nathan Willems"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
+                    YouTube Cookie / Session Data
+                  </label>
+                  <textarea
+                    rows={4}
+                    value={cookiesInput}
+                    onChange={(e) => setCookiesInput(e.target.value)}
+                    placeholder="Paste cookies (Netscape format or cookie header with SID, HSID, SSID, etc.)"
+                    className="w-full bg-neutral-950 border border-neutral-700 rounded-lg p-3 text-xs font-mono text-white focus:outline-none focus:border-red-500"
+                    required
+                  />
+                  <p className="text-[11px] text-neutral-500 mt-1">
+                    Export your cookies using any browser extension (e.g. &ldquo;Get cookies.txt LOCALLY&rdquo;) and paste here.
+                  </p>
+                </div>
+
+                <div className="flex justify-end gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => setIsAuthModalOpen(false)}
+                    className="px-4 py-2 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSavingAuth || !cookiesInput.trim()}
+                    className="flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 text-white rounded-lg text-xs font-bold transition shadow-lg"
+                  >
+                    {isSavingAuth && <Loader2 size={14} className="animate-spin" />}
+                    <span>Save &amp; Connect</span>
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Add Subscription Modal */}
+      {isAddSubModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-neutral-900 border border-neutral-800 rounded-2xl p-6 max-w-md w-full space-y-4 shadow-2xl">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-bold">Add Channel Subscription</h3>
+              <button onClick={() => setIsAddSubModalOpen(false)} className="text-neutral-400 hover:text-white">
+                <X size={20} />
+              </button>
+            </div>
+
+            {subModalError && (
+              <div className="p-3 rounded-lg bg-red-950/60 border border-red-800 text-red-300 text-xs">
+                {subModalError}
+              </div>
+            )}
+
+            <form onSubmit={handleAddSubscription} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  Channel Handle or URL
+                </label>
+                <input
+                  type="text"
+                  value={newSubChannelInput}
+                  onChange={(e) => setNewSubChannelInput(e.target.value)}
+                  placeholder="@lexfridman or https://youtube.com/@joerogan"
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  Minimum Duration (Minutes)
+                </label>
+                <input
+                  type="number"
+                  value={newSubMinDuration}
+                  onChange={(e) => setNewSubMinDuration(parseInt(e.target.value, 10) || 0)}
+                  className="w-full bg-neutral-950 border border-neutral-700 rounded-lg px-3.5 py-2 text-sm text-white focus:outline-none focus:border-red-500"
+                />
+                <p className="text-[11px] text-neutral-500 mt-1">
+                  Filters out short clips and non-podcast uploads.
+                </p>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <input
+                  type="checkbox"
+                  id="autoDl"
+                  checked={newSubAutoDownload}
+                  onChange={(e) => setNewSubAutoDownload(e.target.checked)}
+                  className="rounded bg-neutral-950 border-neutral-700 text-red-600 focus:ring-0"
+                />
+                <label htmlFor="autoDl" className="text-xs text-neutral-300 cursor-pointer">
+                  Auto-download matching episodes to NAS
+                </label>
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsAddSubModalOpen(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={isSubmittingSub}
+                  className="flex items-center gap-2 px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded-lg text-xs font-bold transition shadow-lg"
+                >
+                  {isSubmittingSub && <Loader2 size={14} className="animate-spin" />}
+                  <span>Subscribe</span>
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
