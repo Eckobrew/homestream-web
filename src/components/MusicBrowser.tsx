@@ -242,6 +242,7 @@ export function MusicBrowser({
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
             <input
               type="text"
+              aria-label="Search music"
               value={q}
               onChange={(e) => {
                 setQ(e.target.value);
