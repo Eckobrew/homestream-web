@@ -15,6 +15,7 @@ import { RequestDialog } from '@/components/RequestDialog';
 import { SearchOverlay } from '@/components/SearchOverlay';
 import { Sidebar } from '@/components/Sidebar';
 import { LibraryCatalog } from '@/components/LibraryCatalog';
+import { YouTubeHub } from '@/components/YouTubeHub';
 import { MediaItem, MediaRowSection, Episode, MusicTrack } from '@/types';
 import { Loader2, Sparkles } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
@@ -508,8 +509,14 @@ export default function Home() {
           onOpenModal={handleOpenModal}
           onRequest={handleRequest}
         />
+      ) : activeLibrary === 'youtube' ? (
+        /* Dedicated YouTube Hub with Search, Stream, Subscriptions, Queue, and Archive */
+        <YouTubeHub
+          onPlay={handlePlay}
+          onBackToHome={() => setActiveLibrary(null)}
+        />
       ) : activeLibrary ? (
-        /* Dedicated A-Z Jellyfin Library Page (Movies / TV Shows / YouTube) */
+        /* Dedicated A-Z Jellyfin Library Page (Movies / TV Shows) */
         <LibraryCatalog
           libraryType={activeLibrary}
           onPlay={handlePlay}

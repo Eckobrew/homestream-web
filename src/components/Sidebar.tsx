@@ -59,9 +59,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'youtube' as const,
       name: 'YouTube',
-      description: 'Downloaded YouTube library',
+      description: 'Search, stream, subscribe & archive',
       icon: PlaySquare,
-      badge: 'A–Z',
+      badge: 'Hub',
       color: 'from-red-600 to-rose-700',
     },
   ];
