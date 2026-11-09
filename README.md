@@ -28,7 +28,7 @@ Browser integration checks: install Chromium with `npx playwright install chromi
 
 To enable cross-repository browser checks in GitHub Actions, set `HOMESTREAM_BACKEND_REF` to a tested backend release tag or commit. Ordinary web builds remain independent when this optional integration job is disabled.
 
-Version 1.2 introduces native TMDB/Sonarr/Radarr integrations, direct torrent streaming, dedicated Music Hub (Albums, Artists, Songs, and Playlists with zero-key Spotify playlist/profile importer and Soulseek/slskd MP3 downloader), and dedicated YouTube Hub. Demo mode must be enabled on the backend. Lint enforcement covers extracted modules; the backend repository documents SQLite migration and generated Kotlin clients.
+Version 1.2 introduces native TMDB/Sonarr/Radarr integrations, direct torrent streaming, dedicated Music Hub (Albums, Artists, Songs, and Playlists with zero-key Spotify playlist/profile importer, Exportify CSV/ZIP drag-and-drop/file importer, and Soulseek/slskd MP3 downloader), and dedicated YouTube Hub. Demo mode must be enabled on the backend. Lint enforcement covers extracted modules; the backend repository documents SQLite migration and generated Kotlin clients.
 
 ## Docker image publishing
 

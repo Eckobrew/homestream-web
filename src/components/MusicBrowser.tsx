@@ -19,6 +19,8 @@ import {
   Sparkles,
   Shuffle,
   RefreshCw,
+  Upload,
+  FileSpreadsheet,
 } from 'lucide-react';
 
 interface MusicBrowserProps {
@@ -47,6 +49,8 @@ export function MusicBrowser({
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistDetailResponse | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
+  const [importMode, setImportMode] = useState<'spotify' | 'exportify'>('spotify');
+  const [selectedFile, setSelectedFile] = useState<{ name: string; isZip: boolean; data: string } | null>(null);
   const [importUrls, setImportUrls] = useState('');
   const [importing, setImporting] = useState(false);
   const [configured, setConfigured] = useState(true);
@@ -173,28 +177,47 @@ export function MusicBrowser({
     }
   }
 
-  async function handleImportSpotify(e?: React.FormEvent) {
+  async function handleImportPlaylists(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!importUrls.trim()) return;
+    if (importMode === 'spotify' && !importUrls.trim()) return;
+    if (importMode === 'exportify' && !selectedFile && !importUrls.trim()) return;
+
     setImporting(true);
     setError('');
     try {
       const params = currentProfileId ? `?userId=${encodeURIComponent(currentProfileId)}` : '';
+      let payload: any = {};
+
+      if (importMode === 'exportify') {
+        if (selectedFile) {
+          if (selectedFile.isZip) {
+            payload = { zipBase64: selectedFile.data };
+          } else {
+            payload = { csv: selectedFile.data, playlistName: selectedFile.name };
+          }
+        } else {
+          payload = { csv: importUrls.trim(), playlistName: 'Exportify Playlist' };
+        }
+      } else {
+        payload = { urls: importUrls.trim() };
+      }
+
       const r = await apiFetch(`/api/music/playlists/import${params}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ urls: importUrls.trim() }),
+        body: JSON.stringify(payload),
       });
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Import failed');
-      setNotice(d.message || 'Spotify playlists queued for download!');
+      setNotice(d.message || 'Playlists queued for download!');
       setTimeout(() => setNotice(''), 5000);
       setShowImportModal(false);
       setImportUrls('');
+      setSelectedFile(null);
       setCategory('playlists');
       fetchPlaylists();
     } catch (e: any) {
-      setError(e.message || 'Failed importing Spotify playlists');
+      setError(e.message || 'Failed importing playlists');
     } finally {
       setImporting(false);
     }
@@ -1037,47 +1060,160 @@ export function MusicBrowser({
         )}
       </main>
 
-      {/* Spotify Import Modal */}
+      {/* Playlists Import Modal (Spotify & Exportify) */}
       {showImportModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-fade-in">
           <div className="bg-[#1e1e1e] border border-neutral-800 rounded-2xl p-6 w-full max-w-lg shadow-2xl space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <span className="w-3 h-3 rounded-full bg-[#1DB954]" />
-                <h3 className="text-lg font-bold text-white">Import Spotify Playlists</h3>
+                <h3 className="text-lg font-bold text-white">Import Playlists</h3>
               </div>
               <button
-                onClick={() => setShowImportModal(false)}
+                onClick={() => {
+                  setShowImportModal(false);
+                  setSelectedFile(null);
+                  setImportUrls('');
+                }}
                 className="p-1 rounded-full text-neutral-400 hover:text-white"
               >
                 <X size={18} />
               </button>
             </div>
 
-            <p className="text-xs text-neutral-300">
-              Paste Spotify playlist link(s) or a user profile link (one URL per line). HomeStream will scrape the tracklists and queue MP3 downloads via Soulseek (slskd) directly into your profile&apos;s library.
-            </p>
+            {/* Sub-tabs: Spotify vs Exportify */}
+            <div className="flex items-center gap-2 border-b border-neutral-800 pb-3">
+              <button
+                type="button"
+                onClick={() => setImportMode('spotify')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  importMode === 'spotify'
+                    ? 'bg-[#1DB954] text-black'
+                    : 'bg-neutral-800 text-neutral-300 hover:text-white'
+                }`}
+              >
+                Spotify URLs / Profile
+              </button>
+              <button
+                type="button"
+                onClick={() => setImportMode('exportify')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
+                  importMode === 'exportify'
+                    ? 'bg-[#1DB954] text-black'
+                    : 'bg-neutral-800 text-neutral-300 hover:text-white'
+                }`}
+              >
+                Exportify CSV / ZIP
+              </button>
+            </div>
 
-            <form onSubmit={handleImportSpotify} className="space-y-4">
-              <textarea
-                value={importUrls}
-                onChange={(e) => setImportUrls(e.target.value)}
-                placeholder="https://open.spotify.com/playlist/...&#10;https://open.spotify.com/user/..."
-                rows={5}
-                className="w-full bg-[#121212] border border-neutral-700 rounded-xl p-3 text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#1DB954] font-mono text-xs"
-              />
+            {importMode === 'spotify' ? (
+              <p className="text-xs text-neutral-300">
+                Paste Spotify playlist link(s) or a user profile link (one URL per line). Tracks are automatically scraped and downloaded via Soulseek (slskd) directly into your profile&apos;s library in MP3 format.
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-300">
+                Import playlists exported from <a href="https://exportify.net" target="_blank" rel="noreferrer" className="text-[#1DB954] underline">Exportify</a>. Upload a single <code className="bg-neutral-900 px-1 rounded text-neutral-200">.csv</code> file, an <code className="bg-neutral-900 px-1 rounded text-neutral-200">Export All (.zip)</code> archive, or paste raw CSV text.
+              </p>
+            )}
+
+            <form onSubmit={handleImportPlaylists} className="space-y-4">
+              {importMode === 'spotify' ? (
+                <textarea
+                  value={importUrls}
+                  onChange={(e) => setImportUrls(e.target.value)}
+                  placeholder="https://open.spotify.com/playlist/...&#10;https://open.spotify.com/user/..."
+                  rows={5}
+                  className="w-full bg-[#121212] border border-neutral-700 rounded-xl p-3 text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#1DB954] font-mono text-xs"
+                />
+              ) : (
+                <div className="space-y-3">
+                  {/* File Upload Box */}
+                  <label className="flex flex-col items-center justify-center border-2 border-dashed border-neutral-700 hover:border-[#1DB954] rounded-xl p-4 cursor-pointer bg-[#141414] hover:bg-[#181818] transition">
+                    <input
+                      type="file"
+                      accept=".csv,.zip,text/csv,application/zip"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        if (file.name.toLowerCase().endsWith('.zip')) {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const b64 = (reader.result as string).split(',')[1];
+                            setSelectedFile({ name: file.name, isZip: true, data: b64 });
+                          };
+                          reader.readAsDataURL(file);
+                        } else {
+                          const reader = new FileReader();
+                          reader.onload = () => {
+                            const text = reader.result as string;
+                            setSelectedFile({ name: file.name.replace(/\.csv$/i, ''), isZip: false, data: text });
+                          };
+                          reader.readAsText(file);
+                        }
+                      }}
+                    />
+                    {selectedFile ? (
+                      <div className="flex items-center gap-2 text-white">
+                        <FileSpreadsheet size={20} className="text-[#1DB954]" />
+                        <span className="text-xs font-semibold">{selectedFile.name} {selectedFile.isZip ? '(ZIP Archive)' : '(CSV File)'}</span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setSelectedFile(null);
+                          }}
+                          className="ml-2 text-neutral-400 hover:text-white"
+                        >
+                          <X size={14} />
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="flex flex-col items-center gap-1.5 text-neutral-400">
+                        <Upload size={22} className="text-neutral-500" />
+                        <span className="text-xs font-medium">Click or drag a .csv or .zip file</span>
+                        <span className="text-[11px] text-neutral-500">Supports single playlist CSV or Export All ZIP</span>
+                      </div>
+                    )}
+                  </label>
+
+                  {/* Or raw CSV text input */}
+                  <div>
+                    <label className="block text-[11px] font-semibold text-neutral-400 mb-1">
+                      Or paste raw Exportify CSV text:
+                    </label>
+                    <textarea
+                      value={importUrls}
+                      onChange={(e) => setImportUrls(e.target.value)}
+                      placeholder="Track URI,Track Name,Artist Name(s),Album Name,..."
+                      rows={4}
+                      className="w-full bg-[#121212] border border-neutral-700 rounded-xl p-2.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#1DB954] font-mono"
+                    />
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center justify-end gap-3 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowImportModal(false)}
+                  onClick={() => {
+                    setShowImportModal(false);
+                    setSelectedFile(null);
+                    setImportUrls('');
+                  }}
                   className="px-4 py-2 rounded-full text-xs font-semibold text-neutral-300 hover:text-white"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  disabled={importing || !importUrls.trim()}
+                  disabled={
+                    importing ||
+                    (importMode === 'spotify' && !importUrls.trim()) ||
+                    (importMode === 'exportify' && !selectedFile && !importUrls.trim())
+                  }
                   className="px-5 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center gap-2 transition disabled:opacity-50"
                 >
                   {importing && <Loader2 size={14} className="animate-spin" />}
