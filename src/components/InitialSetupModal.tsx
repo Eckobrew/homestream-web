@@ -82,6 +82,15 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     error?: string;
   } | null>(null);
 
+  // TMDB form state (personal API key shared across all profiles)
+  const [tmdbApiKey, setTmdbApiKey] = useState('');
+  const [showTmdbKey, setShowTmdbKey] = useState(false);
+  const [isTestingTmdb, setIsTestingTmdb] = useState(false);
+  const [tmdbTestStatus, setTmdbTestStatus] = useState<{
+    success?: boolean;
+    error?: string;
+  } | null>(null);
+
   // Test status states
   const [isTestingJellyfin, setIsTestingJellyfin] = useState(false);
   const [jellyfinTestStatus, setJellyfinTestStatus] = useState<{
@@ -131,6 +140,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           if (cfg.sonarrUrl) setSonarrUrl(cfg.sonarrUrl);
           if (cfg.hasRadarrKey) setRadarrTestStatus({ success: true });
           if (cfg.hasSonarrKey) setSonarrTestStatus({ success: true });
+          if (cfg.hasTmdbKey) setTmdbTestStatus({ success: true });
           if (cfg.hasJellyfinKey) {
             setJellyfinTestStatus({ success: true, serverName: 'Configured' });
           }
@@ -275,6 +285,26 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
     }
   };
 
+  // Test TMDB connection
+  const handleTestTmdb = async () => {
+    if (!tmdbApiKey.trim()) return;
+    setIsTestingTmdb(true);
+    setTmdbTestStatus(null);
+    try {
+      const res = await apiFetch('/api/config?action=test-tmdb', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ apiKey: tmdbApiKey.trim() }),
+      });
+      const data = await res.json();
+      setTmdbTestStatus(data);
+    } catch {
+      setTmdbTestStatus({ success: false, error: 'Connection failed' });
+    } finally {
+      setIsTestingTmdb(false);
+    }
+  };
+
   // Save server configuration and move to Step 2 (Profiles)
   const handleSaveServers = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -295,6 +325,7 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
           ...(jellyfinApiKey.trim() ? { jellyfinApiKey: jellyfinApiKey.trim() } : {}),
           seerrUrl: seerrUrl.trim(),
           ...(seerrApiKey.trim() ? { seerrApiKey: seerrApiKey.trim() } : {}),
+          tmdbApiKey: tmdbApiKey.trim() ? tmdbApiKey.trim() : undefined,
           qbittorrentUrl: qbittorrentUrl.trim(),
           qbittorrentUsername: qbittorrentUsername.trim(),
           ...(qbittorrentPassword.trim() ? { qbittorrentPassword: qbittorrentPassword.trim() } : {}),
@@ -615,6 +646,90 @@ export const InitialSetupModal: React.FC<InitialSetupModalProps> = ({
                       </>
                     ) : (
                       <span>Test Seerr Connection</span>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* The Movie Database (TMDB) Integration */}
+            <div className="bg-neutral-950/70 border border-neutral-800/90 rounded-xl p-4 sm:p-5 space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-8 h-8 rounded-lg bg-emerald-600/20 text-emerald-400 flex items-center justify-center font-bold">
+                    <Sparkles size={18} />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-bold text-white">
+                      TheMovieDB (TMDB) <span className="text-neutral-500 text-xs font-normal">(Shared across all profiles)</span>
+                    </h3>
+                    <p className="text-[11px] text-neutral-400">
+                      Powers trending catalog discovery, search, and the Smart Recommendation Engine.
+                    </p>
+                  </div>
+                </div>
+
+                {tmdbTestStatus && (
+                  <div
+                    className={`flex items-center space-x-1 text-xs px-2.5 py-1 rounded-full border ${
+                      tmdbTestStatus.success
+                        ? 'bg-emerald-950/60 border-emerald-800/80 text-emerald-300'
+                        : 'bg-red-950/60 border-red-800/80 text-red-300'
+                    }`}
+                  >
+                    {tmdbTestStatus.success ? (
+                      <>
+                        <CheckCircle2 size={13} className="text-emerald-400" />
+                        <span>Connected</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertCircle size={13} className="text-red-400" />
+                        <span>Failed</span>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="space-y-3 pt-1">
+                <div>
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-neutral-400 mb-1">
+                    TMDB API Key (v3 auth)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showTmdbKey ? 'text' : 'password'}
+                      placeholder="e.g. 1a2b3c4d5e..."
+                      value={tmdbApiKey}
+                      onChange={(e) => setTmdbApiKey(e.target.value)}
+                      className="w-full pl-3.5 pr-10 py-2.5 rounded-lg bg-neutral-900 border border-neutral-700/80 text-white text-sm focus:outline-none focus:border-red-500 focus:ring-1 focus:ring-red-500 placeholder-neutral-500 font-mono text-xs"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowTmdbKey(!showTmdbKey)}
+                      className="absolute right-3 top-3 text-neutral-400 hover:text-white"
+                      tabIndex={-1}
+                    >
+                      {showTmdbKey ? <EyeOff size={16} /> : <Eye size={16} />}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleTestTmdb}
+                    disabled={isTestingTmdb || !tmdbApiKey.trim()}
+                    className="px-3.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 text-xs font-semibold transition flex items-center space-x-1.5 disabled:opacity-50"
+                  >
+                    {isTestingTmdb ? (
+                      <>
+                        <Loader2 size={13} className="animate-spin" />
+                        <span>Testing...</span>
+                      </>
+                    ) : (
+                      <span>Test TMDB API Key</span>
                     )}
                   </button>
                 </div>

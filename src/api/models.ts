@@ -199,7 +199,7 @@ export interface RequestedItem {
 }
 export interface RequestedResponse { items: RequestedItem[]; warnings: string[]; updatedAt: string; }
 export interface IntegrationSummary {
-  id: 'jellyfin' | 'seerr' | 'qbittorrent' | 'droppedneedle' | 'radarr' | 'sonarr';
+  id: 'jellyfin' | 'seerr' | 'qbittorrent' | 'droppedneedle' | 'radarr' | 'sonarr' | 'tmdb';
   name: string;
   url: string;
   configured: boolean;
