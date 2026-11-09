@@ -112,7 +112,7 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
   return (
     <aside
       className="fixed bottom-0 inset-x-0 z-50 bg-[#121212]/95 backdrop-blur-xl border-t border-neutral-800 text-white px-4 md:px-8 py-3 shadow-2xl transition-all"
-      aria-label="Spotify Music player"
+      aria-label="Music player"
     >
       <audio
         key={track.id}

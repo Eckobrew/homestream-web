@@ -67,9 +67,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'music' as const,
       name: 'Music Hub',
-      description: 'Spotify-style personal music library',
+      description: 'Personal music library & streaming',
       icon: Music,
-      badge: 'Spotify',
+      badge: 'Hub',
       color: 'from-emerald-600 to-green-700',
     },
   ];

@@ -223,7 +223,7 @@ export function MusicBrowser({
               <div className="flex items-center space-x-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-[#1DB954] animate-pulse" />
                 <span className="text-[11px] font-bold uppercase tracking-widest text-[#1DB954]">
-                  Spotify Music Hub
+                  Music Hub
                 </span>
                 {activeProfile?.name && (
                   <span className="text-xs px-2 py-0.5 rounded-full bg-neutral-800 text-neutral-300 font-medium">
