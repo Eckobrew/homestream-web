@@ -12,6 +12,9 @@ import {
   X,
   Music2,
   AlertCircle,
+  Shuffle,
+  Repeat,
+  Repeat1,
 } from 'lucide-react';
 
 interface MusicPlayerProps {
@@ -27,6 +30,8 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
   const [duration, setDuration] = useState(0);
   const [volume, setVolume] = useState(0.8);
   const [isMuted, setIsMuted] = useState(false);
+  const [isShuffle, setIsShuffle] = useState(false);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [error, setError] = useState('');
 
   const audioRef = useRef<HTMLAudioElement>(null);
@@ -62,8 +67,13 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
   };
 
   const handleSkipPrev = () => {
-    if (index > 0) {
+    if (currentTime > 3 && audioRef.current) {
+      audioRef.current.currentTime = 0;
+    } else if (index > 0) {
       setIndex((i) => i - 1);
+      setError('');
+    } else if (repeatMode === 'all') {
+      setIndex(tracks.length - 1);
       setError('');
     } else if (audioRef.current) {
       audioRef.current.currentTime = 0;
@@ -71,8 +81,15 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
   };
 
   const handleSkipNext = () => {
-    if (index < tracks.length - 1) {
+    if (isShuffle) {
+      const nextIdx = Math.floor(Math.random() * tracks.length);
+      setIndex(nextIdx);
+      setError('');
+    } else if (index < tracks.length - 1) {
       setIndex((i) => i + 1);
+      setError('');
+    } else if (repeatMode === 'all') {
+      setIndex(0);
       setError('');
     }
   };
@@ -125,8 +142,18 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
         onTimeUpdate={handleTimeUpdate}
         onLoadedMetadata={handleLoadedMetadata}
         onEnded={() => {
-          if (index + 1 < tracks.length) {
+          if (repeatMode === 'one') {
+            if (audioRef.current) {
+              audioRef.current.currentTime = 0;
+              audioRef.current.play().catch(() => {});
+            }
+          } else if (isShuffle) {
+            const nextIdx = Math.floor(Math.random() * tracks.length);
+            setIndex(nextIdx);
+          } else if (index + 1 < tracks.length) {
             setIndex((i) => i + 1);
+          } else if (repeatMode === 'all') {
+            setIndex(0);
           } else {
             setIsPlaying(false);
           }
@@ -154,8 +181,17 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
         <div className="flex flex-col items-center gap-1.5 flex-1 max-w-xl">
           <div className="flex items-center gap-4">
             <button
+              aria-label={isShuffle ? 'Disable shuffle' : 'Enable shuffle'}
+              onClick={() => setIsShuffle((s) => !s)}
+              className={`p-1 transition ${isShuffle ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
+              title={isShuffle ? 'Shuffle on' : 'Shuffle off'}
+            >
+              <Shuffle size={18} />
+            </button>
+
+            <button
               aria-label="Previous track"
-              disabled={index === 0 && currentTime < 3}
+              disabled={index === 0 && currentTime < 3 && repeatMode !== 'all'}
               onClick={handleSkipPrev}
               className="text-neutral-400 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-400 transition"
             >
@@ -176,11 +212,20 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
 
             <button
               aria-label="Next track"
-              disabled={index >= tracks.length - 1}
+              disabled={!isShuffle && repeatMode !== 'all' && index >= tracks.length - 1}
               onClick={handleSkipNext}
               className="text-neutral-400 hover:text-white disabled:opacity-30 disabled:hover:text-neutral-400 transition"
             >
               <SkipForward size={20} />
+            </button>
+
+            <button
+              aria-label={`Repeat mode: ${repeatMode}`}
+              onClick={() => setRepeatMode((m) => (m === 'off' ? 'all' : m === 'all' ? 'one' : 'off'))}
+              className={`p-1 transition ${repeatMode !== 'off' ? 'text-[#1DB954]' : 'text-neutral-400 hover:text-white'}`}
+              title={`Repeat: ${repeatMode}`}
+            >
+              {repeatMode === 'one' ? <Repeat1 size={18} /> : <Repeat size={18} />}
             </button>
           </div>
 
