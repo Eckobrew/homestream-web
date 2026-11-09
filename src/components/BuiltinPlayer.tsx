@@ -83,11 +83,14 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [streamError, setStreamError] = useState(false);
   const [isMidStreamBuffering, setIsMidStreamBuffering] = useState(false);
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(false);
-  const [streamUrl, setStreamUrl] = useState(() =>
-    (item.downloaded ?? 0) >= 15 * 1024 * 1024 || (downloadProgress ?? item.downloadProgress ?? 0) >= 99
+  const [streamUrl, setStreamUrl] = useState(() => {
+    if (item.videoStreamUrl?.includes('/api/youtube/') || item.downloadStreamUrl?.includes('/api/youtube/') || item.id?.startsWith('yt-')) {
+      return item.videoStreamUrl || item.downloadStreamUrl || '';
+    }
+    return (item.downloaded ?? 0) >= 15 * 1024 * 1024 || (downloadProgress ?? item.downloadProgress ?? 0) >= 99
       ? item.downloadStreamUrl || item.videoStreamUrl || ''
-      : ''
-  );
+      : '';
+  });
   const [streamDelivery, setStreamDelivery] = useState<{ url: string; type: string } | null>(null);
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [isLoadingStream, setIsLoadingStream] = useState(!streamUrl);
@@ -173,6 +176,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [castDeviceName, setCastDeviceName] = useState<string>('');
 
   const currentTimeRef = useRef(0);
+  const lastProgressTime = useRef(0);
   useEffect(() => {
     currentTimeRef.current = currentTime;
   }, [currentTime]);
@@ -213,7 +217,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       (item.totalDurationTicks && item.totalDurationTicks > 0) ||
       (activeEpisode?.durationMinutes && activeEpisode.durationMinutes > 0);
 
-    if (!hasDuration && item.id) {
+    if (!hasDuration && item.id && !item.id.startsWith('yt-')) {
       apiFetch(`/api/media/${item.id}`)
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
@@ -735,6 +739,24 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         }
         return Math.max(prev, cur);
       });
+
+      if (item.id?.startsWith('yt-') && Math.abs(cur - lastProgressTime.current) >= 5) {
+        lastProgressTime.current = cur;
+        const videoId = item.id.replace(/^yt-(?:archive-)?/, '');
+        apiFetch('/api/youtube/progress', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId,
+            title: item.title,
+            channelName: item.genres?.[1] || 'YouTube',
+            thumbnailUrl: item.posterUrl,
+            positionSeconds: cur,
+            durationSeconds: duration > 0 ? duration : (knownDurationSeconds > 0 ? knownDurationSeconds : cur),
+            streamUrl: item.videoStreamUrl || item.downloadStreamUrl,
+          }),
+        }).catch(() => {});
+      }
 
       updateBufferState();
     }
