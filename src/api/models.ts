@@ -183,6 +183,44 @@ export interface MusicTrack {
 }
 export interface MusicResponse { configured: boolean; albums: MusicAlbum[]; total: number; }
 export interface MusicAlbumResponse { album: MusicAlbum; tracks: MusicTrack[]; }
+export interface Playlist {
+  id: string;
+  profileId: string;
+  name: string;
+  description?: string;
+  coverUrl?: string;
+  spotifyId?: string;
+  totalTracks: number;
+  downloadedTracks: number;
+  createdAt: string;
+  updatedAt: string;
+}
+export interface PlaylistTrack {
+  id: string;
+  playlistId: string;
+  trackId?: string;
+  title: string;
+  artist: string;
+  album: string;
+  durationSeconds: number;
+  coverUrl?: string;
+  spotifyTrackId?: string;
+  position: number;
+  status: 'pending' | 'searching' | 'downloading' | 'completed' | 'failed';
+  errorMessage?: string;
+  streamUrl?: string;
+  createdAt: string;
+}
+export interface PlaylistsResponse {
+  configured: boolean;
+  playlists: Playlist[];
+  total: number;
+}
+export interface PlaylistDetailResponse {
+  configured: boolean;
+  playlist: Playlist;
+  tracks: PlaylistTrack[];
+}
 export interface RequestedItem {
   id: string;
   title: string;
