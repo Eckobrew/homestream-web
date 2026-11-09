@@ -904,7 +904,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 }`}
               >
                 {isRequested ? <Clock size={16} /> : <Download size={16} />}
-                <span>{isRequested ? 'Download In Progress' : 'Download via Seerr'}</span>
+                <span>{isRequested ? 'Download In Progress' : 'Request Download'}</span>
               </button>
             </div>
           )}

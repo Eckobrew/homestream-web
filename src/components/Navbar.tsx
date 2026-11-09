@@ -216,7 +216,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }`}
               />
               <span className="font-medium text-gray-400">
-                {seerrConnected ? 'Seerr' : 'Seerr Off'}
+                {seerrConnected ? 'Discovery' : 'Discovery Off'}
               </span>
             </div>
           </div>
