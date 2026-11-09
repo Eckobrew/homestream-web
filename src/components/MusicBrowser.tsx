@@ -300,8 +300,8 @@ export function MusicBrowser({
           </div>
         )}
 
-        {/* Quick Access Grid (Spotify 6-Box Hero Grid) */}
-        {!q && quickAccessAlbums.length > 0 && (
+        {/* Quick Access Grid (Spotify 6-Box Hero Grid for larger collections) */}
+        {!q && albums.length > 6 && quickAccessAlbums.length > 0 && (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
             {quickAccessAlbums.map((album) => (
               <div
@@ -439,17 +439,17 @@ export function MusicBrowser({
 
                 <div className="divide-y divide-neutral-800/40 mt-1">
                   {selected.tracks.map((track, i) => (
-                    <div
+                    <button
                       key={track.id}
                       onClick={() => onPlay(selected.tracks, i)}
-                      className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition"
+                      className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
                     >
                       <span className="text-sm text-neutral-400 group-hover:hidden">
                         {track.trackNumber || i + 1}
                       </span>
-                      <button className="hidden group-hover:flex items-center text-white">
+                      <span className="hidden group-hover:flex items-center text-white">
                         <Play size={14} className="fill-white" />
-                      </button>
+                      </span>
 
                       <div className="min-w-0 pr-4">
                         <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
@@ -465,7 +465,7 @@ export function MusicBrowser({
                             ).padStart(2, '0')}`
                           : '--:--'}
                       </span>
-                    </div>
+                    </button>
                   ))}
                 </div>
               </div>
@@ -561,10 +561,16 @@ export function MusicBrowser({
                   {/* Add / Status Footer Button */}
                   <div className="mt-3 pt-2 border-t border-neutral-800/60">
                     {album.inLibrary ? (
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-[#1DB954]">
-                        <Check size={12} />
-                        <span>In Library</span>
-                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAlbum(album);
+                        }}
+                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-[#1DB954] hover:underline"
+                      >
+                        <Play size={12} className="fill-[#1DB954]" />
+                        <span>Tracks & playback</span>
+                      </button>
                     ) : album.isDownloaded ? (
                       <button
                         onClick={(e) => {
@@ -586,7 +592,7 @@ export function MusicBrowser({
                         className="w-full py-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-white text-[11px] font-semibold flex items-center justify-center gap-1 transition disabled:opacity-50"
                       >
                         <Download size={12} />
-                        <span>{album.requested ? 'Requested' : 'Download'}</span>
+                        <span>{album.requested ? 'Requested' : 'Request album'}</span>
                       </button>
                     )}
                   </div>
