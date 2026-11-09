@@ -2,15 +2,12 @@
 import React, { useState } from 'react';
 import type { MediaRowSection, MediaItem, MusicTrack } from '@/types';
 import { MediaRow } from './MediaRow';
-import { MusicBrowser } from './MusicBrowser';
 
 export function DiscoverHub({
   sections,
   onPlay,
   onOpenModal,
   onRequest,
-  onMusic,
-  onAdmin,
 }: {
   sections: MediaRowSection[];
   onPlay: (i: MediaItem) => void;
@@ -38,14 +35,13 @@ export function DiscoverHub({
         </p>
         <h1 className="text-3xl md:text-4xl font-bold">Discover</h1>
         <p className="text-neutral-400 mt-3">
-          Explore movies, TV, and music. Request something new and track it in Requested.
+          Explore movies and TV shows. Request something new and track it in Requested.
         </p>
         <div className="flex flex-wrap gap-2 mt-6" aria-label="Discover media filters">
           {[
             ['all', 'All media'],
             ['movies', 'Movies'],
             ['tv', 'TV Shows'],
-            ['music', 'Music'],
           ].map(([id, label]) => (
             <button
               key={id}
@@ -61,28 +57,23 @@ export function DiscoverHub({
           ))}
         </div>
       </header>
-      {filter !== 'music' && (
-        <div className="space-y-6">
-          {rows.map((s) => (
-            <MediaRow
-              key={s.id}
-              title={s.title}
-              items={s.items}
-              onPlay={onPlay}
-              onOpenModal={onOpenModal}
-              onRequest={onRequest}
-            />
-          ))}
-          {!rows.length && (
-            <p className="px-4 md:px-12 text-neutral-400">
-              Connect TMDB or Arr services in Admin to discover and request movies and TV.
-            </p>
-          )}
-        </div>
-      )}
-      {(filter === 'all' || filter === 'music') && (
-        <MusicBrowser onPlay={onMusic || (() => {})} onAdmin={onAdmin} />
-      )}
+      <div className="space-y-6">
+        {rows.map((s) => (
+          <MediaRow
+            key={s.id}
+            title={s.title}
+            items={s.items}
+            onPlay={onPlay}
+            onOpenModal={onOpenModal}
+            onRequest={onRequest}
+          />
+        ))}
+        {!rows.length && (
+          <p className="px-4 md:px-12 text-neutral-400">
+            Connect TMDB or Arr services in Admin to discover and request movies and TV.
+          </p>
+        )}
+      </div>
     </main>
   );
 }
