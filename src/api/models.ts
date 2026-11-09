@@ -29,6 +29,11 @@ export interface Episode {
   jellyfinId?: string;
   videoStreamUrl?: string;
   downloadStreamUrl?: string;
+  airDate?: string;
+  voteAverage?: number;
+  tmdbId?: number;
+  seriesId?: string;
+  seriesName?: string;
 }
 
 export interface Season {
@@ -37,6 +42,9 @@ export interface Season {
   name: string;
   episodeCount: number;
   overview?: string;
+  posterUrl?: string;
+  airDate?: string;
+  voteAverage?: number;
   episodes?: Episode[];
 }
 
@@ -64,7 +72,7 @@ export interface MediaItem {
   durationMinutes?: number;
   genres: string[];
   seasonsCount?: number;
-  source: 'jellyfin' | 'seerr' | 'demo';
+  source: 'jellyfin' | 'seerr' | 'demo' | 'youtube';
   jellyfinId?: string;
   seerrId?: number;
   tmdbId?: number;
@@ -183,18 +191,7 @@ export interface MusicTrack {
 }
 export interface MusicResponse { configured: boolean; albums: MusicAlbum[]; total: number; }
 export interface MusicAlbumResponse { album: MusicAlbum; tracks: MusicTrack[]; }
-export interface Playlist {
-  id: string;
-  profileId: string;
-  name: string;
-  description?: string;
-  coverUrl?: string;
-  spotifyId?: string;
-  totalTracks: number;
-  downloadedTracks: number;
-  createdAt: string;
-  updatedAt: string;
-}
+
 export interface PlaylistTrack {
   id: string;
   playlistId: string;
@@ -211,13 +208,27 @@ export interface PlaylistTrack {
   streamUrl?: string;
   createdAt: string;
 }
+
+export interface Playlist {
+  id: string;
+  profileId: string;
+  name: string;
+  description?: string;
+  coverUrl?: string;
+  spotifyId?: string;
+  totalTracks: number;
+  downloadedTracks: number;
+  createdAt: string;
+  updatedAt: string;
+  tracks?: PlaylistTrack[];
+}
+
 export interface PlaylistsResponse {
-  configured: boolean;
   playlists: Playlist[];
   total: number;
 }
+
 export interface PlaylistDetailResponse {
-  configured: boolean;
   playlist: Playlist;
   tracks: PlaylistTrack[];
 }
@@ -225,7 +236,7 @@ export interface RequestedItem {
   id: string;
   title: string;
   kind: 'movie' | 'tv' | 'music';
-  source: 'seerr' | 'qbittorrent' | 'slskd';
+  source: 'seerr' | 'tmdb' | 'qbittorrent' | 'slskd' | 'radarr' | 'sonarr';
   status: string;
   artist?: string;
   posterUrl?: string;
@@ -246,3 +257,91 @@ export interface IntegrationSummary {
   username?: string;
 }
 export interface IntegrationsResponse { integrations: IntegrationSummary[]; downloadsPath: string; }
+
+export interface YouTubeSearchResult {
+  id: string;
+  title: string;
+  channelId: string;
+  channelTitle: string;
+  channelAvatarUrl?: string;
+  durationSeconds: number;
+  durationFormatted: string;
+  thumbnailUrl: string;
+  uploadDate?: string;
+  viewCount?: string;
+  description?: string;
+  isShort: boolean;
+  isDownloaded?: boolean;
+}
+
+export interface YouTubeSearchResponse {
+  results: YouTubeSearchResult[];
+}
+
+export interface YouTubeStreamResponse {
+  videoId: string;
+  streamUrl: string;
+  title?: string;
+  durationSeconds?: number;
+}
+
+export interface YouTubeSubscription {
+  id: string;
+  title: string;
+  handle?: string;
+  avatarUrl?: string;
+  bannerUrl?: string;
+  description?: string;
+  subscribedAt: string;
+  autoDownload: boolean;
+  minDurationSeconds: number;
+  maxDurationSeconds?: number;
+  includeKeywords?: string[];
+  excludeKeywords?: string[];
+  ignoreShorts: boolean;
+  lastCheckedAt?: string;
+  lastVideoId?: string;
+  downloadCount?: number;
+}
+
+export interface YouTubeSubscriptionsResponse {
+  subscriptions: YouTubeSubscription[];
+}
+
+export interface YouTubeDownloadItem {
+  videoId: string;
+  channelId?: string;
+  channelTitle?: string;
+  title: string;
+  durationSeconds?: number;
+  thumbnailUrl?: string;
+  uploadDate?: string;
+  status: 'queued' | 'downloading' | 'completed' | 'failed' | 'ignored';
+  progressPercent: number;
+  speedBytes: number;
+  etaSeconds?: number;
+  filePath?: string;
+  errorMessage?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface YouTubeQueueResponse {
+  queue: YouTubeDownloadItem[];
+}
+
+export interface YouTubeArchiveItem {
+  id: string;
+  title: string;
+  channelName: string;
+  filePath: string;
+  fileSize: number;
+  thumbnailUrl?: string;
+  modifiedAt: string;
+  streamUrl: string;
+}
+
+export interface YouTubeArchiveResponse {
+  items: YouTubeArchiveItem[];
+}
+
