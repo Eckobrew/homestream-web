@@ -190,8 +190,16 @@ export default function Home() {
     const searchParams = new URLSearchParams(window.location.search);
 
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin'].includes(tabParam)) {
-      setActiveTab(tabParam==='requests'?'discover':tabParam);
+    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin', 'music', 'youtube'].includes(tabParam)) {
+      if (tabParam === 'music') {
+        setActiveTab('music');
+        setActiveLibrary('music');
+      } else if (tabParam === 'youtube') {
+        setActiveTab('youtube');
+        setActiveLibrary('youtube');
+      } else {
+        setActiveTab(tabParam==='requests'?'discover':tabParam);
+      }
     }
 
     const mediaParam = searchParams.get('media');
@@ -246,7 +254,9 @@ export default function Home() {
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
     setSearchQuery('');
-    setActiveLibrary(null); // Exit A-Z sidebar view and return to standard tab streaming rows
+    if (tab === 'music') setActiveLibrary('music');
+    else if (tab === 'youtube') setActiveLibrary('youtube');
+    else setActiveLibrary(null); // Exit A-Z sidebar view and return to standard tab streaming rows
     if (tab === 'movies') fetchCategories('movies');
     if (tab === 'series') fetchCategories('series');
     if (tab === 'discover') fetchCategories('requests');
@@ -510,20 +520,20 @@ export default function Home() {
           onOpenModal={handleOpenModal}
           onRequest={handleRequest}
         />
-      ) : activeLibrary === 'youtube' ? (
+      ) : activeLibrary === 'youtube' || activeTab === 'youtube' ? (
         /* Dedicated YouTube Hub with Search, Stream, Subscriptions, Queue, and Archive */
         <YouTubeHub
           onPlay={handlePlay}
-          onBackToHome={() => setActiveLibrary(null)}
+          onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
         />
-      ) : activeLibrary === 'music' ? (
+      ) : activeLibrary === 'music' || activeTab === 'music' ? (
         /* Dedicated Spotify-Styled Music Hub */
         <div className="pt-24 min-h-screen">
           <MusicBrowser
             onPlay={(t, i) => setMusic({ tracks: t, index: i })}
             onAdmin={() => setIsServerSetupOpen(true)}
             activeProfileId={activeProfile?.id}
-            onBackToHome={() => setActiveLibrary(null)}
+            onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
           />
         </div>
       ) : activeLibrary ? (
