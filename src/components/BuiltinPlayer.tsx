@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { negotiatePlayback } from '@/player/transport';
 import { playbackState } from '@/player/state';
-import { selectCastSubtitles } from '@/player/cast';
+import { castReceiverId, castStartupState, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { browserPlaybackParameters } from '@/lib/playback-capabilities';
@@ -59,6 +59,17 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const castLoadRef = useRef<(compatible?: boolean) => Promise<void>>(async () => {});
   const castCompatibilityRef = useRef(false);
   const castLoadGeneration = useRef(0);
+  const castStartup = useRef<{ position: number; autoplay: boolean; attempt: number; deadline: number } | null>(null);
+  const [castError, setCastError] = useState(false);
+  const cancelCastLoad = useCallback(() => {
+    ++castLoadGeneration.current;
+    castStartup.current = null;
+  }, []);
+  useEffect(() => cancelCastLoad, [cancelCastLoad]);
+  const syncCastVolume = useCallback((level: number, muted: boolean) => {
+    if (Number.isFinite(level)) setVolume(level);
+    setIsMuted(muted);
+  }, []);
   const containerRef = useRef<HTMLDivElement>(null);
   const hlsRef = useRef<Hls | null>(null);
 
@@ -349,15 +360,41 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     [isCasting, subtitles]
   );
 
+  const returnFromFailedCast = useCallback((start: { position: number; autoplay: boolean }) => {
+    cancelCastLoad();
+    setIsCastConnecting(false);
+    setIsCasting(false);
+    setCastError(true);
+    (window as any).cast?.framework?.CastContext.getInstance().endCurrentSession(true);
+    if (videoRef.current) {
+      videoRef.current.currentTime = start.position;
+      if (start.autoplay) void videoRef.current.play().catch(() => {});
+    }
+  }, [cancelCastLoad]);
+
   // Load media stream with metadata and subtitles onto connected Chromecast receiver
   const loadCastMedia = useCallback(async (compatible = false) => {
     const generation = ++castLoadGeneration.current;
     castCompatibilityRef.current = compatible;
+    const previous = compatible ? castStartup.current : null;
+    setCastError(false);
+    const start = {
+      position: previous?.position ?? (compatible ? currentTimeRef.current : videoRef.current?.currentTime ?? currentTimeRef.current),
+      autoplay: previous?.autoplay ?? (videoRef.current ? !videoRef.current.paused : true),
+      attempt: generation,
+      deadline: Date.now() + 30_000,
+    };
+    castStartup.current = start;
+    const failed = () => {
+      if (generation !== castLoadGeneration.current) return;
+      if (!compatible) { void castLoadRef.current(true); return; }
+      returnFromFailedCast(start);
+    };
     try {
       if (typeof window === 'undefined' || !(window as any).cast?.framework) return;
       const castContext = (window as any).cast.framework.CastContext.getInstance();
       const session = castContext.getCurrentSession();
-      if (!session) return;
+      if (!session) { cancelCastLoad(); return; }
 
       const deviceName = session.getCastDevice()?.friendlyName;
       if (deviceName) setCastDeviceName(deviceName);
@@ -368,7 +405,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       let negotiatedDuration = 0;
       const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
       if (!isItemDownloading && targetId) {
-        const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', videoCodecs: compatible ? 'h264' : 'h264,hevc,vp8,vp9,av1', audioCodecs: 'aac,mp3,opus,vorbis', maxWidth: compatible ? '1920' : '3840', maxHeight: compatible ? '1080' : '2160', forceTranscode: String(compatible) });
+        const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
+        const capabilities = compatible ? undefined : await requestCastCapabilities(session);
+        if (generation !== castLoadGeneration.current) return;
+        if (capabilities) params.set('videoCapabilities', capabilities);
         const response = await apiFetch(`/api/playback?${params}`);
         if (!response.ok) throw new Error('Cast stream negotiation failed');
         const result = await response.json();
@@ -377,11 +417,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         negotiatedDuration = result.durationSeconds || 0;
       }
       if (generation !== castLoadGeneration.current) return;
-      if (!rawUrl) return;
+      if (!rawUrl || castContext.getCurrentSession() !== session) { failed(); return; }
 
       const absoluteMediaUrl = new URL(rawUrl, window.location.href).href;
       lastCastedUrlRef.current = absoluteMediaUrl;
-      lastCastedKeyRef.current = (activeEpisode ? `${item.id}-${activeEpisode.id}` : item.id) + '-' + localUrl;
+      lastCastedKeyRef.current = targetId;
 
       const isHls = absoluteMediaUrl.includes('.m3u8');
       const contentType = negotiatedContentType || (isHls ? 'application/x-mpegURL' : new URL(absoluteMediaUrl).pathname.endsWith('.webm') ? 'video/webm' : 'video/mp4');
@@ -399,8 +439,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       mediaInfo.streamType = (window as any).chrome.cast.media.StreamType.BUFFERED;
       if (negotiatedDuration > 0) {
         mediaInfo.duration = negotiatedDuration;
-        mediaInfo.customData = { playback: { durationSeconds: negotiatedDuration } };
+
       }
+
+      mediaInfo.customData = { itemId: targetId, attempt: generation, playback: { durationSeconds: negotiatedDuration } };
 
       if (subtitles && subtitles.length > 0 && (window as any).chrome?.cast?.media?.Track) {
         mediaInfo.tracks = subtitles.map((sub, idx) => {
@@ -418,8 +460,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       }
 
       const request = new (window as any).chrome.cast.media.LoadRequest(mediaInfo);
-      request.currentTime = videoRef.current?.currentTime || currentTimeRef.current || 0;
-      request.autoplay = true;
+      request.currentTime = start.position;
+      request.autoplay = start.autoplay;
+      const selectedTrack = subtitles.findIndex(track => track.id === selectedSubtitleId);
+      if (selectedTrack >= 0) request.activeTrackIds = [selectedTrack + 1];
 
       session.loadMedia(request).then(
         () => {
@@ -430,26 +474,32 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             videoRef.current.pause();
           }
         },
-        (err: any) => {
-          if (generation !== castLoadGeneration.current) return;
-          if (!compatible) { void castLoadRef.current(true); return; }
-          console.error('Error loading media to Chromecast:', err);
-          setIsCastConnecting(false);
-          setStreamError(true);
-        }
+        failed
       );
-    } catch (e) {
-      if (generation !== castLoadGeneration.current) return;
-      if (!compatible) { void castLoadRef.current(true); return; }
-      console.error('Cast media load exception:', e);
-      setIsCastConnecting(false);
-      setStreamError(true);
+    } catch {
+      failed();
     }
-  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading]);
+  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, cancelCastLoad, returnFromFailedCast]);
   castLoadRef.current = loadCastMedia;
+
+  const inspectCastStartup = useCallback((media: unknown) => {
+    const pending = castStartup.current;
+    if (!pending) return false;
+    const state = castStartupState(pending, media);
+    if (state === 'ready') {
+      castStartup.current = null;
+      return false;
+    }
+    if (state === 'failed') {
+      if (!castCompatibilityRef.current) void castLoadRef.current(true);
+      else returnFromFailedCast(pending);
+    }
+    return true;
+  }, [returnFromFailedCast]);
 
   // Disconnect from Chromecast session
   const handleDisconnectCast = useCallback(() => {
+    cancelCastLoad();
     if (typeof window !== 'undefined' && (window as any).cast?.framework) {
       try {
         const castContext = (window as any).cast.framework.CastContext.getInstance();
@@ -457,7 +507,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       } catch (e) {}
     }
     const video = videoRef.current;
-    if (video && 'remote' in video && (video as any).remote?.prompt) {
+    if (video && (video as any).remote?.state === 'connected') {
       (video as any).remote.prompt().catch(() => {});
     }
     setIsCasting(false);
@@ -471,7 +521,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         videoRef.current.play().catch(console.error);
       }
     }
-  }, [currentTime, isPlaying]);
+  }, [cancelCastLoad, currentTime, isPlaying]);
 
   // Cast button click handler supporting both Google Cast SDK and RemotePlayback API
   const handleCastClick = useCallback(async (e?: React.MouseEvent) => {
@@ -509,7 +559,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         const castContext = (window as any).cast.framework.CastContext.getInstance();
         try {
           castContext.setOptions({
-            receiverApplicationId: (window as any).chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID || 'CC1AD845',
+            receiverApplicationId: castReceiverId(),
             autoJoinPolicy: (window as any).chrome?.cast?.AutoJoinPolicy?.ORIGIN_SCOPED,
           });
         } catch (initErr) {
@@ -547,18 +597,18 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     );
   }, [isCasting, handleDisconnectCast]);
 
-  useCastSession({videoRef, loadCastMedia, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying});
+  useCastSession({videoRef, loadCastMedia: castLoadRef, cancelCastLoad, inspectCastStartup, syncCastVolume, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying});
 
   // Auto-reload on Chromecast ONLY when media/episode actually changes while casting
   useEffect(() => {
     if (isCasting && streamUrl && lastCastedKeyRef.current) {
-      const currentItemKey = (activeEpisode ? `${item.id}-${activeEpisode.id}` : item.id) + '-' + streamUrl;
+      const currentItemKey = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
       if (lastCastedKeyRef.current !== currentItemKey) {
         lastCastedKeyRef.current = currentItemKey;
         loadCastMedia();
       }
     }
-  }, [streamUrl, activeEpisode, item.id, isCasting, loadCastMedia]);
+  }, [streamUrl, activeEpisode, activePlayableId, item, isCasting, loadCastMedia]);
 
   // Resolve known media duration in seconds
   const knownDurationSeconds =
@@ -882,14 +932,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   const handleVolumeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const newVol = Number(e.target.value);
-    setVolume(newVol);
-    setIsMuted(newVol === 0);
     if (isCasting && typeof window !== 'undefined' && (window as any).cast?.framework) {
       try {
         const castContext = (window as any).cast.framework.CastContext.getInstance();
-        castContext.setVolumeLevel(newVol);
+        const session = castContext.getCurrentSession();
+        if (session) { void session.setVolume(newVol).catch(() => {}); return; }
       } catch (e) {}
     }
+    setVolume(newVol);
+    setIsMuted(newVol === 0);
     if (videoRef.current) {
       videoRef.current.volume = newVol;
       videoRef.current.muted = newVol === 0;
@@ -898,13 +949,14 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   const toggleMute = () => {
     const nextMuted = !isMuted;
-    setIsMuted(nextMuted);
     if (isCasting && typeof window !== 'undefined' && (window as any).cast?.framework) {
       try {
         const castContext = (window as any).cast.framework.CastContext.getInstance();
-        castContext.setMuted(nextMuted);
+        const session = castContext.getCurrentSession();
+        if (session) { void session.setMute(nextMuted).catch(() => {}); return; }
       } catch (e) {}
     }
+    setIsMuted(nextMuted);
     if (videoRef.current) {
       videoRef.current.muted = nextMuted;
     }
@@ -1069,6 +1121,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       )}
 
       {/* Stream Error Dialog */}
+      {castError && (
+        <button type="button" role="alert" onClick={() => setCastError(false)}
+          className="absolute left-1/2 top-4 z-50 -translate-x-1/2 rounded bg-black/90 px-4 py-2 text-sm text-white">
+          Chromecast could not start playback. Playback returned to this device.
+        </button>
+      )}
       {streamError && (
         <div className="absolute inset-0 bg-black/95 flex flex-col items-center justify-center p-6 text-center z-40 space-y-4">
           <div className="w-16 h-16 rounded-full bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-500">

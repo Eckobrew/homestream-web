@@ -18,9 +18,15 @@ const state={stopped:false,error:false,loading:false,buffering:false,playing:tru
 assert.equal(playbackState(state),'playing');
 for(const [property,expected] of [['loading','loading'],['buffering','buffering'],['error','error'],['stopped','stopped']]) assert.equal(playbackState({...state,[property]:true}),expected);
 assert.equal(playbackState({...state,playing:false}),'paused');
-const {selectCastSubtitles}=await source('cast');
+const {castStartupState,selectCastSubtitles}=await source('cast');
 const selected=[];
 const sdk={createRequest:ids=>ids,editTracks:request=>selected.push(request)};
 selectCastSubtitles(sdk,1);selectCastSubtitles(sdk,-1);
 assert.deepEqual(selected,[[2],[]]);
+const pending={attempt:2,deadline:30000};
+const castStatus=(attempt,playerState,idleReason)=>({media:{customData:{attempt}},playerState,idleReason});
+assert.equal(castStartupState(pending,castStatus(1,'PLAYING'),500),'pending');
+assert.equal(castStartupState(pending,castStatus(2,'PAUSED'),500),'ready');
+assert.equal(castStartupState(pending,castStatus(2,'BUFFERING'),30000),'failed');
+assert.equal(castStartupState(pending,castStatus(2,'IDLE','ERROR'),1000),'failed');
 console.info('Playback state, item-bound progress, and Cast track checks passed');

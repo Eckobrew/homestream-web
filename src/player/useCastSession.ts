@@ -1,9 +1,10 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 'use client';
+import { castReceiverId } from './cast';
 import { useEffect, type RefObject, type MutableRefObject, type Dispatch, type SetStateAction } from 'react';
 type Setter<T> = Dispatch<SetStateAction<T>>;
-export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying}: {
- videoRef:RefObject<HTMLVideoElement|null>; loadCastMedia:()=>Promise<void>; setIsCastConnecting:Setter<boolean>; setIsCasting:Setter<boolean>; setIsCastAvailable:Setter<boolean>; setCastDeviceName:Setter<string>; lastCastedUrlRef:MutableRefObject<string>; lastCastedKeyRef:MutableRefObject<string>; isCasting:boolean; isScrubbing:boolean; setCurrentTime:Setter<number>; castCompatibilityRef:MutableRefObject<boolean>; castLoadRef:MutableRefObject<(compatible?:boolean)=>Promise<void>>; castFinishedItem:MutableRefObject<string>; autoplayEpisodes:boolean; nextEpisodeHandler:MutableRefObject<()=>void>; setIsPlaying:Setter<boolean>;
+export function useCastSession({videoRef, loadCastMedia, cancelCastLoad, syncCastVolume, inspectCastStartup, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying}: {
+ videoRef:RefObject<HTMLVideoElement|null>; loadCastMedia:MutableRefObject<(compatible?:boolean)=>Promise<void>>; cancelCastLoad:()=>void; syncCastVolume:(level:number, muted:boolean)=>void; inspectCastStartup:(media:unknown)=>boolean; setIsCastConnecting:Setter<boolean>; setIsCasting:Setter<boolean>; setIsCastAvailable:Setter<boolean>; setCastDeviceName:Setter<string>; lastCastedUrlRef:MutableRefObject<string>; lastCastedKeyRef:MutableRefObject<string>; isCasting:boolean; isScrubbing:boolean; setCurrentTime:Setter<number>; castCompatibilityRef:MutableRefObject<boolean>; castLoadRef:MutableRefObject<(compatible?:boolean)=>Promise<void>>; castFinishedItem:MutableRefObject<string>; autoplayEpisodes:boolean; nextEpisodeHandler:MutableRefObject<()=>void>; setIsPlaying:Setter<boolean>;
 }) {
   // Initialize Google Cast SDK & HTMLMediaElement Remote Playback
   useEffect(() => {
@@ -61,7 +62,7 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
           cleanup.push(() => castContext.removeEventListener(type, listener));
         };
         castContext.setOptions({
-          receiverApplicationId: (window as any).chrome?.cast?.media?.DEFAULT_MEDIA_RECEIVER_APP_ID || 'CC1AD845',
+          receiverApplicationId: castReceiverId(),
           autoJoinPolicy: (window as any).chrome?.cast?.AutoJoinPolicy?.ORIGIN_SCOPED,
         });
 
@@ -72,8 +73,10 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
         }
         if (currentCastState === CastState.CONNECTED) {
           setIsCasting(true);
-          const dev = castContext.getCurrentSession()?.getCastDevice()?.friendlyName;
+          const session = castContext.getCurrentSession();
+          const dev = session?.getCastDevice()?.friendlyName;
           if (dev) setCastDeviceName(dev);
+          lastCastedKeyRef.current = session?.getMediaSession()?.media?.customData?.itemId || '';
         }
 
         listen(
@@ -107,10 +110,12 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
               const session = castContext.getCurrentSession();
               const dev = session?.getCastDevice()?.friendlyName;
               if (dev) setCastDeviceName(dev);
-              loadCastMedia();
+              if (event.sessionState === SessionState.SESSION_STARTED) void loadCastMedia.current();
+              else lastCastedKeyRef.current = session?.getMediaSession()?.media?.customData?.itemId || '';
             } else if (event.sessionState === SessionState.SESSION_ENDED) {
               setIsCasting(false);
               setIsCastConnecting(false);
+              cancelCastLoad();
               setCastDeviceName('');
               lastCastedUrlRef.current = '';
               lastCastedKeyRef.current = '';
@@ -136,7 +141,7 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
       }
     }
     return () => { disposed = true; cleanup.forEach(stop => stop()); };
-  }, [loadCastMedia]);
+  }, [loadCastMedia, cancelCastLoad]);
 
   // Google Cast receiver position polling & playback state sync
   useEffect(() => {
@@ -147,9 +152,11 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
           try {
             const session = (window as any).cast.framework.CastContext.getInstance().getCurrentSession();
             const media = session?.getMediaSession();
+            if (session) syncCastVolume(session.getVolume(), session.isMute());
+            if (inspectCastStartup(media)) return;
             if (media) {
               const estimatedTime = media.getEstimatedTime();
-              if (typeof estimatedTime === 'number' && !isScrubbing && estimatedTime > 0) {
+              if (typeof estimatedTime === 'number' && !isScrubbing && estimatedTime >= 0) {
                 setCurrentTime(estimatedTime);
               }
               const playerState = media.playerState;
@@ -177,6 +184,6 @@ export function useCastSession({videoRef, loadCastMedia, setIsCastConnecting, se
     return () => {
       if (interval) clearInterval(interval);
     };
-  }, [isCasting, isScrubbing, autoplayEpisodes]);
+  }, [isCasting, isScrubbing, autoplayEpisodes, syncCastVolume, inspectCastStartup]);
 
 }
