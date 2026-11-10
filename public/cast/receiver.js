@@ -6,6 +6,20 @@
   if (!window.cast?.framework) { notice.hidden = false; notice.textContent = 'Connect using a Google Cast device to start HomeStream.'; return; }
   const context = cast.framework.CastReceiverContext.getInstance();
   const manager = context.getPlayerManager();
+  function debugLog(data) {
+    try {
+      const q = encodeURIComponent(JSON.stringify(data));
+      fetch('/api/cast-debug?d=' + q).catch(() => {});
+    } catch (e) {}
+  }
+  manager.setMessageInterceptor(cast.framework.messages.MessageType.LOAD, req => {
+    debugLog({ type: 'LOAD', contentId: req?.media?.contentId, contentType: req?.media?.contentType, streamType: req?.media?.streamType, tracks: req?.media?.tracks?.length });
+    return req;
+  });
+  manager.setMessageInterceptor(cast.framework.messages.MessageType.QUEUE_LOAD, req => {
+    debugLog({ type: 'QUEUE_LOAD', itemsCount: req?.items?.length, startIndex: req?.startIndex, currentTime: req?.currentTime });
+    return req;
+  });
   // Transcoding output may expose a growing buffered duration. The library
   // runtime is the full title duration, independent of how much is encoded.
   manager.setMessageInterceptor(cast.framework.messages.MessageType.MEDIA_STATUS, message => {
@@ -60,8 +74,13 @@
     if (updated !== signature) { signature = updated; slides = valid; index = 0; if (!slides.length) { ++serial; images.forEach(image => { image.onload = null; image.classList.remove('active'); image.removeAttribute('src'); }); document.getElementById('slide-title').textContent = ''; } stateChanged(true); }
   });
   manager.addEventListener(cast.framework.events.EventType.MEDIA_STATUS, stateChanged);
-  manager.addEventListener(cast.framework.events.EventType.ERROR, () => {
-    stateChanged(); notice.textContent = 'Playback could not start. Choose the title again in HomeStream.'; notice.hidden = false;
+  manager.addEventListener(cast.framework.events.EventType.ERROR, event => {
+    stateChanged();
+    const code = event?.detailedErrorCode || event?.reason || 'UNKNOWN';
+    const msg = event?.error?.message || event?.reason || '';
+    debugLog({ type: 'ERROR', detailedErrorCode: code, error: msg, raw: String(event) });
+    notice.textContent = 'Error [' + code + ']: Playback could not start. Choose the title again in HomeStream.';
+    notice.hidden = false;
   });
   context.start({ statusText: 'Ready to cast', versionCode: 1, customNamespaces: { [namespace]: cast.framework.system.MessageType.JSON } });
   stateChanged();
