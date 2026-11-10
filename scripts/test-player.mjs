@@ -18,7 +18,16 @@ const state={stopped:false,error:false,loading:false,buffering:false,playing:tru
 assert.equal(playbackState(state),'playing');
 for(const [property,expected] of [['loading','loading'],['buffering','buffering'],['error','error'],['stopped','stopped']]) assert.equal(playbackState({...state,[property]:true}),expected);
 assert.equal(playbackState({...state,playing:false}),'paused');
-const {castStartupState,selectCastSubtitles}=await source('cast');
+const {castReceiverId,castStartupState,selectCastSubtitles}=await source('cast');
+const previousReceiver=process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID;
+delete process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID;
+assert.equal(castReceiverId(),'CC1AD845');
+assert.equal(castReceiverId(''),'CC1AD845');
+assert.equal(castReceiverId('invalid'),'CC1AD845');
+assert.equal(castReceiverId('abc123ef'),'ABC123EF');
+if(previousReceiver!==undefined) process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID=previousReceiver;
+const dockerfile=await readFile(new URL('../Dockerfile',import.meta.url),'utf8');
+assert.match(dockerfile,/^ARG NEXT_PUBLIC_CAST_RECEIVER_APP_ID(?:=)?$/m);
 const selected=[];
 const sdk={createRequest:ids=>ids,editTracks:request=>selected.push(request)};
 selectCastSubtitles(sdk,1);selectCastSubtitles(sdk,-1);

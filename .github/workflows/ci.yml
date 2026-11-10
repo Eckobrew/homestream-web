@@ -16,6 +16,12 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run lint
+      - name: Keep private Cast receiver assets out of Git
+        run: |
+          if [ -n "$(git ls-files -- public/cast)" ]; then
+            echo 'Host private Cast receiver assets outside the repository.'
+            exit 1
+          fi
       - run: npm run test:player
       - run: npm run test:contract
       - run: npm run test:playback

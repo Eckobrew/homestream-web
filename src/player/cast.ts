@@ -4,10 +4,9 @@ export function selectCastSubtitles(sdk: { createRequest(ids: number[]): unknown
 }
 
 export const CAST_NAMESPACE = 'urn:x-cast:uk.eckonet.homestream';
-const DEFAULT_RECEIVER_ID = '75369D0A';
+export const DEFAULT_RECEIVER_ID = 'CC1AD845';
 
-export function castReceiverId() {
-  const configured = process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID;
+export function castReceiverId(configured = process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID) {
   return configured && /^[a-f\d]{8}$/i.test(configured) ? configured.toUpperCase() : DEFAULT_RECEIVER_ID;
 }
 

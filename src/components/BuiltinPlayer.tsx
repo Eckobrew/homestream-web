@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { negotiatePlayback } from '@/player/transport';
 import { playbackState } from '@/player/state';
-import { castReceiverId, castStartupState, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
+import { castReceiverId, castStartupState, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { browserPlaybackParameters } from '@/lib/playback-capabilities';
@@ -406,7 +406,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
       if (!isItemDownloading && targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
-        const capabilities = compatible ? undefined : await requestCastCapabilities(session);
+        const capabilities = compatible || castReceiverId() === DEFAULT_RECEIVER_ID
+          ? undefined : await requestCastCapabilities(session);
         if (generation !== castLoadGeneration.current) return;
         if (capabilities) params.set('videoCapabilities', capabilities);
         const response = await apiFetch(`/api/playback?${params}`);
