@@ -43,3 +43,6 @@ next-env.d.ts
 
 playwright-report/
 test-results/
+
+# Privately hosted Cast receiver assets
+/public/cast/
