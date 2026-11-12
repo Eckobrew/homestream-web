@@ -50,3 +50,28 @@ export function castStartupState(pending: { attempt: number; deadline: number },
   if (now >= pending.deadline || (matches && status.playerState === 'IDLE' && status.idleReason === 'ERROR')) return 'failed';
   return 'pending';
 }
+
+export function sendCastIdle(session: any, items: Array<{ title: string; backdropUrl?: string; posterUrl?: string }>) {
+  if (castReceiverId() === DEFAULT_RECEIVER_ID) return;
+  try {
+    const slides = items
+      .filter((item) => item.backdropUrl || item.posterUrl)
+      .slice(0, 5)
+      .map((item) => ({
+        title: item.title || '',
+        artwork: new URL(item.backdropUrl || item.posterUrl || '', window.location.href).href,
+      }));
+    if (slides.length > 0 && session?.sendMessage) {
+      void session.sendMessage(CAST_NAMESPACE, { type: 'idle', items: slides }).catch(() => {});
+    }
+  } catch {}
+}
+
+export function clearCastIdle(session: any) {
+  if (castReceiverId() === DEFAULT_RECEIVER_ID) return;
+  try {
+    if (session?.sendMessage) {
+      void session.sendMessage(CAST_NAMESPACE, { type: 'idle', items: [] }).catch(() => {});
+    }
+  } catch {}
+}

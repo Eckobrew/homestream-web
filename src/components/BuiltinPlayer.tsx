@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { negotiatePlayback } from '@/player/transport';
 import { playbackState } from '@/player/state';
-import { castReceiverId, castStartupState, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
+import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
 import { browserPlaybackParameters } from '@/lib/playback-capabilities';
@@ -404,8 +404,16 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       let negotiatedContentType = '';
       let negotiatedDuration = 0;
       const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
-      if (!isItemDownloading && targetId) {
+      if (targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
+        if (activeEpisode) {
+          if (activeEpisode.seasonNumber) params.set('season', String(activeEpisode.seasonNumber));
+          if (activeEpisode.episodeNumber) params.set('episode', String(activeEpisode.episodeNumber));
+          params.set('type', 'tv');
+        } else if (item.type) {
+          params.set('type', item.type === 'Movie' ? 'movie' : 'tv');
+        }
+        if (item.title) params.set('title', item.title);
         const capabilities = compatible || castReceiverId() === DEFAULT_RECEIVER_ID
           ? undefined : await requestCastCapabilities(session);
         if (generation !== castLoadGeneration.current) return;
@@ -438,12 +446,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       }
 
       mediaInfo.streamType = (window as any).chrome.cast.media.StreamType.BUFFERED;
-      if (negotiatedDuration > 0) {
-        mediaInfo.duration = negotiatedDuration;
-
+      const finalDuration = negotiatedDuration > 0
+        ? negotiatedDuration
+        : (item.durationMinutes ? item.durationMinutes * 60 : 0) || (activeEpisode?.totalDurationTicks ? activeEpisode.totalDurationTicks / 10000000 : 0);
+      if (finalDuration > 0) {
+        mediaInfo.duration = finalDuration;
       }
 
-      mediaInfo.customData = { itemId: targetId, attempt: generation, playback: { durationSeconds: negotiatedDuration } };
+      mediaInfo.customData = { itemId: targetId, attempt: generation, playback: { durationSeconds: finalDuration > 0 ? finalDuration : undefined } };
+      clearCastIdle(session);
 
       if (subtitles && subtitles.length > 0 && (window as any).chrome?.cast?.media?.Track) {
         mediaInfo.tracks = subtitles.map((sub, idx) => {
