@@ -28,7 +28,7 @@ export default async function TvLoginPage({
         </div>
       )}
 
-      <form action="/api/tv/login" method="POST" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+      <form action="/tv/login/submit" method="POST" style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
         <div>
           <label htmlFor="username" style={{ display: 'block', fontSize: '15px', fontWeight: 'bold', color: '#dddddd', marginBottom: '8px' }}>
             Username
