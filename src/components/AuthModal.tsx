@@ -68,7 +68,11 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
         return;
       }
 
-      onSuccess();
+      if (typeof window !== 'undefined') {
+        window.location.href = '/';
+      } else {
+        onSuccess();
+      }
     } catch (err) {
       setError('Connection to server failed. Please try again.');
       setIsLoading(false);

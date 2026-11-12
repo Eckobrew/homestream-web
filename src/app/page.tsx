@@ -553,8 +553,8 @@ export default function Home() {
         <DiscoverHub key={activeProfile?.id || 'default'} sections={displayedSections} onPlay={handlePlay} onOpenModal={handleOpenModal} onRequest={handleRequest} onMusic={(tracks,index)=>{setPlayingState(null);setMusic({tracks,index});}} onAdmin={()=>handleTabChange('admin')}/>
       ) : loading ? (
         /* Loading Skeleton */
-        <div className="h-screen w-full flex flex-col items-center justify-center space-y-4">
-          <Loader2 size={48} className="animate-spin text-red-600" />
+        <div className="h-screen w-full flex flex-col items-center justify-center space-y-4 pt-28 text-center px-4" style={{ minHeight: '70vh', textAlign: 'center', paddingTop: '7rem' }}>
+          <Loader2 size={48} className="animate-spin text-red-600 mx-auto" />
           <p className="text-sm font-semibold tracking-wide text-neutral-400 uppercase">
             Loading {serverConfig.appName || 'HomeStream'}...
           </p>
@@ -584,7 +584,7 @@ export default function Home() {
           )}
 
           {/* Horizontal Scrolling Media Rows */}
-          <div className="relative z-20 -mt-16 md:-mt-24 space-y-2 md:space-y-4 pb-20">
+          <div className={`relative z-20 ${displayedHeroItems.length > 0 ? '-mt-16 md:-mt-24' : 'pt-20 md:pt-24'} space-y-2 md:space-y-4 pb-20`}>
             {displayedSections.map((section) => (
               <MediaRow
                 key={section.id}
