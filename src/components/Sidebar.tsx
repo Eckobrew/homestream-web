@@ -81,6 +81,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`fixed inset-0 bg-black/70 backdrop-blur-sm z-40 transition-opacity duration-300 ${
           isOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'
         }`}
+        style={{ display: isOpen ? undefined : 'none' }}
         onClick={onClose}
         aria-hidden="true"
       />
@@ -90,6 +91,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         className={`fixed top-0 left-0 bottom-0 w-80 max-w-[85vw] bg-[#121212] border-r border-neutral-800/80 z-50 flex flex-col transform transition-transform duration-300 ease-out shadow-2xl ${
           isOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
+        style={{ display: isOpen ? undefined : 'none' }}
         role="dialog"
         aria-hidden={!isOpen}
         inert={!isOpen}
@@ -214,7 +216,17 @@ export const Sidebar: React.FC<SidebarProps> = ({
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-neutral-800 bg-[#0e0e0e]/50">
+        <div className="p-4 border-t border-neutral-800 bg-[#0e0e0e]/50 space-y-3">
+          <a
+            href="/tv"
+            className="w-full flex items-center justify-between px-3 py-2 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-xs text-white font-medium transition"
+          >
+            <span className="flex items-center space-x-2">
+              <Tv size={14} className="text-red-500" />
+              <span>Leanback TV Mode (Smart TV / Remote)</span>
+            </span>
+            <ChevronRight size={14} className="opacity-60" />
+          </a>
           <div className="flex items-center justify-between text-xs text-neutral-400">
             <span className="flex items-center space-x-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />

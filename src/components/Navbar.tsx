@@ -152,6 +152,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </button>
             <button onClick={()=>onTabChange('requested')} className={'transition-colors '+(activeTab==='requested'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Requested</button>
             {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'transition-colors '+(activeTab==='admin'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Admin</button>}
+            <a href="/tv" title="Switch to Leanback TV Mode (Smart TVs, Remotes & Game Consoles)" className="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider text-neutral-400 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 transition">TV Mode</a>
           </div>
         </div>
 

@@ -149,6 +149,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased bg-[#141414] text-white`}
+        style={{ backgroundColor: '#141414', color: '#ffffff' }}
       >
         <ProfileProvider>
           {children}
