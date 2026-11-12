@@ -244,6 +244,7 @@ export function MusicBrowser({
       discNumber: 1,
       durationSeconds: t.durationSeconds,
       streamUrl: t.streamUrl || '',
+      coverUrl: t.coverUrl,
     }));
 
     onPlay(playable, readyIdx);

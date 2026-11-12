@@ -164,8 +164,24 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
       <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">
         {/* Left Track Info */}
         <div className="flex items-center gap-3 min-w-0 w-1/4">
-          <div className="w-12 h-12 rounded bg-neutral-800 flex items-center justify-center shrink-0 border border-neutral-700/60 shadow">
-            <Music2 size={22} className="text-[#1DB954]" />
+          <div className="w-12 h-12 rounded bg-neutral-800 flex items-center justify-center shrink-0 border border-neutral-700/60 shadow overflow-hidden relative">
+            {track.coverUrl ? (
+              <img
+                src={track.coverUrl}
+                alt={track.album || track.title}
+                className="w-full h-full object-cover"
+                onError={(e) => {
+                  (e.currentTarget as HTMLElement).style.display = 'none';
+                  const fb = e.currentTarget.nextElementSibling as HTMLElement | null;
+                  if (fb) fb.style.display = 'flex';
+                }}
+              />
+            ) : null}
+            <div
+              className={`w-full h-full flex items-center justify-center ${track.coverUrl ? 'hidden' : ''}`}
+            >
+              <Music2 size={22} className="text-[#1DB954]" />
+            </div>
           </div>
           <div className="min-w-0">
             <p className="font-semibold text-sm text-white truncate hover:underline cursor-pointer">
