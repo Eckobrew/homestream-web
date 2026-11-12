@@ -81,16 +81,17 @@ export default async function TvMusicPage({
           ) : (
             <div className="tv-grid">
               {albums.map((album) => (
-                <a key={album.id} href={`/tv/music/album/${album.id}`} className="tv-grid-card" tabIndex={0}>
-                  <div className="tv-card-poster" style={{ aspectRatio: '1/1' }}>
-                    <img
-                      src={album.coverUrl || '/poster-placeholder.png'}
-                      alt={album.title}
-                      style={{ objectFit: 'cover', width: '100%', height: '100%' }}
-                    />
+                <a key={album.id} href={`/tv/music/album/${album.id}`} className="tv-card tv-card-music" tabIndex={0}>
+                  <img
+                    src={album.coverUrl || '/poster-placeholder.png'}
+                    alt={album.title}
+                    loading="lazy"
+                    style={{ width: '100%', height: '180px', objectFit: 'cover' }}
+                  />
+                  <div className="tv-card-meta">
+                    <div className="tv-card-title">{album.title}</div>
+                    <div className="tv-card-sub">{album.artist}</div>
                   </div>
-                  <div className="tv-card-title">{album.title}</div>
-                  <div className="tv-card-subtitle">{album.artist}</div>
                 </a>
               ))}
             </div>
@@ -104,16 +105,23 @@ export default async function TvMusicPage({
           ) : (
             <div className="tv-grid">
               {playlists.map((pl) => (
-                <a key={pl.id} href={`/tv/music/playlist/${pl.id}`} className="tv-grid-card" tabIndex={0}>
-                  <div className="tv-card-poster" style={{ aspectRatio: '1/1', backgroundColor: '#1a1a1a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {pl.coverUrl ? (
-                      <img src={pl.coverUrl} alt={pl.name} style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
-                    ) : (
-                      <span style={{ fontSize: '32px' }}>🎵</span>
-                    )}
+                <a key={pl.id} href={`/tv/music/playlist/${pl.id}`} className="tv-card tv-card-music" tabIndex={0}>
+                  {pl.coverUrl ? (
+                    <img
+                      src={pl.coverUrl}
+                      alt={pl.name}
+                      loading="lazy"
+                      style={{ width: '100%', height: '180px', objectFit: 'cover' }}
+                    />
+                  ) : (
+                    <div style={{ width: '100%', height: '180px', backgroundColor: '#262626', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <span style={{ fontSize: '36px' }}>🎵</span>
+                    </div>
+                  )}
+                  <div className="tv-card-meta">
+                    <div className="tv-card-title">{pl.name}</div>
+                    <div className="tv-card-sub">{pl.trackCount || 0} tracks</div>
                   </div>
-                  <div className="tv-card-title">{pl.name}</div>
-                  <div className="tv-card-subtitle">{pl.trackCount || 0} tracks</div>
                 </a>
               ))}
             </div>

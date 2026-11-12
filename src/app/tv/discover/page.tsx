@@ -51,17 +51,18 @@ export default async function TvDiscoverPage({
       ) : (
         <div className="tv-grid">
           {items.map((item) => (
-            <a key={item.id} href={`/tv/media/${item.id}`} className="tv-grid-card" tabIndex={0}>
-              <div className="tv-card-poster">
-                <img
-                  src={item.posterUrl || '/poster-placeholder.png'}
-                  alt={item.title}
-                />
-              </div>
-              <div className="tv-card-title">{item.title}</div>
-              <div className="tv-card-subtitle">
-                {item.year || item.releaseDate?.slice(0, 4) || 'TMDB'}
-                {item.communityRating ? ` • ★ ${item.communityRating.toFixed(1)}` : ''}
+            <a key={item.id} href={`/tv/media/${item.id}`} className="tv-card" tabIndex={0}>
+              <img
+                src={item.posterUrl || '/poster-placeholder.png'}
+                alt={item.title}
+                loading="lazy"
+              />
+              <div className="tv-card-meta">
+                <div className="tv-card-title">{item.title}</div>
+                <div className="tv-card-sub">
+                  {item.year || item.releaseDate?.slice(0, 4) || 'TMDB'}
+                  {item.communityRating ? ` • ★ ${item.communityRating.toFixed(1)}` : ''}
+                </div>
               </div>
             </a>
           ))}

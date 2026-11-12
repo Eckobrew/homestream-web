@@ -68,16 +68,17 @@ export default async function TvRequestedPage() {
             {requested.map((item: any) => {
               const id = item.id || `seerr-${item.mediaType || 'movie'}-${item.mediaId || item.tmdbId}`;
               return (
-                <a key={id} href={`/tv/media/${id}`} className="tv-grid-card" tabIndex={0}>
-                  <div className="tv-card-poster">
-                    <img
-                      src={item.posterUrl || '/poster-placeholder.png'}
-                      alt={item.title || item.name}
-                    />
-                  </div>
-                  <div className="tv-card-title">{item.title || item.name}</div>
-                  <div className="tv-card-subtitle" style={{ color: item.status === 'available' ? '#10b981' : '#f59e0b' }}>
-                    {item.status ? item.status.toUpperCase() : 'REQUESTED'}
+                <a key={id} href={`/tv/media/${id}`} className="tv-card" tabIndex={0}>
+                  <img
+                    src={item.posterUrl || '/poster-placeholder.png'}
+                    alt={item.title || item.name}
+                    loading="lazy"
+                  />
+                  <div className="tv-card-meta">
+                    <div className="tv-card-title">{item.title || item.name}</div>
+                    <div className="tv-card-sub" style={{ color: item.status === 'available' ? '#10b981' : '#f59e0b', fontWeight: 'bold' }}>
+                      {item.status ? item.status.toUpperCase() : 'REQUESTED'}
+                    </div>
                   </div>
                 </a>
               );

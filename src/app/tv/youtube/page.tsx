@@ -87,12 +87,17 @@ export default async function TvYouTubePage({
             const watchUrl = `/tv/watch/${vidId}?source=youtube`;
 
             return (
-              <a key={vidId} href={watchUrl} className="tv-grid-card" tabIndex={0}>
-                <div className="tv-card-poster" style={{ aspectRatio: '16/9' }}>
-                  <img src={thumb} alt={vid.title} style={{ objectFit: 'cover', width: '100%', height: '100%' }} />
+              <a key={vidId} href={watchUrl} className="tv-card tv-card-youtube" tabIndex={0}>
+                <img
+                  src={thumb}
+                  alt={vid.title}
+                  loading="lazy"
+                  style={{ width: '100%', height: '135px', objectFit: 'cover' }}
+                />
+                <div className="tv-card-meta">
+                  <div className="tv-card-title">{vid.title}</div>
+                  <div className="tv-card-sub">{vid.channelTitle || vid.author || 'YouTube'}</div>
                 </div>
-                <div className="tv-card-title">{vid.title}</div>
-                <div className="tv-card-subtitle">{vid.channelTitle || vid.author || 'YouTube'}</div>
               </a>
             );
           })}
