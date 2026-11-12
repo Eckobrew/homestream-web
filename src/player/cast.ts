@@ -51,7 +51,11 @@ export function castStartupState(pending: { attempt: number; deadline: number },
   return 'pending';
 }
 
-export function sendCastIdle(session: any, items: Array<{ title: string; backdropUrl?: string; posterUrl?: string }>) {
+type CastMessageSession = {
+  sendMessage?(namespace: string, message: object): Promise<unknown>;
+};
+
+export function sendCastIdle(session: CastMessageSession | null | undefined, items: Array<{ title: string; backdropUrl?: string; posterUrl?: string }>) {
   if (castReceiverId() === DEFAULT_RECEIVER_ID) return;
   try {
     const slides = items
@@ -64,14 +68,18 @@ export function sendCastIdle(session: any, items: Array<{ title: string; backdro
     if (slides.length > 0 && session?.sendMessage) {
       void session.sendMessage(CAST_NAMESPACE, { type: 'idle', items: slides }).catch(() => {});
     }
-  } catch {}
+  } catch {
+    /* Ignore cast session idle message errors */
+  }
 }
 
-export function clearCastIdle(session: any) {
+export function clearCastIdle(session: CastMessageSession | null | undefined) {
   if (castReceiverId() === DEFAULT_RECEIVER_ID) return;
   try {
     if (session?.sendMessage) {
       void session.sendMessage(CAST_NAMESPACE, { type: 'idle', items: [] }).catch(() => {});
     }
-  } catch {}
+  } catch {
+    /* Ignore cast session idle message errors */
+  }
 }
