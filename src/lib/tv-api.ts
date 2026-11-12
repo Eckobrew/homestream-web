@@ -333,7 +333,13 @@ export async function fetchTvRequested(): Promise<{ requested: any[]; downloads:
   }
 }
 
-export async function fetchTvYouTube(tab = 'home', q = ''): Promise<any[]> {
+export interface TvYouTubeResponse {
+  hero: any | null;
+  sections: Array<{ id: string; title: string; items: any[] }>;
+  items: any[];
+}
+
+export async function fetchTvYouTube(tab = 'home', q = ''): Promise<TvYouTubeResponse> {
   try {
     const hdrs = await getForwardedHeaders();
     let url = `${getBackendUrl()}/api/v1/youtube/recommendations`;
@@ -342,10 +348,38 @@ export async function fetchTvYouTube(tab = 'home', q = ''): Promise<any[]> {
     else if (tab === 'subscriptions') url = `${getBackendUrl()}/api/v1/youtube/subscriptions`;
 
     const res = await fetch(url, { cache: 'no-store', headers: hdrs });
-    if (!res.ok) return [];
+    if (!res.ok) return { hero: null, sections: [], items: [] };
     const data = await res.json();
-    return data.videos || data.items || data.recommendations || [];
+
+    if (Array.isArray(data.sections)) {
+      const allItems: any[] = [];
+      const seen = new Set<string>();
+      if (data.hero?.id) {
+        allItems.push(data.hero);
+        seen.add(data.hero.id);
+      }
+      for (const s of data.sections) {
+        for (const it of (s.items || [])) {
+          if (!seen.has(it.id)) {
+            seen.add(it.id);
+            allItems.push(it);
+          }
+        }
+      }
+      return {
+        hero: data.hero || null,
+        sections: data.sections || [],
+        items: allItems,
+      };
+    }
+
+    const rawList = data.results || data.items || data.subscriptions || data.videos || [];
+    return {
+      hero: null,
+      sections: [],
+      items: Array.isArray(rawList) ? rawList : [],
+    };
   } catch {
-    return [];
+    return { hero: null, sections: [], items: [] };
   }
 }

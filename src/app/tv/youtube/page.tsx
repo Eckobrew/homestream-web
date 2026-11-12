@@ -9,10 +9,12 @@ export default async function TvYouTubePage({
   searchParams: Promise<{ tab?: string; q?: string }>;
 }) {
   const { tab = 'home', q = '' } = await searchParams;
-  const videos = await fetchTvYouTube(tab, q);
+  const youtubeData = await fetchTvYouTube(tab, q);
+  const { hero, sections, items } = youtubeData;
+  const isHome = tab === 'home' && !q;
 
   return (
-    <div style={{ padding: '24px 36px' }}>
+    <div style={{ padding: '24px 36px 48px 36px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '28px', flexWrap: 'wrap', gap: '16px' }}>
         <div style={{ display: 'flex', gap: '12px' }}>
           <a
@@ -20,7 +22,7 @@ export default async function TvYouTubePage({
             className="tv-btn"
             tabIndex={0}
             style={{
-              backgroundColor: tab === 'home' && !q ? '#e50914' : '#242424',
+              backgroundColor: isHome ? '#e50914' : '#242424',
               color: '#ffffff',
             }}
           >
@@ -73,34 +75,90 @@ export default async function TvYouTubePage({
         </form>
       </div>
 
-      <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '18px' }}>
-        {q ? `YouTube Results for "${q}"` : tab === 'archive' ? 'Archived YouTube Videos' : tab === 'subscriptions' ? 'Subscribed Channels' : 'YouTube Recommendations'}
-      </h2>
+      {isHome && sections.length > 0 ? (
+        <div>
+          {sections.map((sec) => (
+            <div key={sec.id} style={{ marginBottom: '32px' }}>
+              <h2 className="tv-section-title" style={{ marginBottom: '14px' }}>{sec.title}</h2>
+              <div className="tv-row">
+                {sec.items.map((vid: any) => {
+                  const vidId = vid.id || vid.videoId;
+                  const thumb = vid.thumbnailUrl || vid.thumbnail || `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`;
+                  const watchUrl = `/tv/watch/${vidId}?source=youtube`;
 
-      {videos.length === 0 ? (
-        <p style={{ color: '#aaaaaa', fontSize: '18px' }}>No YouTube videos found.</p>
+                  return (
+                    <a key={vidId} href={watchUrl} className="tv-card tv-card-youtube" tabIndex={0}>
+                      <img
+                        src={thumb}
+                        alt={vid.title}
+                        loading="lazy"
+                        style={{ width: '100%', height: '135px', objectFit: 'cover' }}
+                      />
+                      <div className="tv-card-meta">
+                        <div className="tv-card-title">{vid.title}</div>
+                        <div className="tv-card-sub">{vid.channelTitle || vid.author || 'YouTube'}</div>
+                      </div>
+                    </a>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
       ) : (
-        <div className="tv-grid">
-          {videos.map((vid: any) => {
-            const vidId = vid.id || vid.videoId;
-            const thumb = vid.thumbnailUrl || vid.thumbnail || `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`;
-            const watchUrl = `/tv/watch/${vidId}?source=youtube`;
+        <div>
+          <h2 style={{ fontSize: '24px', fontWeight: 'bold', marginBottom: '18px' }}>
+            {q ? `YouTube Results for "${q}"` : tab === 'archive' ? 'Archived YouTube Videos' : tab === 'subscriptions' ? 'Subscribed Channels' : 'YouTube Recommendations'}
+          </h2>
 
-            return (
-              <a key={vidId} href={watchUrl} className="tv-card tv-card-youtube" tabIndex={0}>
-                <img
-                  src={thumb}
-                  alt={vid.title}
-                  loading="lazy"
-                  style={{ width: '100%', height: '135px', objectFit: 'cover' }}
-                />
-                <div className="tv-card-meta">
-                  <div className="tv-card-title">{vid.title}</div>
-                  <div className="tv-card-sub">{vid.channelTitle || vid.author || 'YouTube'}</div>
-                </div>
-              </a>
-            );
-          })}
+          {items.length === 0 ? (
+            <p style={{ color: '#aaaaaa', fontSize: '18px' }}>
+              {tab === 'subscriptions'
+                ? 'No subscribed channels found. Add channels in the web interface or search above.'
+                : 'No YouTube videos found.'}
+            </p>
+          ) : (
+            <div className="tv-grid">
+              {items.map((it: any) => {
+                if (tab === 'subscriptions' && (it.name || it.channelId)) {
+                  const subSearchUrl = `/tv/youtube?q=${encodeURIComponent(it.name || it.channelTitle || it.id)}`;
+                  return (
+                    <a key={it.id || it.channelId} href={subSearchUrl} className="tv-card" tabIndex={0}>
+                      <img
+                        src={it.avatarUrl || '/poster-placeholder.png'}
+                        alt={it.name || it.channelTitle}
+                        loading="lazy"
+                        style={{ width: '100%', height: '180px', objectFit: 'cover' }}
+                      />
+                      <div className="tv-card-meta">
+                        <div className="tv-card-title">{it.name || it.channelTitle}</div>
+                        <div className="tv-card-sub">Channel • Click to Browse</div>
+                      </div>
+                    </a>
+                  );
+                }
+
+                const vidId = it.id || it.videoId;
+                const thumb = it.thumbnailUrl || it.thumbnail || `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`;
+                const watchUrl = `/tv/watch/${vidId}?source=youtube`;
+
+                return (
+                  <a key={vidId} href={watchUrl} className="tv-card tv-card-youtube" tabIndex={0}>
+                    <img
+                      src={thumb}
+                      alt={it.title}
+                      loading="lazy"
+                      style={{ width: '100%', height: '135px', objectFit: 'cover' }}
+                    />
+                    <div className="tv-card-meta">
+                      <div className="tv-card-title">{it.title}</div>
+                      <div className="tv-card-sub">{it.channelTitle || it.author || 'YouTube'}</div>
+                    </div>
+                  </a>
+                );
+              })}
+            </div>
+          )}
         </div>
       )}
     </div>

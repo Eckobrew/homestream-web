@@ -28,6 +28,7 @@ import {
   History,
 } from 'lucide-react';
 import { MediaItem } from '@/types';
+import { useProfile } from '@/context/ProfileContext';
 
 export interface YouTubeSearchResult {
   id: string;
@@ -127,6 +128,8 @@ function formatDurationSeconds(sec?: number): string {
 }
 
 export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) => {
+  const { activeProfile } = useProfile();
+  const profileId = activeProfile?.id || 'default';
   const [currentView, setCurrentView] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
 
   // Home / Discovery State
@@ -178,30 +181,30 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
   // Fetch Auth Status
   const loadAuthStatus = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/youtube/auth');
+      const res = await apiFetch(`/api/youtube/auth?profileId=${encodeURIComponent(profileId)}`);
       if (res.ok) {
         const data = await res.json();
         setAuthStatus(data);
       }
     } catch {}
-  }, []);
+  }, [profileId]);
 
   // Fetch Continue Watching
   const loadContinueWatching = useCallback(async () => {
     try {
-      const res = await apiFetch('/api/youtube/continue-watching');
+      const res = await apiFetch(`/api/youtube/continue-watching?profileId=${encodeURIComponent(profileId)}`);
       if (res.ok) {
         const data = await res.json();
         setContinueWatching(data.items || []);
       }
     } catch {}
-  }, []);
+  }, [profileId]);
 
   // Fetch Recommendations & Media Sections
   const loadHomeRecommendations = useCallback(async () => {
     setIsLoadingHome(true);
     try {
-      const res = await apiFetch('/api/youtube/recommendations');
+      const res = await apiFetch(`/api/youtube/recommendations?profileId=${encodeURIComponent(profileId)}`);
       if (res.ok) {
         const data = await res.json();
         setHeroVideo(data.hero || null);
@@ -212,7 +215,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
     } finally {
       setIsLoadingHome(false);
     }
-  }, []);
+  }, [profileId]);
 
   // Fetch Subscriptions
   const loadSubscriptions = useCallback(async () => {
@@ -404,7 +407,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
 
     setIsSavingAuth(true);
     try {
-      const res = await apiFetch('/api/youtube/auth', {
+      const res = await apiFetch(`/api/youtube/auth?profileId=${encodeURIComponent(profileId)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -432,7 +435,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
   // Disconnect YouTube Auth
   const handleDisconnectAuth = async () => {
     try {
-      await apiFetch('/api/youtube/auth', { method: 'DELETE' });
+      await apiFetch(`/api/youtube/auth?profileId=${encodeURIComponent(profileId)}`, { method: 'DELETE' });
       setAuthStatus({ connected: false });
       showToast('YouTube account disconnected.');
       setIsAuthModalOpen(false);
@@ -697,6 +700,21 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) 
               <div className="flex items-center justify-center py-20 text-neutral-500 gap-3">
                 <Loader2 size={24} className="animate-spin text-red-500" />
                 <span>Loading YouTube rows...</span>
+              </div>
+            ) : sections.length === 0 ? (
+              <div className="text-center py-20 text-neutral-400 space-y-3">
+                <PlaySquare size={48} className="mx-auto text-neutral-600 mb-2" />
+                <p className="text-lg font-semibold text-white">No YouTube recommendations available right now.</p>
+                <p className="text-sm text-neutral-400 max-w-md mx-auto">
+                  Try searching for your favorite creators above, connecting your YouTube account, or refreshing recommendations.
+                </p>
+                <button
+                  onClick={() => loadHomeRecommendations()}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition"
+                >
+                  <RefreshCw size={14} />
+                  <span>Refresh Recommendations</span>
+                </button>
               </div>
             ) : (
               sections.map((section) => (
