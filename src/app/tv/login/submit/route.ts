@@ -8,7 +8,10 @@ export async function POST(request: NextRequest) {
     const password = (formData.get('password') as string) || '';
 
     if (!username.trim()) {
-      return NextResponse.redirect(new URL('/tv/login?error=Username%20is%20required', request.url), 303);
+      return new NextResponse(null, {
+        status: 303,
+        headers: { Location: '/tv/login?error=Username%20is%20required' },
+      });
     }
 
     const res = await fetch(`${getBackendUrl()}/api/v1/auth`, {
@@ -25,11 +28,16 @@ export async function POST(request: NextRequest) {
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.success) {
       const errMsg = encodeURIComponent(data.error || 'Invalid username or password');
-      return NextResponse.redirect(new URL(`/tv/login?error=${errMsg}`, request.url), 303);
+      return new NextResponse(null, {
+        status: 303,
+        headers: { Location: `/tv/login?error=${errMsg}` },
+      });
     }
 
-    const redirectUrl = new URL('/tv', request.url);
-    const response = NextResponse.redirect(redirectUrl, 303);
+    const response = new NextResponse(null, {
+      status: 303,
+      headers: { Location: '/tv' },
+    });
 
     const setCookieHeader = res.headers.get('set-cookie');
     if (setCookieHeader) {
@@ -55,6 +63,9 @@ export async function POST(request: NextRequest) {
 
     return response;
   } catch (err: any) {
-    return NextResponse.redirect(new URL('/tv/login?error=Server%20connection%20failed', request.url), 303);
+    return new NextResponse(null, {
+      status: 303,
+      headers: { Location: '/tv/login?error=Server%20connection%20failed' },
+    });
   }
 }
