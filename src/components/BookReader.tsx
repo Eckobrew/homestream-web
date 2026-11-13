@@ -5,15 +5,9 @@ import { apiFetch } from '@/api/client';
 import type { BookItem, BookProgress } from '@/types';
 import {
   X,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
-  BookOpen,
-  Download,
-  Minus,
-  Plus,
-  List,
   AlertCircle,
+  Download,
 } from 'lucide-react';
 
 interface BookReaderProps {
@@ -21,12 +15,6 @@ interface BookReaderProps {
   initialProgress?: BookProgress | null;
   profileId?: string;
   onClose: () => void;
-}
-
-interface TocItem {
-  id: string;
-  label: string;
-  href: string;
 }
 
 export function BookReader({
@@ -43,11 +31,13 @@ export function BookReader({
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [fontSize, setFontSize] = useState(105);
   const [percent, setPercent] = useState<number>(initialProgress?.percent || 0);
   const [locationLabel, setLocationLabel] = useState<string>('');
-  const [toc, setToc] = useState<TocItem[]>([]);
-  const [showToc, setShowToc] = useState(false);
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const turnRef = useRef<Animation | null>(null);
+  const [wide, setWide] = useState(false);
+  const pagesPerTurn = wide ? 2 : 1;
+  const [hoverTop, setHoverTop] = useState(false);
 
   // EPUB refs
   const epubContainerRef = useRef<HTMLDivElement | null>(null);
@@ -63,6 +53,21 @@ export function BookReader({
   const [pdfTotal, setPdfTotal] = useState<number>(0);
   const leftCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const rightCanvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Touch / swipe tracking
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 768px)');
+    const update = () => setWide(media.matches);
+    update();
+    media.addEventListener('change', update);
+    return () => {
+      media.removeEventListener('change', update);
+      turnRef.current?.cancel();
+      turnRef.current = null;
+    };
+  }, []);
 
   const fileUrl = useCallback(
     (dl = false) => {
@@ -93,6 +98,64 @@ export function BookReader({
     [book.id, profileId]
   );
 
+  const turnPage = useCallback(async (forward: boolean) => {
+    const page = pageRef.current;
+    if (!page || turnRef.current || loading || error) return;
+
+    const nextPdfPage = forward ? pdfPage + pagesPerTurn : Math.max(1, pdfPage - pagesPerTurn);
+    if (format === 'pdf' && (nextPdfPage === pdfPage || nextPdfPage > pdfTotal)) return;
+
+    const rendition = renditionRef.current;
+    if (format === 'epub') {
+      const location = rendition?.location;
+      if (!location || (forward ? location.atEnd : location.atStart)) return;
+    }
+    const advance = async () => {
+      if (format === 'pdf') setPdfPage(nextPdfPage);
+      else if (format === 'epub') await (forward ? rendition.next() : rendition.prev());
+    };
+
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !page.animate) {
+      try {
+        await advance();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Unable to turn the page');
+      }
+      return;
+    }
+
+    const outgoing = forward ? -88 : 88;
+    const flat = 'perspective(2000px) rotateY(0deg)';
+    const animate = (from: string, to: string, transformOrigin: string, duration: number, easing: string) =>
+      page.animate([{ transform: from, transformOrigin }, { transform: to, transformOrigin }], {
+        duration, easing, fill: 'both',
+      });
+
+    let animation = animate(flat, `perspective(2000px) rotateY(${outgoing}deg)`, forward ? 'left' : 'right', 200, 'ease-in');
+    turnRef.current = animation;
+    try {
+      await animation.finished;
+      await advance();
+      if (turnRef.current !== animation) return;
+      animation.cancel();
+      animation = animate(`perspective(2000px) rotateY(${-outgoing}deg)`, flat, forward ? 'right' : 'left', 240, 'ease-out');
+      turnRef.current = animation;
+      await animation.finished;
+    } catch (err) {
+      if (turnRef.current === animation) {
+        setError(err instanceof Error ? err.message : 'Unable to turn the page');
+      }
+    } finally {
+      if (turnRef.current === animation) {
+        animation.cancel();
+        turnRef.current = null;
+      }
+    }
+  }, [format, pdfPage, pdfTotal, pagesPerTurn, loading, error]);
+
+  const goPrev = useCallback(() => { void turnPage(false); }, [turnPage]);
+  const goNext = useCallback(() => { void turnPage(true); }, [turnPage]);
+
   // EPUB 2-page spread loader
   useEffect(() => {
     if (format !== 'epub') return;
@@ -116,7 +179,7 @@ export function BookReader({
         const rendition = epubBook.renderTo(epubContainerRef.current, {
           width: '100%',
           height: '100%',
-          spread: 'always',
+          spread: 'auto',
           minSpreadWidth: 640,
           flow: 'paginated',
         });
@@ -124,26 +187,27 @@ export function BookReader({
 
         rendition.themes.default({
           body: {
-            background: '#161616 !important',
-            color: '#ececec !important',
-            'font-family': 'Georgia, ui-serif, serif !important',
-            'line-height': '1.65 !important',
-            padding: '0 24px !important',
+            background: 'transparent !important',
+            color: '#231c14 !important',
+            'font-family': '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif !important',
+            'line-height': '1.78 !important',
+            'font-size': '106% !important',
+            'text-align': 'justify !important',
+            padding: '28px 38px !important',
           },
-          'a, a:link, a:visited': { color: '#f87171 !important' },
+          'p': {
+            'text-indent': '1.4em !important',
+            'margin-top': '0 !important',
+            'margin-bottom': '0.45em !important',
+          },
+          'h1, h2, h3, h4': {
+            color: '#1b140e !important',
+            'font-family': 'Georgia, serif !important',
+            'text-align': 'center !important',
+            'letter-spacing': '0.04em !important',
+          },
+          'a, a:link, a:visited': { color: '#7c2d12 !important', 'text-decoration': 'none !important' },
         });
-        rendition.themes.fontSize(`${fontSize}%`);
-
-        const nav = await epubBook.loaded.navigation;
-        if (!cancelled && nav?.toc) {
-          setToc(
-            nav.toc.map((item: any, idx: number) => ({
-              id: String(item.id || idx),
-              label: String(item.label || '').trim(),
-              href: String(item.href || ''),
-            }))
-          );
-        }
 
         const startLoc =
           initialProgress?.location && initialProgress.location.startsWith('epubcfi(')
@@ -155,7 +219,7 @@ export function BookReader({
           const cfi = loc?.start?.cfi || '';
           const displayed = loc?.start?.displayed;
           if (displayed?.page && displayed?.total) {
-            setLocationLabel(`Spread ${displayed.page} of ${displayed.total}`);
+            setLocationLabel(`${displayed.page} / ${displayed.total}`);
           }
           let pct = percent;
           if (epubBook.locations?.length?.() > 0 && cfi) {
@@ -196,16 +260,6 @@ export function BookReader({
     };
   }, [format, fileUrl]);
 
-  useEffect(() => {
-    if (format === 'epub' && renditionRef.current) {
-      try {
-        renditionRef.current.themes.fontSize(`${fontSize}%`);
-      } catch {
-        // ignore
-      }
-    }
-  }, [fontSize, format]);
-
   // PDF 2-page spread loader
   useEffect(() => {
     if (format !== 'pdf') return;
@@ -221,9 +275,9 @@ export function BookReader({
         if (cancelled) return;
 
         const pdfjs: any = await import('pdfjs-dist');
-        if (pdfjs.GlobalWorkerOptions && !pdfjs.GlobalWorkerOptions.workerSrc) {
-          pdfjs.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version || '4.10.38'}/pdf.worker.min.mjs`;
-        }
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
+        ).toString();
         const doc = await pdfjs.getDocument({ data: new Uint8Array(buf) }).promise;
         if (cancelled) return;
         pdfDocRef.current = doc;
@@ -255,8 +309,6 @@ export function BookReader({
 
     const renderPage = async (pageNum: number, canvas: HTMLCanvasElement | null) => {
       if (!canvas) return;
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
       if (pageNum < 1 || pageNum > doc.numPages) {
         canvas.width = 0;
         canvas.height = 0;
@@ -265,219 +317,181 @@ export function BookReader({
       const page = await doc.getPage(pageNum);
       if (cancelled) return;
       const baseViewport = page.getViewport({ scale: 1 });
-      const maxHeight = Math.max(480, window.innerHeight - 160);
-      const maxWidth = Math.max(320, (window.innerWidth - 140) / 2);
-      const scale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height) * (fontSize / 100);
+      const area = canvas.parentElement;
+      if (!area) return;
+      const maxHeight = area.clientHeight - 16;
+      const maxWidth = (area.clientWidth - (wide ? 24 : 0)) / pagesPerTurn;
+      const scale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height);
       const viewport = page.getViewport({ scale });
-      canvas.width = viewport.width;
-      canvas.height = viewport.height;
-      await page.render({ canvasContext: ctx, viewport }).promise;
+      const buffer = document.createElement('canvas');
+      buffer.width = viewport.width;
+      buffer.height = viewport.height;
+      const context = buffer.getContext('2d');
+      if (!context) return;
+      await page.render({ canvas: buffer, canvasContext: context, viewport }).promise;
+      if (cancelled) return;
+      canvas.width = buffer.width;
+      canvas.height = buffer.height;
+      canvas.getContext('2d')?.drawImage(buffer, 0, 0);
     };
 
     void (async () => {
       await Promise.all([
         renderPage(pdfPage, leftCanvasRef.current),
-        renderPage(pdfPage + 1, rightCanvasRef.current),
+        wide ? renderPage(pdfPage + 1, rightCanvasRef.current) : Promise.resolve(),
       ]);
       if (cancelled) return;
-      const pct = pdfTotal > 0 ? Math.min(100, Math.round((Math.min(pdfTotal, pdfPage + 1) / pdfTotal) * 100)) : 0;
+      const pct = pdfTotal > 0 ? Math.min(100, Math.round((Math.min(pdfTotal, pdfPage + pagesPerTurn - 1) / pdfTotal) * 100)) : 0;
       setPercent(pct);
       setLocationLabel(
-        pdfPage + 1 <= pdfTotal
-          ? `Pages ${pdfPage}–${pdfPage + 1} of ${pdfTotal}`
-          : `Page ${pdfPage} of ${pdfTotal}`
+        wide && pdfPage + 1 <= pdfTotal
+          ? `${pdfPage}–${pdfPage + 1} / ${pdfTotal}`
+          : `${pdfPage} / ${pdfTotal}`
       );
       persistProgress(String(pdfPage), pct);
-    })();
+    })().catch((err: unknown) => {
+      if (!cancelled) setError(err instanceof Error ? err.message : 'Unable to render PDF');
+    });
 
     return () => {
       cancelled = true;
     };
-  }, [format, pdfPage, pdfTotal, fontSize, loading, persistProgress]);
-
-  const goPrev = useCallback(() => {
-    if (format === 'epub') {
-      void renditionRef.current?.prev?.();
-    } else if (format === 'pdf') {
-      setPdfPage((p) => Math.max(1, p - 2));
-    }
-  }, [format]);
-
-  const goNext = useCallback(() => {
-    if (format === 'epub') {
-      void renditionRef.current?.next?.();
-    } else if (format === 'pdf') {
-      setPdfPage((p) => (p + 2 <= pdfTotal ? p + 2 : p));
-    }
-  }, [format, pdfTotal]);
+  }, [format, pdfPage, pdfTotal, loading, persistProgress, pagesPerTurn, wide]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose();
       else if (e.key === 'ArrowLeft') goPrev();
-      else if (e.key === 'ArrowRight') goNext();
+      else if (e.key === 'ArrowRight' || e.key === ' ') goNext();
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [goPrev, goNext, onClose]);
 
   return (
-    <div className="fixed inset-0 z-50 bg-[#0d0d0d] text-white flex flex-col select-none">
-      {/* Top Reader Bar */}
-      <header className="h-14 px-4 md:px-6 border-b border-neutral-800/90 bg-[#141414] flex items-center justify-between gap-4 shrink-0">
-        <div className="flex items-center gap-3 min-w-0">
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 transition"
-            title="Close reader (Esc)"
-          >
-            <X size={20} />
-          </button>
-          <div className="w-7 h-7 rounded-md bg-red-600/20 border border-red-500/40 flex items-center justify-center text-red-400 shrink-0">
-            <BookOpen size={15} />
-          </div>
-          <div className="min-w-0">
-            <div className="text-sm font-bold truncate">{book.title}</div>
-            <div className="text-[11px] text-neutral-400 truncate">
-              {book.author} · <span className="uppercase text-red-400 font-semibold">{format}</span> · Two-page spread
-            </div>
-          </div>
-        </div>
+    <div
+      className="fixed inset-0 z-50 bg-[radial-gradient(ellipse_at_center,#231a14_0%,#0c0907_100%)] flex items-center justify-center select-none overflow-hidden p-2 sm:p-6 md:p-10"
+      onMouseMove={(e) => {
+        setHoverTop(e.clientY < 68);
+      }}
+      onTouchStart={(e) => {
+        const touch = e.touches[0];
+        touchStartRef.current = e.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+      }}
+      onTouchCancel={() => { touchStartRef.current = null; }}
+      onTouchEnd={(e) => {
+        const start = touchStartRef.current;
+        touchStartRef.current = null;
+        const end = e.changedTouches[0];
+        if (!start || !end) return;
+        const dx = end.clientX - start.x;
+        const dy = end.clientY - start.y;
+        if (Math.abs(dx) > 48 && Math.abs(dx) > Math.abs(dy)) {
+          e.preventDefault();
+          if (dx < 0) goNext();
+          else goPrev();
+        }
+      }}
+    >
+      {/* Subtle auto-hiding close bookmark in top-right */}
+      <button
+        onClick={onClose}
+        aria-label="Close book"
+        title="Close book (Esc)"
+        className={`fixed top-0 right-8 z-40 px-3 pt-4 pb-5 rounded-b-md bg-gradient-to-b from-red-800 to-red-950 text-amber-100/90 shadow-xl border-x border-b border-red-700/50 transition-all duration-300 ${
+          hoverTop ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-40 hover:opacity-100 hover:translate-y-0'
+        }`}
+      >
+        <X size={16} />
+      </button>
 
-        <div className="flex items-center gap-2">
-          {toc.length > 0 && (
-            <button
-              onClick={() => setShowToc((v) => !v)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 border transition ${
-                showToc
-                  ? 'bg-red-600 border-red-500 text-white'
-                  : 'border-neutral-700 text-neutral-300 hover:text-white hover:border-neutral-500'
-              }`}
-            >
-              <List size={14} />
-              <span>Contents</span>
-            </button>
-          )}
-          <div className="hidden sm:flex items-center rounded-lg border border-neutral-800 bg-neutral-900/80">
-            <button
-              onClick={() => setFontSize((s) => Math.max(75, s - 10))}
-              className="p-1.5 text-neutral-300 hover:text-white"
-              title="Smaller text / zoom out"
-            >
-              <Minus size={14} />
-            </button>
-            <span className="px-2 text-xs text-neutral-400 font-mono">{fontSize}%</span>
-            <button
-              onClick={() => setFontSize((s) => Math.min(160, s + 10))}
-              className="p-1.5 text-neutral-300 hover:text-white"
-              title="Larger text / zoom in"
-            >
-              <Plus size={14} />
-            </button>
-          </div>
-          <a
-            href={fileUrl(true)}
-            className="px-3 py-1.5 rounded-lg border border-neutral-700 hover:border-neutral-500 text-xs font-semibold text-neutral-200 flex items-center gap-1.5"
-          >
-            <Download size={14} />
-            <span className="hidden sm:inline">Download</span>
-          </a>
-        </div>
-      </header>
-
-      {/* Main Spread Viewport */}
-      <div className="relative flex-1 flex items-center justify-center overflow-hidden bg-[#121212]">
-        {showToc && toc.length > 0 && (
-          <aside className="absolute left-0 top-0 bottom-0 w-72 bg-[#181818] border-r border-neutral-800 z-30 overflow-y-auto p-3 space-y-1">
-            <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 px-2 py-1.5">
-              Table of Contents
+      {/* Outer Hardcover Leather Binding */}
+      <div
+        className="relative w-full max-w-6xl h-full max-h-[880px] rounded-[18px] p-2.5 sm:p-4 bg-gradient-to-b from-[#3b2316] via-[#27160e] to-[#1b0f09] shadow-[0_35px_90px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.12)] border border-[#4e3020]/70 flex items-center justify-center"
+      >
+        {/* Stacked Paper Edges Effect */}
+        <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[3px] sm:p-[5px] shadow-[inset_0_0_8px_rgba(0,0,0,0.45)]">
+          {/* Open Book Cream Spread */}
+          <div ref={pageRef} className="relative w-full h-full rounded-[8px] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+            {/* Running Book Header inside Paper Margins */}
+            <div className="pointer-events-none z-20 flex items-center justify-between px-8 sm:px-14 pt-3.5 text-[11px] tracking-[0.18em] uppercase font-serif text-[#7b6a55]/80">
+              <span className="truncate max-w-[42%] italic">{book.author}</span>
+              <span className="truncate max-w-[42%]">{book.title}</span>
             </div>
-            {toc.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => {
-                  setShowToc(false);
-                  void renditionRef.current?.display?.(item.href);
+
+            {/* Center Book Spine Crease & Shadow */}
+            {!loading && !error && (
+              <div
+                aria-hidden="true"
+                className="pointer-events-none hidden md:block absolute inset-y-0 left-1/2 -translate-x-1/2 w-14 z-20"
+                style={{
+                  background:
+                    'linear-gradient(90deg, rgba(60,42,24,0) 0%, rgba(60,42,24,0.11) 35%, rgba(32,20,10,0.28) 50%, rgba(60,42,24,0.11) 65%, rgba(60,42,24,0) 100%)',
                 }}
-                className="w-full text-left px-3 py-2 rounded-lg text-xs text-neutral-200 hover:bg-red-600/20 hover:text-white truncate"
-              >
-                {item.label}
-              </button>
-            ))}
-          </aside>
-        )}
+              />
+            )}
 
-        <button
-          onClick={goPrev}
-          aria-label="Previous spread"
-          className="z-20 mx-2 p-3 rounded-full bg-neutral-900/80 hover:bg-red-600 text-neutral-200 hover:text-white border border-neutral-700/80 transition shadow-lg"
-        >
-          <ChevronLeft size={22} />
-        </button>
+            {/* Invisible Left & Right Page Click Zones for Natural Page Turning */}
+            {!loading && !error && (
+              <>
+                <div
+                  onClick={goPrev}
+                  title="Previous page"
+                  className="absolute inset-y-0 left-0 w-[12%] touch-none z-20 cursor-w-resize"
+                />
+                <div
+                  onClick={goNext}
+                  title="Next page"
+                  className="absolute inset-y-0 right-0 w-[12%] touch-none z-20 cursor-e-resize"
+                />
+              </>
+            )}
 
-        <div className="relative flex-1 h-full max-w-6xl mx-auto py-4 px-2 flex items-center justify-center">
-          {/* Center spine divider for 2-page book feel */}
-          {!loading && !error && (
-            <div
-              aria-hidden="true"
-              className="pointer-events-none hidden md:block absolute top-6 bottom-6 left-1/2 -translate-x-1/2 w-px bg-gradient-to-b from-transparent via-neutral-700/70 to-transparent z-10"
-            />
-          )}
+            {/* Main Book Content Area */}
+            <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center px-2 sm:px-6">
+              {loading && (
+                <div className="flex flex-col items-center gap-3 text-[#6e5c46] font-serif">
+                  <Loader2 size={30} className="animate-spin text-[#8c3b2b]" />
+                  <span className="text-xs italic tracking-wider">Opening volume…</span>
+                </div>
+              )}
 
-          {loading && (
-            <div className="flex flex-col items-center gap-3 text-neutral-400">
-              <Loader2 size={36} className="animate-spin text-red-500" />
-              <span className="text-xs uppercase tracking-widest">Opening book…</span>
+              {error && (
+                <div className="max-w-md rounded-xl border border-[#b98b68] bg-[#efe5d2] p-6 text-center space-y-3 text-[#3a2a1d] font-serif z-30">
+                  <AlertCircle size={26} className="text-[#8c2d19] mx-auto" />
+                  <p className="text-sm">{error}</p>
+                  <a
+                    href={fileUrl(true)}
+                    className="inline-flex items-center gap-2 rounded-lg bg-[#7c2d12] px-4 py-2 text-xs font-semibold text-amber-50"
+                  >
+                    <Download size={14} /> Download file
+                  </a>
+                </div>
+              )}
+
+              {format === 'epub' && (
+                <div
+                  ref={epubContainerRef}
+                  className="w-full h-full overflow-hidden"
+                />
+              )}
+
+              {format === 'pdf' && !loading && !error && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2">
+                  <canvas ref={leftCanvasRef} className="rounded-sm shadow-md max-w-full" />
+                  <canvas ref={rightCanvasRef} className="rounded-sm shadow-md max-w-full hidden md:block" />
+                </div>
+              )}
             </div>
-          )}
 
-          {error && (
-            <div className="max-w-md rounded-xl border border-red-500/40 bg-red-950/20 p-6 text-center space-y-3">
-              <AlertCircle size={28} className="text-red-400 mx-auto" />
-              <p className="text-sm text-red-200">{error}</p>
-              <a
-                href={fileUrl(true)}
-                className="inline-flex items-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-xs font-semibold text-white"
-              >
-                <Download size={14} /> Download file instead
-              </a>
+            {/* Classic Printed Folio Footer inside Paper Margins */}
+            <div className="pointer-events-none z-20 flex items-center justify-between px-8 sm:px-14 pb-3.5 text-[11px] font-serif text-[#7b6a55]/85">
+              <span>{locationLabel}</span>
+              <span className="italic">{Math.round(percent)}%</span>
             </div>
-          )}
-
-          {format === 'epub' && (
-            <div
-              ref={epubContainerRef}
-              className="w-full h-full rounded-xl bg-[#161616] border border-neutral-800/80 shadow-2xl overflow-hidden"
-            />
-          )}
-
-          {format === 'pdf' && !loading && !error && (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-center justify-items-center w-full h-full overflow-auto">
-              <canvas ref={leftCanvasRef} className="rounded bg-white shadow-xl max-w-full" />
-              <canvas ref={rightCanvasRef} className="rounded bg-white shadow-xl max-w-full hidden md:block" />
-            </div>
-          )}
-        </div>
-
-        <button
-          onClick={goNext}
-          aria-label="Next spread"
-          className="z-20 mx-2 p-3 rounded-full bg-neutral-900/80 hover:bg-red-600 text-neutral-200 hover:text-white border border-neutral-700/80 transition shadow-lg"
-        >
-          <ChevronRight size={22} />
-        </button>
-      </div>
-
-      {/* Bottom Progress Bar */}
-      <footer className="h-10 px-6 border-t border-neutral-800/90 bg-[#141414] flex items-center justify-between text-xs text-neutral-400 shrink-0">
-        <span>{locationLabel || 'Use ← / → keys to turn pages'}</span>
-        <div className="flex items-center gap-3">
-          <div className="w-36 h-1.5 rounded-full bg-neutral-800 overflow-hidden">
-            <div className="h-full bg-red-600 transition-all" style={{ width: `${ Math.min(100, Math.max(0, percent)) }%` }} />
           </div>
-          <span className="font-mono text-neutral-300">{Math.round(percent)}%</span>
         </div>
-      </footer>
+      </div>
     </div>
   );
 }
