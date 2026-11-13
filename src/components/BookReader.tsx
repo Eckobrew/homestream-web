@@ -36,6 +36,8 @@ export function BookReader({
   const pageRef = useRef<HTMLDivElement | null>(null);
   const turnRef = useRef<Animation | null>(null);
   const [wide, setWide] = useState(false);
+  const [pdfArea, setPdfArea] = useState({ width: 0, height: 0 });
+  const pdfAreaRef = useRef<HTMLDivElement>(null);
   const pagesPerTurn = wide ? 2 : 1;
   const [hoverTop, setHoverTop] = useState(false);
 
@@ -180,7 +182,7 @@ export function BookReader({
           width: '100%',
           height: '100%',
           spread: 'auto',
-          minSpreadWidth: 640,
+          minSpreadWidth: 690,
           flow: 'paginated',
         });
         renditionRef.current = rendition;
@@ -193,7 +195,7 @@ export function BookReader({
             'line-height': '1.78 !important',
             'font-size': '106% !important',
             'text-align': 'justify !important',
-            padding: '28px 38px !important',
+            'overflow-wrap': 'anywhere',
           },
           'p': {
             'text-indent': '1.4em !important',
@@ -205,6 +207,11 @@ export function BookReader({
             'font-family': 'Georgia, serif !important',
             'text-align': 'center !important',
             'letter-spacing': '0.04em !important',
+          },
+          'img, svg, video': {
+            'max-width': '100% !important',
+            'max-height': 'calc(100vh - 72px) !important',
+            'object-fit': 'contain',
           },
           'a, a:link, a:visited': { color: '#7c2d12 !important', 'text-decoration': 'none !important' },
         });
@@ -301,9 +308,19 @@ export function BookReader({
     };
   }, [format, fileUrl]);
 
-  // Render two PDF pages side by side
   useEffect(() => {
-    if (format !== 'pdf' || !pdfDocRef.current || loading) return;
+    const area = pdfAreaRef.current;
+    if (!area || loading || error) return;
+    const observer = new ResizeObserver(([entry]) => {
+      setPdfArea({ width: entry.contentRect.width, height: entry.contentRect.height });
+    });
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, [format, loading, error]);
+
+  // Fit the PDF page or spread inside the available paper area.
+  useEffect(() => {
+    if (format !== 'pdf' || !pdfDocRef.current || loading || pdfArea.width <= 24 || pdfArea.height <= 0) return;
     let cancelled = false;
     const doc = pdfDocRef.current;
 
@@ -317,10 +334,8 @@ export function BookReader({
       const page = await doc.getPage(pageNum);
       if (cancelled) return;
       const baseViewport = page.getViewport({ scale: 1 });
-      const area = canvas.parentElement;
-      if (!area) return;
-      const maxHeight = area.clientHeight - 16;
-      const maxWidth = (area.clientWidth - (wide ? 24 : 0)) / pagesPerTurn;
+      const maxHeight = pdfArea.height;
+      const maxWidth = (pdfArea.width - (wide ? 24 : 0)) / pagesPerTurn;
       const scale = Math.min(maxWidth / baseViewport.width, maxHeight / baseViewport.height);
       const viewport = page.getViewport({ scale });
       const buffer = document.createElement('canvas');
@@ -356,7 +371,7 @@ export function BookReader({
     return () => {
       cancelled = true;
     };
-  }, [format, pdfPage, pdfTotal, loading, persistProgress, pagesPerTurn, wide]);
+  }, [format, pdfPage, pdfTotal, loading, persistProgress, pagesPerTurn, wide, pdfArea]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -410,24 +425,21 @@ export function BookReader({
         className="relative w-full max-w-6xl h-full max-h-[880px] rounded-[18px] p-2.5 sm:p-4 bg-gradient-to-b from-[#3b2316] via-[#27160e] to-[#1b0f09] shadow-[0_35px_90px_rgba(0,0,0,0.95),inset_0_1px_1px_rgba(255,255,255,0.12)] border border-[#4e3020]/70 flex items-center justify-center"
       >
         {/* Stacked Paper Edges Effect */}
-        <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[3px] sm:p-[5px] shadow-[inset_0_0_8px_rgba(0,0,0,0.45)]">
+        <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[5px] sm:p-[7px] shadow-[inset_0_0_0_1px_#b8a286,inset_0_0_0_3px_#e9ddc7,inset_0_0_0_4px_#c7b598]">
           {/* Open Book Cream Spread */}
-          <div ref={pageRef} className="relative w-full h-full rounded-[8px] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+          <div ref={pageRef} className="relative w-full h-full rounded-[8px] border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
             {/* Running Book Header inside Paper Margins */}
-            <div className="pointer-events-none z-20 flex items-center justify-between px-8 sm:px-14 pt-3.5 text-[11px] tracking-[0.18em] uppercase font-serif text-[#7b6a55]/80">
-              <span className="truncate max-w-[42%] italic">{book.author}</span>
-              <span className="truncate max-w-[42%]">{book.title}</span>
+            <div className="pointer-events-none z-20 flex items-center justify-between gap-3 shrink-0 px-5 sm:px-12 pt-2.5 text-[11px] tracking-[0.18em] uppercase font-serif text-[#7b6a55]/80">
+              <span className="min-w-0 flex-1 break-words line-clamp-2 italic">{book.author}</span>
+              <span className="min-w-0 flex-1 break-words line-clamp-2 text-right">{book.title}</span>
             </div>
 
             {/* Center Book Spine Crease & Shadow */}
             {!loading && !error && (
               <div
                 aria-hidden="true"
-                className="pointer-events-none hidden md:block absolute inset-y-0 left-1/2 -translate-x-1/2 w-14 z-20"
-                style={{
-                  background:
-                    'linear-gradient(90deg, rgba(60,42,24,0) 0%, rgba(60,42,24,0.11) 35%, rgba(32,20,10,0.28) 50%, rgba(60,42,24,0.11) 65%, rgba(60,42,24,0) 100%)',
-                }}
+                className="pointer-events-none absolute inset-y-0 left-0 w-5 md:left-1/2 md:-translate-x-1/2 md:w-14 z-20 bg-gradient-to-r from-[#493019]/30 to-transparent md:from-transparent md:via-[#493019]/40 md:to-transparent"
+
               />
             )}
 
@@ -448,7 +460,7 @@ export function BookReader({
             )}
 
             {/* Main Book Content Area */}
-            <div className="relative flex-1 w-full h-full overflow-hidden flex items-center justify-center px-2 sm:px-6">
+            <div className="relative flex-1 min-h-0 w-full overflow-hidden flex items-center justify-center px-4 sm:px-7">
               {loading && (
                 <div className="flex flex-col items-center gap-3 text-[#6e5c46] font-serif">
                   <Loader2 size={30} className="animate-spin text-[#8c3b2b]" />
@@ -477,7 +489,7 @@ export function BookReader({
               )}
 
               {format === 'pdf' && !loading && !error && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2">
+                <div ref={pdfAreaRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2">
                   <canvas ref={leftCanvasRef} className="rounded-sm shadow-md max-w-full" />
                   <canvas ref={rightCanvasRef} className="rounded-sm shadow-md max-w-full hidden md:block" />
                 </div>
@@ -485,7 +497,7 @@ export function BookReader({
             </div>
 
             {/* Classic Printed Folio Footer inside Paper Margins */}
-            <div className="pointer-events-none z-20 flex items-center justify-between px-8 sm:px-14 pb-3.5 text-[11px] font-serif text-[#7b6a55]/85">
+            <div className="pointer-events-none z-20 flex items-center justify-between gap-2 shrink-0 px-5 sm:px-12 pb-2.5 text-[11px] font-serif text-[#7b6a55]/85">
               <span>{locationLabel}</span>
               <span className="italic">{Math.round(percent)}%</span>
             </div>
