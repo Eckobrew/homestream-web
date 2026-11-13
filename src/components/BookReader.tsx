@@ -286,7 +286,8 @@ export function BookReader({
         const buf = await res.arrayBuffer();
         if (cancelled) return;
 
-        const pdfjs: any = await import('pdfjs-dist');
+        const pdfModuleUrl = new URL('pdfjs-dist/build/pdf.mjs', import.meta.url).toString();
+        const pdfjs: typeof import('pdfjs-dist') = await import(/* webpackIgnore: true */ pdfModuleUrl);
         pdfjs.GlobalWorkerOptions.workerSrc = new URL(
           'pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url
         ).toString();
