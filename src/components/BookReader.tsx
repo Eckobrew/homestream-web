@@ -193,7 +193,7 @@ export function BookReader({
             color: '#231c14 !important',
             'font-family': '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif !important',
             'line-height': '1.78 !important',
-            'font-size': '106% !important',
+            'font-size': 'clamp(0.95rem, 2.4vw, 1.0625rem) !important',
             'text-align': 'justify !important',
             'overflow-wrap': 'anywhere',
           },
@@ -220,8 +220,6 @@ export function BookReader({
           initialProgress?.location && initialProgress.location.startsWith('epubcfi(')
             ? initialProgress.location
             : undefined;
-        await rendition.display(startLoc);
-
         rendition.on('relocated', (loc: any) => {
           const cfi = loc?.start?.cfi || '';
           const displayed = loc?.start?.displayed;
@@ -235,6 +233,8 @@ export function BookReader({
           }
           if (cfi) persistProgress(cfi, pct);
         });
+
+        await rendition.display(startLoc);
 
         void epubBook.ready
           .then(() => epubBook.locations.generate(1200))
@@ -439,7 +439,6 @@ export function BookReader({
               <div
                 aria-hidden="true"
                 className="pointer-events-none absolute inset-y-0 left-0 w-5 md:left-1/2 md:-translate-x-1/2 md:w-14 z-20 bg-gradient-to-r from-[#493019]/30 to-transparent md:from-transparent md:via-[#493019]/40 md:to-transparent"
-
               />
             )}
 
