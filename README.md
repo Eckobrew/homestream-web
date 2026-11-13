@@ -42,4 +42,3 @@ Use a commit tag or image digest for controlled deployments. `edge` tracks teste
 
 Discover replaces the Requests tab and combines movie/TV discovery with native Music catalog search and library browsing. Requested tracks all media types with source status, download progress and release dates. Music plays in a persistent queue using authenticated HomeStream audio URLs. Admin configures/tests Jellyfin, Seerr, qBittorrent and slskd; blank saved credentials are preserved and existing secrets are never returned. The backend enforces admin and Kids restrictions.
 
-[Android handoff](HANDOFF.md) points to the maintained backend implementation guide and contract 1.2.0. No Android source was changed here.
