@@ -137,9 +137,13 @@ export function BookReader({
     turnRef.current = animation;
     try {
       await animation.finished;
-      await advance();
-      if (turnRef.current !== animation) return;
+      page.style.opacity = '0';
       animation.cancel();
+      await advance();
+      // epub.js maps the new location on the next frame using untransformed bounds.
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      if (turnRef.current !== animation) return;
+      page.style.opacity = '';
       animation = animate(`perspective(2000px) rotateY(${-outgoing}deg)`, flat, forward ? 'right' : 'left', 240, 'ease-out');
       turnRef.current = animation;
       await animation.finished;
@@ -148,6 +152,7 @@ export function BookReader({
         setError(err instanceof Error ? err.message : 'Unable to turn the page');
       }
     } finally {
+      page.style.opacity = '';
       if (turnRef.current === animation) {
         animation.cancel();
         turnRef.current = null;
