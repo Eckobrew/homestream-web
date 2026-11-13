@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server, Music } from 'lucide-react';
+import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server, Music, BookOpen } from 'lucide-react';
+import { useProfile } from '@/context/ProfileContext';
 
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
-  activeLibrary: 'movies' | 'tv' | 'youtube' | 'music' | null;
-  onSelectLibrary: (lib: 'movies' | 'tv' | 'youtube' | 'music' | null) => void;
+  activeLibrary: 'movies' | 'tv' | 'youtube' | 'music' | 'books' | null;
+  onSelectLibrary: (lib: 'movies' | 'tv' | 'youtube' | 'music' | 'books' | null) => void;
   appName?: string;
 }
 
@@ -18,6 +19,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onSelectLibrary,
   appName = 'HomeStream',
 }) => {
+  const { activeProfile } = useProfile();
+  const isKids = Boolean(activeProfile?.isKids);
   // Close on Escape key or '[' hotkey
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -64,6 +67,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'Hub',
       color: 'from-emerald-600 to-green-700',
     },
+    ...(!isKids
+      ? [
+          {
+            id: 'books' as const,
+            name: 'Books Hub',
+            description: 'Bookshelf, eBook reader & requests',
+            icon: BookOpen,
+            badge: 'Hub',
+            color: 'from-red-600 to-rose-700',
+          },
+        ]
+      : []),
     {
       id: 'youtube' as const,
       name: 'YouTube',

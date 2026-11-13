@@ -7,6 +7,7 @@ import { RequestedPanel } from '@/components/RequestedPanel';
 import { AdminIntegrations } from '@/components/AdminIntegrations';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicBrowser } from '@/components/MusicBrowser';
+import { BooksBrowser } from '@/components/BooksBrowser';
 import { Navbar } from '@/components/Navbar';
 import { HeroBanner } from '@/components/HeroBanner';
 import { MediaRow } from '@/components/MediaRow';
@@ -42,7 +43,7 @@ export default function Home() {
 
   // Dedicated Hideable Sidebar & A-Z Library Catalog States
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [activeLibrary, setActiveLibrary] = useState<'movies' | 'tv' | 'youtube' | 'music' | null>(null);
+  const [activeLibrary, setActiveLibrary] = useState<'movies' | 'tv' | 'youtube' | 'music' | 'books' | null>(null);
 
   // Netflix-style Category Rows for Movies and TV Shows Pages
   const [movieCategories, setMovieCategories] = useState<MediaRowSection[]>([]);
@@ -190,10 +191,13 @@ export default function Home() {
     const searchParams = new URLSearchParams(window.location.search);
 
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin', 'music', 'youtube'].includes(tabParam)) {
+    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin', 'music', 'youtube', 'books'].includes(tabParam)) {
       if (tabParam === 'music') {
         setActiveTab('music');
         setActiveLibrary('music');
+      } else if (tabParam === 'books') {
+        setActiveTab('books');
+        setActiveLibrary('books');
       } else if (tabParam === 'youtube') {
         setActiveTab('youtube');
         setActiveLibrary('youtube');
@@ -255,6 +259,7 @@ export default function Home() {
     setActiveTab(tab);
     setSearchQuery('');
     if (tab === 'music') setActiveLibrary('music');
+    else if (tab === 'books') setActiveLibrary('books');
     else if (tab === 'youtube') setActiveLibrary('youtube');
     else setActiveLibrary(null); // Exit A-Z sidebar view and return to standard tab streaming rows
     if (tab === 'movies') fetchCategories('movies');
@@ -526,6 +531,15 @@ export default function Home() {
           onPlay={handlePlay}
           onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
         />
+      ) : activeLibrary === 'books' || activeTab === 'books' ? (
+        /* Dedicated Red-Themed Bookshelf Hub */
+        <div className="pt-24 min-h-screen">
+          <BooksBrowser
+            onAdmin={canManageIntegrations && !activeProfile?.isKids ? () => handleTabChange('admin') : undefined}
+            activeProfileId={activeProfile?.id}
+            onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
+          />
+        </div>
       ) : activeLibrary === 'music' || activeTab === 'music' ? (
         /* Dedicated Spotify-Styled Music Hub */
         <div className="pt-24 min-h-screen">

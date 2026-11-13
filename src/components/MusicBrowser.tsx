@@ -23,6 +23,14 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 
+const musicDownloadButton = "inline-flex items-center gap-2 rounded-full border border-neutral-600 px-4 py-2 text-xs font-bold text-neutral-300 transition hover:border-neutral-400 hover:text-white";
+
+const importLabels = {
+  queued: 'queued', searching: 'searching', downloading: 'downloading',
+  importing: 'importing', ready: 'ready', failed: 'failed',
+} as const;
+type ImportStatus = Record<keyof typeof importLabels, number>;
+
 interface MusicBrowserProps {
   onPlay: (tracks: MusicTrack[], index: number) => void;
   onAdmin?: () => void;
@@ -59,6 +67,34 @@ export function MusicBrowser({
   const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState('');
   const [reload, setReload] = useState(0);
+
+  const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
+  useEffect(() => {
+    setImportStatus(null);
+    if (kids) return;
+    const controller = new AbortController();
+    const params = new URLSearchParams();
+    if (currentProfileId) params.set('userId', currentProfileId);
+    let next: ReturnType<typeof setTimeout>;
+    const refresh = async () => {
+      try {
+        const response = await apiFetch(`/api/music/import-status?${params}`, { signal: controller.signal });
+        if (response.ok) setImportStatus(await response.json());
+      } catch {
+        // Try again on the next poll.
+      } finally {
+        if (!controller.signal.aborted) next = setTimeout(refresh, 8000);
+      }
+    };
+    void refresh();
+    return () => { controller.abort(); clearTimeout(next); };
+  }, [currentProfileId, kids, reload]);
+
+  function downloadUrl(scope: Record<string, string> = {}) {
+    const params = new URLSearchParams(scope);
+    if (currentProfileId) params.set('userId', currentProfileId);
+    return `/api/v1/music/download?${params}`;
+  }
 
   // Greeting based on current time
   const greeting = useMemo(() => {
@@ -442,6 +478,22 @@ export function MusicBrowser({
           </div>
         )}
 
+        {importStatus && (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-[#242424] px-4 py-3 text-sm text-neutral-300">
+            <p role="status">
+              Import status · {Object.entries(importLabels)
+                .filter(([key]) => importStatus[key as keyof ImportStatus] > 0)
+                .map(([key, label]) => `${importStatus[key as keyof ImportStatus]} ${label}`)
+                .join(' · ') || 'No imports yet'}
+            </p>
+            {(total > 0 || importStatus.ready > 0) && (
+              <a href={downloadUrl()} download className={musicDownloadButton}>
+                <Download size={16} /> Download collection
+              </a>
+            )}
+          </div>
+        )}
+
         {/* Quick Access Grid (Spotify 6-Box Hero Grid for larger collections) */}
         {!q && albums.length > 6 && quickAccessAlbums.length > 0 && (
           <div className="grid grid-cols-2 lg:grid-cols-3 gap-3 mt-6">
@@ -565,7 +617,7 @@ export function MusicBrowser({
                   <span>• {selected.tracks.length} songs</span>
                 </div>
 
-                <div className="flex items-center gap-4 pt-3">
+                <div className="flex flex-wrap items-center gap-3 pt-3">
                   {selected.tracks.length > 0 && (
                     <button
                       onClick={() => onPlay(selected.tracks, 0)}
@@ -576,6 +628,12 @@ export function MusicBrowser({
                     </button>
                   )}
 
+                  {selected.album.inLibrary && selected.tracks.length > 0 && (
+                    <a href={downloadUrl({ albumId: selected.album.id })} download
+                      className={musicDownloadButton}>
+                      <Download size={16} /> Download ZIP
+                    </a>
+                  )}
                   {selected.album.inLibrary ? (
                     <button
                       onClick={() => handleRemoveFromProfile(selected.album)}
@@ -620,33 +678,40 @@ export function MusicBrowser({
 
                 <div className="divide-y divide-neutral-800/40 mt-1">
                   {selected.tracks.map((track, i) => (
-                    <button
-                      key={track.id}
-                      onClick={() => onPlay(selected.tracks, i)}
-                      className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
-                    >
-                      <span className="text-sm text-neutral-400 group-hover:hidden">
-                        {track.trackNumber || i + 1}
-                      </span>
-                      <span className="hidden group-hover:flex items-center text-white">
-                        <Play size={14} className="fill-white" />
-                      </span>
+                    <div key={track.id} className="flex items-center gap-2">
+                      <button
+                        onClick={() => onPlay(selected.tracks, i)}
+                        className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
+                      >
+                        <span className="text-sm text-neutral-400 group-hover:hidden">
+                          {track.trackNumber || i + 1}
+                        </span>
+                        <span className="hidden group-hover:flex items-center text-white">
+                          <Play size={14} className="fill-white" />
+                        </span>
 
-                      <div className="min-w-0 pr-4">
-                        <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
-                          {track.title}
-                        </p>
-                        <p className="text-xs text-neutral-400 truncate">{track.artist}</p>
-                      </div>
+                        <div className="min-w-0 pr-4">
+                          <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
+                            {track.title}
+                          </p>
+                          <p className="text-xs text-neutral-400 truncate">{track.artist}</p>
+                        </div>
 
-                      <span className="text-xs text-neutral-400 text-right">
-                        {track.durationSeconds
-                          ? `${Math.floor(track.durationSeconds / 60)}:${String(
-                              Math.floor(track.durationSeconds % 60)
-                            ).padStart(2, '0')}`
-                          : '--:--'}
-                      </span>
-                    </button>
+                        <span className="text-xs text-neutral-400 text-right">
+                          {track.durationSeconds
+                            ? `${Math.floor(track.durationSeconds / 60)}:${String(
+                                Math.floor(track.durationSeconds % 60)
+                              ).padStart(2, '0')}`
+                            : '--:--'}
+                        </span>
+                      </button>
+                      {selected.album.inLibrary && (
+                        <a href={downloadUrl({ trackId: track.id })} download aria-label={`Download ${track.title}`}
+                          title="Download track" className="p-3 text-neutral-400 hover:text-white">
+                          <Download size={16} />
+                        </a>
+                      )}
+                    </div>
                   ))}
                 </div>
               </div>
@@ -909,7 +974,9 @@ export function MusicBrowser({
                       if (isReady) {
                         playPlaylistTracks(selectedPlaylist.tracks, idx);
                       } else {
-                        const msg = track.status === 'downloading'
+                        const msg = track.status === 'importing'
+                          ? 'Importing track into your library...'
+                          : track.status === 'downloading'
                           ? 'Track is currently downloading via Soulseek (slskd)...'
                           : track.status === 'searching'
                           ? 'Searching Soulseek network for track...'
@@ -945,10 +1012,18 @@ export function MusicBrowser({
                     </div>
 
                     <div className="col-span-5 sm:col-span-4 text-right flex items-center justify-end gap-2 text-xs">
+                      {isReady && track.trackId && (
+                        <a href={downloadUrl({ trackId: track.trackId })} download onClick={event => event.stopPropagation()}
+                          aria-label={`Download ${track.title}`} title="Download track" className="p-1 text-neutral-400 hover:text-white">
+                          <Download size={16} />
+                        </a>
+                      )}
                       {track.status === 'completed' ? (
                         <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 text-[#1DB954] border border-emerald-800/40 font-semibold text-[11px]">
                           ✓ Ready {durStr ? `• ${durStr}` : ''}
                         </span>
+                      ) : track.status === 'importing' ? (
+                        <span className="text-cyan-400">Importing</span>
                       ) : track.status === 'downloading' ? (
                         <span className="px-2 py-0.5 rounded-full bg-amber-950/60 text-amber-400 border border-amber-800/40 text-[11px]">
                           Downloading (slskd)

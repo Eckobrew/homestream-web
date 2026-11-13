@@ -36,11 +36,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
   const cardRef = useRef<HTMLDivElement>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const trailerRequestRef = useRef<AbortController | null>(null);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const previewStartTimeRef = useRef<number>(0);
 
+  const libraryPreview = item.videoStreamUrl?.startsWith('/api/preview-stream?')
+    ? item.videoStreamUrl : undefined;
   const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'demo';
   const isRequested = item.status === 'requested' || item.status === 'processing';
 
@@ -103,95 +104,39 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
     hoverTimeoutRef.current = setTimeout(() => {
       setIsHovered(true);
-
-      // Start muted video preview after expanding
-      if (item.videoStreamUrl) {
-        previewTimeoutRef.current = setTimeout(() => {
-          setIsPlayingPreview(true);
-        }, 400);
-      } else {
-        // Fetch trailer for requests / un-downloaded items
-        const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
-        const type = item.type === 'Series' ? 'tv' : 'movie';
-        apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data) => {
-            if (data?.trailer?.key) {
-              setTrailerKey(data.trailer.key);
-              previewTimeoutRef.current = setTimeout(() => {
-                setIsPlayingPreview(true);
-              }, 400);
-            }
-          })
-          .catch(() => {});
+      if (libraryPreview) {
+        previewTimeoutRef.current = setTimeout(() => setIsPlayingPreview(true), 400);
+        return;
       }
+      if (item.source === 'jellyfin') return;
+
+      const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+      const type = item.type === 'Series' ? 'tv' : 'movie';
+      const controller = new AbortController();
+      trailerRequestRef.current = controller;
+      apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`, { signal: controller.signal })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (!controller.signal.aborted && data?.trailer?.key) {
+            setTrailerKey(data.trailer.key);
+            previewTimeoutRef.current = setTimeout(() => setIsPlayingPreview(true), 400);
+          }
+        })
+        .catch(() => {});
     }, 280);
   };
 
   const handleMouseLeave = () => {
+    trailerRequestRef.current?.abort();
     if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
     if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     setIsHovered(false);
     setIsPlayingPreview(false);
-    previewStartTimeRef.current = 0;
-  };
-
-  // When preview video metadata loads:
-  // For Continue Watching / in-progress items, start preview EXACTLY where the user left off!
-  // Otherwise, pick a dynamic RANDOM section between 15% and 75% of runtime.
-  const handleLoadedMetadata = () => {
-    if (!videoRef.current) return;
-    const dur = videoRef.current.duration;
-
-    // If the stream URL already includes ticks or starts at resume position, don't seek client-side!
-    const hasStreamTicks = item.videoStreamUrl?.includes('ticks=');
-    if (hasStreamTicks) {
-      previewStartTimeRef.current = 0;
-      videoRef.current.play().catch(() => {});
-      return;
-    }
-
-    let seekTime = 45; // default 45s in
-
-    if (item.playbackPositionTicks && item.playbackPositionTicks > 0) {
-      const resumeSecs = Math.floor(item.playbackPositionTicks / 10000000);
-      if (dur && isFinite(dur)) {
-        seekTime = Math.min(resumeSecs, Math.max(0, dur - 5));
-      } else {
-        seekTime = resumeSecs;
-      }
-    } else if (item.progressPercent && item.progressPercent > 0 && dur && isFinite(dur)) {
-      seekTime = Math.floor((dur * item.progressPercent) / 100);
-    } else if (dur && isFinite(dur) && dur > 60) {
-      // Pick random timestamp between 15% and 75% into the show/movie
-      const minStart = dur * 0.15;
-      const maxStart = dur * 0.75;
-      seekTime = Math.floor(minStart + Math.random() * (maxStart - minStart));
-    } else if (dur && dur > 20) {
-      seekTime = Math.floor(dur * 0.25);
-    }
-
-    previewStartTimeRef.current = seekTime;
-    try {
-      if (dur && isFinite(dur) && seekTime > 0 && seekTime < dur) {
-        videoRef.current.currentTime = seekTime;
-      }
-    } catch {
-      // Ignore seek errors
-    }
-    videoRef.current.play().catch(() => {});
-  };
-
-  // Loop back after ~20 seconds so the teaser stays dynamic
-  const handleTimeUpdate = () => {
-    if (!videoRef.current || previewStartTimeRef.current <= 0) return;
-    if (videoRef.current.currentTime > previewStartTimeRef.current + 20) {
-      videoRef.current.currentTime = previewStartTimeRef.current;
-    }
   };
 
   useEffect(() => {
     return () => {
+      trailerRequestRef.current?.abort();
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
       if (previewTimeoutRef.current) clearTimeout(previewTimeoutRef.current);
     };
@@ -322,27 +267,17 @@ export const MediaCard: React.FC<MediaCardProps> = ({
               src={item.backdropUrl || item.posterUrl}
               alt={item.title}
               className={`w-full h-full object-cover transition-opacity duration-300 ${
-                isPlayingPreview && (item.videoStreamUrl || trailerKey) ? 'opacity-0' : 'opacity-100'
+                isPlayingPreview && !libraryPreview && trailerKey ? 'opacity-0' : 'opacity-100'
               }`}
             />
 
-            {/* Video Preview Streaming Random Section (Jellyfin Media) */}
-            {isPlayingPreview && item.videoStreamUrl && (
-              <video
-                ref={videoRef}
-                src={item.videoStreamUrl}
-                autoPlay
-                muted={isPreviewMuted}
-                playsInline
-                onLoadedMetadata={handleLoadedMetadata}
-                onTimeUpdate={handleTimeUpdate}
+            {isPlayingPreview && libraryPreview && (
+              <video key={libraryPreview} src={libraryPreview} autoPlay muted loop playsInline
                 onError={() => setIsPlayingPreview(false)}
-                className="absolute inset-0 w-full h-full object-cover animate-fade-in"
-              />
+                className="absolute inset-0 h-full w-full object-cover pointer-events-none" />
             )}
 
-            {/* YouTube Trailer Preview for Requests / Un-downloaded Media */}
-            {isPlayingPreview && !item.videoStreamUrl && trailerKey && (
+            {isPlayingPreview && !libraryPreview && trailerKey && (
               <div className="absolute inset-0 w-full h-full overflow-hidden bg-black pointer-events-none">
                 <iframe
                   ref={iframeRef}
@@ -355,15 +290,12 @@ export const MediaCard: React.FC<MediaCardProps> = ({
             )}
 
             {/* Preview Audio Mute/Unmute Button */}
-            {isPlayingPreview && (item.videoStreamUrl || trailerKey) && (
+            {isPlayingPreview && !libraryPreview && trailerKey && (
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   const nextMute = !isPreviewMuted;
                   setIsPreviewMuted(nextMute);
-                  if (videoRef.current) {
-                    videoRef.current.muted = nextMute;
-                  }
                   if (iframeRef.current?.contentWindow) {
                     iframeRef.current.contentWindow.postMessage(
                       JSON.stringify({ event: 'command', func: nextMute ? 'mute' : 'unMute', args: [] }),

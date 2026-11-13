@@ -26,8 +26,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   const [isHovering, setIsHovering] = useState(false);
   const [heroTrailerKey, setHeroTrailerKey] = useState<string | null>(null);
   const heroIframeRef = useRef<HTMLIFrameElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const heroStartTimeRef = useRef<number>(0);
 
   // Set random starting index on initial mount
   useEffect(() => {
@@ -54,73 +52,36 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
     return () => clearInterval(interval);
   }, [items, isHovering]);
 
-  // Video preview timer for current item (Jellyfin stream or YouTube trailer)
+  const libraryPreview = currentItem?.videoStreamUrl?.startsWith('/api/preview-stream?')
+    ? currentItem.videoStreamUrl : undefined;
+
+  // Start the current title’s trailer after the slide settles.
   useEffect(() => {
     setShowVideo(false);
     setHeroTrailerKey(null);
-    heroStartTimeRef.current = 0;
     if (!currentItem) return;
 
-    if (currentItem.videoStreamUrl) {
-      const timer = setTimeout(() => {
+    const controller = new AbortController();
+    const timer = setTimeout(async () => {
+      if (document.hidden) return;
+      if (libraryPreview) {
         setShowVideo(true);
-      }, 1800);
-      return () => clearTimeout(timer);
-    } else {
+        return;
+      }
+      if (currentItem.source === 'jellyfin') return;
       const tmdb = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
       const type = currentItem.type === 'Series' ? 'tv' : 'movie';
-      let active = true;
-      apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${currentItem.id}`)
-        .then((res) => (res.ok ? res.json() : null))
-        .then((data) => {
-          if (active && data?.trailer?.key) {
-            setHeroTrailerKey(data.trailer.key);
-            setTimeout(() => {
-              if (active) setShowVideo(true);
-            }, 1800);
-          }
-        })
-        .catch(() => {});
-      return () => {
-        active = false;
-      };
-    }
-  }, [currentItem]);
-
-  // If item has a resume playback position, start preview where the user left off!
-  // Otherwise jump to random section between 15% and 75% of runtime.
-  const handleHeroLoadedMetadata = () => {
-    if (!videoRef.current) return;
-    const dur = videoRef.current.duration;
-    let seekTime = 60;
-
-    if (currentItem.playbackPositionTicks && currentItem.playbackPositionTicks > 0) {
-      const resumeSecs = Math.floor(currentItem.playbackPositionTicks / 10000000);
-      if (dur && isFinite(dur)) {
-        seekTime = Math.min(resumeSecs, Math.max(0, dur - 5));
-      } else {
-        seekTime = resumeSecs;
-      }
-    } else if (currentItem.progressPercent && currentItem.progressPercent > 0 && dur && isFinite(dur)) {
-      seekTime = Math.floor((dur * currentItem.progressPercent) / 100);
-    } else if (dur && isFinite(dur) && dur > 60) {
-      const startMin = dur * 0.15;
-      const startMax = dur * 0.75;
-      seekTime = Math.floor(startMin + Math.random() * (startMax - startMin));
-    } else if (dur && dur > 20) {
-      seekTime = Math.floor(dur * 0.25);
-    }
-    heroStartTimeRef.current = seekTime;
-    videoRef.current.currentTime = seekTime;
-    videoRef.current.play().catch(() => {});
-  };
-
-  const handleHeroTimeUpdate = () => {
-    if (!videoRef.current || heroStartTimeRef.current <= 0) return;
-    if (videoRef.current.currentTime > heroStartTimeRef.current + 30) {
-      videoRef.current.currentTime = heroStartTimeRef.current;
-    }
-  };
+      try {
+        const res = await apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${currentItem.id}`, { signal: controller.signal });
+        const data = res.ok ? await res.json() : null;
+        if (!controller.signal.aborted && data?.trailer?.key) {
+          setHeroTrailerKey(data.trailer.key);
+          setShowVideo(true);
+        }
+      } catch { /* keep the artwork */ }
+    }, 1800);
+    return () => { clearTimeout(timer); controller.abort(); };
+  }, [currentItem, libraryPreview]);
 
   const nextHero = useCallback(() => {
     if (!items || items.length === 0) return;
@@ -135,9 +96,6 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   const toggleMute = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
-    if (videoRef.current) {
-      videoRef.current.muted = nextMute;
-    }
     if (heroIframeRef.current?.contentWindow) {
       heroIframeRef.current.contentWindow.postMessage(
         JSON.stringify({ event: 'command', func: nextMute ? 'mute' : 'unMute', args: [] }),
@@ -163,24 +121,13 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         }}
       />
 
-      {/* Hero Video Preview (Jellyfin) */}
-      {showVideo && currentItem.videoStreamUrl && (
-        <video
-          key={`vid-${currentItem.id}`}
-          ref={videoRef}
-          src={currentItem.videoStreamUrl}
-          autoPlay
-          muted={isMuted}
-          playsInline
-          onLoadedMetadata={handleHeroLoadedMetadata}
-          onTimeUpdate={handleHeroTimeUpdate}
+      {showVideo && libraryPreview && (
+        <video key={libraryPreview} src={libraryPreview} autoPlay muted loop playsInline
           onError={() => setShowVideo(false)}
-          className="absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 animate-fade-in"
-        />
+          className="absolute inset-0 h-full w-full object-cover pointer-events-none" />
       )}
 
-      {/* Hero Trailer Preview (YouTube embed for un-downloaded items) */}
-      {showVideo && !currentItem.videoStreamUrl && heroTrailerKey && (
+      {showVideo && heroTrailerKey && (
         <div className="absolute inset-0 w-full h-full overflow-hidden bg-black pointer-events-none">
           <iframe
             ref={heroIframeRef}
@@ -352,7 +299,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
       <div className="absolute right-4 md:right-12 top-20 sm:top-auto sm:bottom-24 md:bottom-32 z-30 flex flex-col items-end space-y-3 pointer-events-auto">
         {/* Sound toggle & age rating */}
         <div className="flex items-center space-x-3">
-          {showVideo && (currentItem.videoStreamUrl || heroTrailerKey) && (
+          {showVideo && heroTrailerKey && (
             <button
               onClick={toggleMute}
               className="p-2.5 rounded-full border border-white/40 bg-black/40 hover:bg-black/60 text-white backdrop-blur-sm transition-colors"

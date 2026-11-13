@@ -344,6 +344,161 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/books": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/search": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books_search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/book": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books_book"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/cover": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Public endpoint. Pairing additionally requires a direct private-network connection. */
+        get: operations["web_get_books_cover"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/file": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books_file"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/queue": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books_queue"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_books_progress"];
+        put?: never;
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        post: operations["web_post_books_progress"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/request": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        post: operations["web_post_books_request"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/books/profile-book": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        post: operations["web_post_books_profile_book"];
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        delete: operations["web_delete_books_profile_book"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/music": {
         parameters: {
             query?: never;
@@ -405,6 +560,40 @@ export interface paths {
         };
         /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
         get: operations["web_get_music_stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_music_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/music/import-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their Jellyfin account. */
+        get: operations["web_get_music_import_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1116,6 +1305,40 @@ export interface paths {
         };
         /** @description Bearer household token, paired device credential, or signed mobile session. Profile policy is enforced on the server. */
         get: operations["mobile_get_music_stream"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mobile/v1/music/download": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bearer household token, paired device credential, or signed mobile session. Profile policy is enforced on the server. */
+        get: operations["mobile_get_music_download"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/mobile/v1/music/import-status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bearer household token, paired device credential, or signed mobile session. Profile policy is enforced on the server. */
+        get: operations["mobile_get_music_import_status"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2074,6 +2297,7 @@ export interface components {
             discNumber: number;
             durationSeconds?: number;
             streamUrl: string;
+            coverUrl?: string;
         };
         MusicResponse: {
             configured: boolean;
@@ -2084,13 +2308,70 @@ export interface components {
             album: components["schemas"]["MusicAlbum"];
             tracks: components["schemas"]["MusicTrack"][];
         };
+        BookItem: {
+            id: string;
+            foreignBookId: string;
+            title: string;
+            author: string;
+            year?: number;
+            overview: string;
+            series: string;
+            pageCount: number;
+            rating: number;
+            coverUrl: string;
+            inLibrary: boolean;
+            onShelf: boolean;
+            formats: string[];
+            readable: boolean;
+            requestStatus?: string;
+        };
+        BookRequestItem: {
+            foreignBookId: string;
+            bookId?: string;
+            title: string;
+            author: string;
+            coverUrl: string;
+            status: string;
+            error?: string;
+            createdAt: string;
+        };
+        BookProgress: {
+            location: string;
+            percent: number;
+            updatedAt: string;
+        };
+        BooksResponse: {
+            configured: boolean;
+            books: components["schemas"]["BookItem"][];
+            total: number;
+            requests: components["schemas"]["BookRequestItem"][];
+        };
+        BookSearchResponse: {
+            books: components["schemas"]["BookItem"][];
+        };
+        BookDetailResponse: {
+            book: components["schemas"]["BookItem"];
+            progress: components["schemas"]["BookProgress"] | null;
+        };
+        BookQueueItem: {
+            id: string;
+            bookId?: string;
+            title: string;
+            status: string;
+            progress: number;
+            timeLeft?: string;
+            error?: string;
+        };
+        BookQueueResponse: {
+            queue: components["schemas"]["BookQueueItem"][];
+        };
         RequestedItem: {
             id: string;
             title: string;
             /** @enum {string} */
             kind: "movie" | "music" | "tv";
             /** @enum {string} */
-            source: "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "tmdb";
+            source: "bookshelf" | "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "tmdb";
             status: string;
             artist?: string;
             posterUrl?: string;
@@ -2108,7 +2389,7 @@ export interface components {
         };
         IntegrationSummary: {
             /** @enum {string} */
-            id: "jellyfin" | "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "tmdb";
+            id: "bookshelf" | "jellyfin" | "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "tmdb";
             name: string;
             url: string;
             configured: boolean;
@@ -2118,6 +2399,7 @@ export interface components {
         IntegrationsResponse: {
             integrations: components["schemas"]["IntegrationSummary"][];
             downloadsPath: string;
+            booksPath?: string;
         };
         YouTubeSearchResult: {
             id: string;
@@ -2805,6 +3087,9 @@ export interface operations {
                     qbittorrentUrl?: string;
                     qbittorrentUsername?: string;
                     qbittorrentPassword?: string;
+                    bookshelfUrl?: string;
+                    bookshelfApiKey?: string;
+                    booksPath?: string;
                     downloadsPath?: string;
                     radarrUrl?: string;
                     radarrApiKey?: string;
@@ -4742,6 +5027,11 @@ export interface operations {
                 videoCapabilities?: string;
                 maxWidth?: string;
                 maxHeight?: string;
+                tmdbId?: string;
+                type?: string;
+                season?: string;
+                episode?: string;
+                title?: string;
             };
             header?: never;
             path?: never;
@@ -6336,6 +6626,11 @@ export interface operations {
                 forceTranscode?: "true" | "false";
                 canPlayHevc?: "true" | "false";
                 receiver?: string;
+                start?: string;
+                transcode?: "0" | "1";
+                native?: "0" | "1";
+                source?: "0" | "1";
+                probe?: "0" | "1";
             };
             header?: {
                 Range?: string;
@@ -6928,6 +7223,2061 @@ export interface operations {
                         } & {
                             [key: string]: unknown;
                         })[];
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books: {
+        parameters: {
+            query?: {
+                userId?: string;
+                q?: string;
+                offset?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BooksResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_search: {
+        parameters: {
+            query?: {
+                userId?: string;
+                q?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookSearchResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_book: {
+        parameters: {
+            query: {
+                userId?: string;
+                bookId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookDetailResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_cover: {
+        parameters: {
+            query: {
+                userId?: string;
+                bookId: string;
+            };
+            header?: {
+                Range?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_file: {
+        parameters: {
+            query: {
+                userId?: string;
+                bookId: string;
+                format?: string;
+                download?: "0" | "1";
+            };
+            header?: {
+                Range?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_queue: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BookQueueResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_books_progress: {
+        parameters: {
+            query: {
+                userId?: string;
+                bookId: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_post_books_progress: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    bookId: string;
+                    location: string;
+                    percent?: number;
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        message?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_post_books_request: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    foreignBookId: string;
+                    title: string;
+                    author: string;
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        message?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_post_books_profile_book: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    bookId: string;
+                } & {
+                    [key: string]: unknown;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        message?: string;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_delete_books_profile_book: {
+        parameters: {
+            query?: {
+                userId?: string;
+                bookId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success?: boolean;
+                        message?: string;
                     } & {
                         [key: string]: unknown;
                     };
@@ -8048,6 +10398,381 @@ export interface operations {
             };
         };
     };
+    web_get_music_download: {
+        parameters: {
+            query?: {
+                userId?: string;
+                trackId?: string;
+                albumId?: string;
+            };
+            header?: {
+                Range?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_music_import_status: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        queued?: number;
+                        searching?: number;
+                        downloading?: number;
+                        importing?: number;
+                        ready?: number;
+                        failed?: number;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     web_post_music_request: {
         parameters: {
             query?: {
@@ -9018,7 +11743,7 @@ export interface operations {
             content: {
                 "application/json": {
                     url?: string;
-                    urls?: string[];
+                    urls?: string | string[];
                     spotifyUrl?: string;
                     csv?: string;
                     files?: ({
@@ -9227,7 +11952,7 @@ export interface operations {
             content: {
                 "application/json": {
                     url?: string;
-                    urls?: string[];
+                    urls?: string | string[];
                     spotifyUrl?: string;
                 } & {
                     [key: string]: unknown;
@@ -10761,13 +13486,14 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "radarr" | "sonarr" | "tmdb";
+                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb";
                     /** @enum {string} */
                     action: "save" | "test";
                     url?: string;
                     secret?: string;
                     username?: string;
                     downloadsPath?: string;
+                    booksPath?: string;
                     parentPin?: string;
                 } & {
                     [key: string]: unknown;
@@ -16233,6 +18959,11 @@ export interface operations {
                 videoCapabilities?: string;
                 maxWidth?: string;
                 maxHeight?: string;
+                tmdbId?: string;
+                type?: string;
+                season?: string;
+                episode?: string;
+                title?: string;
             };
             header?: never;
             path?: never;
@@ -17427,6 +20158,11 @@ export interface operations {
                 forceTranscode?: "true" | "false";
                 canPlayHevc?: "true" | "false";
                 receiver?: string;
+                start?: string;
+                transcode?: "0" | "1";
+                native?: "0" | "1";
+                source?: "0" | "1";
+                probe?: "0" | "1";
             };
             header?: {
                 Range?: string;
@@ -18565,6 +21301,381 @@ export interface operations {
             };
         };
     };
+    mobile_get_music_download: {
+        parameters: {
+            query?: {
+                userId?: string;
+                trackId?: string;
+                albumId?: string;
+            };
+            header?: {
+                Range?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    mobile_get_music_import_status: {
+        parameters: {
+            query?: {
+                userId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        queued?: number;
+                        searching?: number;
+                        downloading?: number;
+                        importing?: number;
+                        ready?: number;
+                        failed?: number;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
     mobile_post_music_request: {
         parameters: {
             query?: {
@@ -19535,7 +22646,7 @@ export interface operations {
             content: {
                 "application/json": {
                     url?: string;
-                    urls?: string[];
+                    urls?: string | string[];
                     spotifyUrl?: string;
                     csv?: string;
                     files?: ({
@@ -19744,7 +22855,7 @@ export interface operations {
             content: {
                 "application/json": {
                     url?: string;
-                    urls?: string[];
+                    urls?: string | string[];
                     spotifyUrl?: string;
                 } & {
                     [key: string]: unknown;
@@ -21278,13 +24389,14 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "radarr" | "sonarr" | "tmdb";
+                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb";
                     /** @enum {string} */
                     action: "save" | "test";
                     url?: string;
                     secret?: string;
                     username?: string;
                     downloadsPath?: string;
+                    booksPath?: string;
                     parentPin?: string;
                 } & {
                     [key: string]: unknown;
