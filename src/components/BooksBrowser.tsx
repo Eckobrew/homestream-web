@@ -140,6 +140,8 @@ export function BooksBrowser({
           foreignBookId: book.foreignBookId,
           title: book.title,
           author: book.author || 'Unknown Author',
+          userId: currentProfileId,
+          profileId: currentProfileId,
         }),
       });
       const data = await res.json();
@@ -148,7 +150,11 @@ export function BooksBrowser({
       setDiscoverBooks((prev) =>
         prev.map((b) =>
           b.foreignBookId === book.foreignBookId
-            ? { ...b, requestStatus: data.status || 'requested' }
+            ? {
+                ...b,
+                requestStatus: data.status || 'requested',
+                onShelf: data.status === 'available' ? true : b.onShelf,
+              }
             : b
         )
       );
