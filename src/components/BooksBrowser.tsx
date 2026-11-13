@@ -173,12 +173,16 @@ export function BooksBrowser({
         body: book.onShelf ? undefined : JSON.stringify({ bookId: book.id }),
       });
       if (res.ok) {
-        setBooks((prev) =>
+        if (book.onShelf) {
+          setBooks((prev) => prev.filter((b) => b.id !== book.id));
+        }
+        setDiscoverBooks((prev) =>
           prev.map((b) => (b.id === book.id ? { ...b, onShelf: !book.onShelf } : b))
         );
         if (selected?.id === book.id) {
           setSelected({ ...selected, onShelf: !book.onShelf });
         }
+        void loadLibrary();
       }
     } finally {
       setBusyId('');
@@ -389,49 +393,27 @@ export function BooksBrowser({
               </button>
             </div>
           ) : (
-            <>
-              {shelfBooks.length > 0 && (
-                <section className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <Bookmark size={16} className="text-red-500" />
-                    <h2 className="text-lg font-bold">My Personal Shelf</h2>
-                    <span className="text-xs text-neutral-500">({shelfBooks.length})</span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                    {shelfBooks.map((book) => (
-                      <BookCard
-                        key={book.id || book.foreignBookId}
-                        book={book}
-                        busy={busyId === book.id}
-                        onRead={() => void openReader(book)}
-                        onSelect={() => setSelected(book)}
-                        onToggleShelf={() => void toggleShelf(book)}
-                      />
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              <section className="space-y-4">
-                <div className="flex items-center gap-2">
-                  <BookOpen size={16} className="text-red-500" />
-                  <h2 className="text-lg font-bold">All Books in Library</h2>
-                  <span className="text-xs text-neutral-500">({books.length})</span>
-                </div>
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                  {books.map((book) => (
-                    <BookCard
-                      key={book.id || book.foreignBookId}
-                      book={book}
-                      busy={busyId === book.id}
-                      onRead={() => void openReader(book)}
-                      onSelect={() => setSelected(book)}
-                      onToggleShelf={() => void toggleShelf(book)}
-                    />
-                  ))}
-                </div>
-              </section>
-            </>
+            <section className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Bookmark size={16} className="text-red-500" />
+                <h2 className="text-lg font-bold">
+                  {activeProfile?.name ? `${activeProfile.name}'s Bookshelf` : 'My Bookshelf'}
+                </h2>
+                <span className="text-xs text-neutral-500">({books.length})</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
+                {books.map((book) => (
+                  <BookCard
+                    key={book.id || book.foreignBookId}
+                    book={book}
+                    busy={busyId === book.id}
+                    onRead={() => void openReader(book)}
+                    onSelect={() => setSelected(book)}
+                    onToggleShelf={() => void toggleShelf(book)}
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </div>
       )}
