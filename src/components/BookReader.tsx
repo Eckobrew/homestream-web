@@ -193,8 +193,9 @@ export function BookReader({
         renditionRef.current = rendition;
 
         rendition.themes.default({
+          html: { background: '#fff !important' },
           body: {
-            background: 'transparent !important',
+            background: '#fff !important',
             color: '#231c14 !important',
             'font-family': '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif !important',
             'line-height': '1.78 !important',
@@ -433,7 +434,7 @@ export function BookReader({
         {/* Stacked Paper Edges Effect */}
         <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[5px] sm:p-[7px] shadow-[inset_0_0_0_1px_#b8a286,inset_0_0_0_3px_#e9ddc7,inset_0_0_0_4px_#c7b598]">
           {/* Open Book Cream Spread */}
-          <div ref={pageRef} className="relative w-full h-full rounded-[8px] border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+          <div ref={pageRef} className="relative w-full h-full rounded-[8px] isolate border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
             {/* Running Book Header inside Paper Margins */}
             <div className="pointer-events-none z-20 flex items-center justify-between gap-3 shrink-0 px-5 sm:px-12 pt-2.5 text-[11px] tracking-[0.18em] uppercase font-serif text-[#7b6a55]/80">
               <span className="min-w-0 flex-1 break-words line-clamp-2 italic">{book.author}</span>
@@ -489,14 +490,14 @@ export function BookReader({
               {format === 'epub' && (
                 <div
                   ref={epubContainerRef}
-                  className="w-full h-full overflow-hidden"
+                  className="w-full h-full overflow-hidden mix-blend-multiply"
                 />
               )}
 
               {format === 'pdf' && !loading && !error && (
                 <div ref={pdfAreaRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2">
-                  <canvas ref={leftCanvasRef} className="rounded-sm shadow-md max-w-full" />
-                  <canvas ref={rightCanvasRef} className="rounded-sm shadow-md max-w-full hidden md:block" />
+                  <canvas ref={leftCanvasRef} className="rounded-sm mix-blend-multiply max-w-full" />
+                  <canvas ref={rightCanvasRef} className="rounded-sm mix-blend-multiply max-w-full hidden md:block" />
                 </div>
               )}
             </div>
