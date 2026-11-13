@@ -151,6 +151,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               Discover
             </button>
             <button onClick={()=>onTabChange('requested')} className={'transition-colors '+(activeTab==='requested'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Requested</button>
+            {canManageIntegrations && <button onClick={()=>onTabChange('downloads')} className={'transition-colors '+(activeTab==='downloads'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Downloads</button>}
             {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'transition-colors '+(activeTab==='admin'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Admin</button>}
             <a href="/tv" title="Switch to Leanback TV Mode (Smart TVs, Remotes & Game Consoles)" className="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider text-neutral-400 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 transition">TV Mode</a>
           </div>
@@ -442,6 +443,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           <span className="text-[10px] tracking-tight">Discover</span>
         </button>
         <button onClick={()=>onTabChange('requested')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='requested'?'text-red-500 font-bold':'text-neutral-400')}><ListChecks size={19}/><span className="text-[10px]">Requested</span></button>
+        {canManageIntegrations && <button onClick={()=>onTabChange('downloads')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='downloads'?'text-red-500 font-bold':'text-neutral-400')}><Download size={19}/><span className="text-[10px]">Downloads</span></button>}
         {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='admin'?'text-red-500 font-bold':'text-neutral-400')}><ShieldCheck size={19}/><span className="text-[10px]">Admin</span></button>}
 
 

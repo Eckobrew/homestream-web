@@ -5,6 +5,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DiscoverHub } from '@/components/DiscoverHub';
 import { RequestedPanel } from '@/components/RequestedPanel';
 import { AdminIntegrations } from '@/components/AdminIntegrations';
+import { AdminDownloadManager } from '@/components/AdminDownloadManager';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicBrowser } from '@/components/MusicBrowser';
 import { BooksBrowser } from '@/components/BooksBrowser';
@@ -38,6 +39,13 @@ export default function Home() {
   const [music,setMusic]=useState<{tracks:MusicTrack[];index:number}|null>(null);
   const [canManageIntegrations,setCanManageIntegrations]=useState(false);
   useEffect(()=>{setMusic(null);},[activeProfile?.id]);
+  useEffect(() => {
+    if (activeProfile && (activeProfile.isKids || activeProfile.isAdministrator === false)) {
+      if (activeTab === 'downloads' || activeTab === 'admin') {
+        setActiveTab('home');
+      }
+    }
+  }, [activeProfile, activeTab]);
   const [searchQuery, setSearchQuery] = useState('');
   const [isServerSetupOpen, setIsServerSetupOpen] = useState(false);
 
@@ -191,7 +199,7 @@ export default function Home() {
     const searchParams = new URLSearchParams(window.location.search);
 
     const tabParam = searchParams.get('tab');
-    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'admin', 'music', 'youtube', 'books'].includes(tabParam)) {
+    if (tabParam && ['home', 'series', 'movies', 'requests', 'discover', 'requested', 'downloads', 'admin', 'music', 'youtube', 'books'].includes(tabParam)) {
       if (tabParam === 'music') {
         setActiveTab('music');
         setActiveLibrary('music');
@@ -494,10 +502,10 @@ export default function Home() {
         isDemoMode={isDemoMode}
         jellyfinConnected={jellyfinConnected}
         seerrConnected={seerrConnected}
-        canManageIntegrations={canManageIntegrations && !activeProfile?.isKids}
+        canManageIntegrations={canManageIntegrations && !activeProfile?.isKids && activeProfile?.isAdministrator !== false}
         activeTab={activeTab}
         onTabChange={handleTabChange}
-        onOpenServerSetup={canManageIntegrations && !activeProfile?.isKids ? ()=>handleTabChange('admin') : undefined}
+        onOpenServerSetup={canManageIntegrations && !activeProfile?.isKids && activeProfile?.isAdministrator !== false ? ()=>handleTabChange('admin') : undefined}
         isExternal={!authStatus.isLocalOrTailscale}
         onLogout={handleLogout}
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
@@ -561,6 +569,12 @@ export default function Home() {
         />
       ) : activeTab==='requested' ? (
         <RequestedPanel key={activeProfile?.id || 'default'} onDiscover={()=>handleTabChange('discover')} onOpenMedia={handleOpenModal}/>
+      ) : activeTab==='downloads' ? (
+        <AdminDownloadManager
+          key={activeProfile?.id || 'default'}
+          activeProfileId={activeProfile?.id}
+          onOpenAdminSettings={() => handleTabChange('admin')}
+        />
       ) : activeTab==='admin' ? (
         <AdminIntegrations key={activeProfile?.id || 'default'}/>
       ) : activeTab==='discover' ? (
