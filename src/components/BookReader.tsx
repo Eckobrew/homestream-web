@@ -56,8 +56,10 @@ export function BookReader({
   const leftCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const rightCanvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Touch / swipe tracking
-  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  // Interactive drag curl state (pointer / touch tracking)
+  const bookSpreadRef = useRef<HTMLDivElement | null>(null);
+  const pointerDownRef = useRef<{ x: number; y: number } | null>(null);
+  const [dragCurl, setDragCurl] = useState<{ dir: 'next' | 'prev'; progress: number } | null>(null);
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 768px)');
@@ -365,16 +367,75 @@ export function BookReader({
       className="fixed inset-0 z-50 bg-[radial-gradient(ellipse_at_center,#231a14_0%,#0c0907_100%)] flex items-center justify-center select-none overflow-hidden p-2 sm:p-6 md:p-10"
       onMouseMove={(e) => {
         setHoverTop(e.clientY < 68);
+        if (pointerDownRef.current && bookSpreadRef.current) {
+          const dx = e.clientX - pointerDownRef.current.x;
+          const dy = e.clientY - pointerDownRef.current.y;
+          if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+            const rect = bookSpreadRef.current.getBoundingClientRect();
+            const dir = dx < 0 ? 'next' : 'prev';
+            const progress =
+              dir === 'next'
+                ? Math.max(0.02, Math.min(0.98, (rect.right - e.clientX) / Math.max(1, rect.width)))
+                : Math.max(0.02, Math.min(0.98, (e.clientX - rect.left) / Math.max(1, rect.width)));
+            setDragCurl({ dir, progress });
+          }
+        }
+      }}
+      onMouseDown={(e) => {
+        pointerDownRef.current = { x: e.clientX, y: e.clientY };
+      }}
+      onMouseUp={(e) => {
+        const start = pointerDownRef.current;
+        pointerDownRef.current = null;
+        if (dragCurl) {
+          const shouldTurn = dragCurl.progress > 0.18 || (start ? Math.abs(e.clientX - start.x) > 48 : false);
+          const dir = dragCurl.dir;
+          setDragCurl(null);
+          if (shouldTurn) {
+            if (dir === 'next') goNext();
+            else goPrev();
+          }
+        }
       }}
       onTouchStart={(e) => {
         const touch = e.touches[0];
-        touchStartRef.current = e.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
+        pointerDownRef.current = e.touches.length === 1 ? { x: touch.clientX, y: touch.clientY } : null;
       }}
-      onTouchCancel={() => { touchStartRef.current = null; }}
+      onTouchMove={(e) => {
+        const touch = e.touches[0];
+        if (!touch || !pointerDownRef.current || !bookSpreadRef.current) return;
+        const dx = touch.clientX - pointerDownRef.current.x;
+        const dy = touch.clientY - pointerDownRef.current.y;
+        if (Math.abs(dx) > 10 && Math.abs(dx) > Math.abs(dy)) {
+          const rect = bookSpreadRef.current.getBoundingClientRect();
+          const dir = dx < 0 ? 'next' : 'prev';
+          const progress =
+            dir === 'next'
+              ? Math.max(0.02, Math.min(0.98, (rect.right - touch.clientX) / Math.max(1, rect.width)))
+              : Math.max(0.02, Math.min(0.98, (touch.clientX - rect.left) / Math.max(1, rect.width)));
+          setDragCurl({ dir, progress });
+        }
+      }}
+      onTouchCancel={() => {
+        pointerDownRef.current = null;
+        setDragCurl(null);
+      }}
       onTouchEnd={(e) => {
-        const start = touchStartRef.current;
-        touchStartRef.current = null;
+        const start = pointerDownRef.current;
+        pointerDownRef.current = null;
         const end = e.changedTouches[0];
+        if (dragCurl) {
+          const dx = start && end ? end.clientX - start.x : 0;
+          const shouldTurn = dragCurl.progress > 0.18 || Math.abs(dx) > 48;
+          const dir = dragCurl.dir;
+          setDragCurl(null);
+          if (shouldTurn) {
+            e.preventDefault();
+            if (dir === 'next') goNext();
+            else goPrev();
+          }
+          return;
+        }
         if (!start || !end) return;
         const dx = end.clientX - start.x;
         const dy = end.clientY - start.y;
@@ -404,7 +465,26 @@ export function BookReader({
         {/* Stacked Paper Edges Effect */}
         <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[5px] sm:p-[7px] shadow-[inset_0_0_0_1px_#b8a286,inset_0_0_0_3px_#e9ddc7,inset_0_0_0_4px_#c7b598]">
           {/* Open Book Cream Spread */}
-          <div className="relative w-full h-full rounded-[8px] isolate border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+          <div ref={bookSpreadRef} className="relative w-full h-full rounded-[8px] isolate border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+            {/* Interactive Finger-Tracked Page Curl Overlay */}
+            {dragCurl && (
+              <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+                <div
+                  style={{
+                    transform:
+                      dragCurl.dir === 'next'
+                        ? `translateX(${65 - dragCurl.progress * 140}%) skewX(${-8 - dragCurl.progress * 8}deg)`
+                        : `translateX(${-65 + dragCurl.progress * 140}%) skewX(${8 + dragCurl.progress * 8}deg)`,
+                  }}
+                  className={
+                    dragCurl.dir === 'next'
+                      ? 'hs-ibooks-curl-drag-next absolute inset-y-0 right-0 w-full'
+                      : 'hs-ibooks-curl-drag-prev absolute inset-y-0 left-0 w-full'
+                  }
+                />
+              </div>
+            )}
+
             {/* Classic iBooks-style Page Curl Overlay */}
             {turnAnim && (
               <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
@@ -495,6 +575,30 @@ export function BookReader({
       </div>
 
       <style jsx>{`
+        .hs-ibooks-curl-drag-next {
+          background: linear-gradient(
+            100deg,
+            transparent 0%,
+            rgba(35, 22, 12, 0.32) 36%,
+            #efe5d0 42%,
+            #fdf9f0 48%,
+            #e5d6bc 55%,
+            rgba(25, 16, 8, 0.28) 61%,
+            transparent 70%
+          );
+        }
+        .hs-ibooks-curl-drag-prev {
+          background: linear-gradient(
+            -100deg,
+            transparent 0%,
+            rgba(35, 22, 12, 0.32) 36%,
+            #efe5d0 42%,
+            #fdf9f0 48%,
+            #e5d6bc 55%,
+            rgba(25, 16, 8, 0.28) 61%,
+            transparent 70%
+          );
+        }
         .hs-ibooks-curl-next {
           background: linear-gradient(
             100deg,
