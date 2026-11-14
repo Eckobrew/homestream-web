@@ -33,8 +33,8 @@ export function BookReader({
   const [error, setError] = useState('');
   const [percent, setPercent] = useState<number>(initialProgress?.percent || 0);
   const [locationLabel, setLocationLabel] = useState<string>('');
-  const pageRef = useRef<HTMLDivElement | null>(null);
-  const turnRef = useRef<Animation | null>(null);
+  const [turnAnim, setTurnAnim] = useState<'next' | 'prev' | null>(null);
+  const turnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [wide, setWide] = useState(false);
   const [pdfArea, setPdfArea] = useState({ width: 0, height: 0 });
   const pdfAreaRef = useRef<HTMLDivElement>(null);
@@ -66,8 +66,7 @@ export function BookReader({
     media.addEventListener('change', update);
     return () => {
       media.removeEventListener('change', update);
-      turnRef.current?.cancel();
-      turnRef.current = null;
+      if (turnTimerRef.current) clearTimeout(turnTimerRef.current);
     };
   }, []);
 
@@ -101,8 +100,7 @@ export function BookReader({
   );
 
   const turnPage = useCallback(async (forward: boolean) => {
-    const page = pageRef.current;
-    if (!page || turnRef.current || loading || error) return;
+    if (turnAnim || loading || error) return;
 
     const nextPdfPage = forward ? pdfPage + pagesPerTurn : Math.max(1, pdfPage - pagesPerTurn);
     if (format === 'pdf' && (nextPdfPage === pdfPage || nextPdfPage > pdfTotal)) return;
@@ -112,53 +110,25 @@ export function BookReader({
       const location = rendition?.location;
       if (!location || (forward ? location.atEnd : location.atStart)) return;
     }
-    const advance = async () => {
-      if (format === 'pdf') setPdfPage(nextPdfPage);
-      else if (format === 'epub') await (forward ? rendition.next() : rendition.prev());
-    };
 
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || !page.animate) {
-      try {
-        await advance();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unable to turn the page');
-      }
-      return;
-    }
+    setTurnAnim(forward ? 'next' : 'prev');
+    if (turnTimerRef.current) clearTimeout(turnTimerRef.current);
 
-    const outgoing = forward ? -88 : 88;
-    const flat = 'perspective(2000px) rotateY(0deg)';
-    const animate = (from: string, to: string, transformOrigin: string, duration: number, easing: string) =>
-      page.animate([{ transform: from, transformOrigin }, { transform: to, transformOrigin }], {
-        duration, easing, fill: 'both',
-      });
+    setTimeout(() => {
+      void (async () => {
+        try {
+          if (format === 'pdf') setPdfPage(nextPdfPage);
+          else if (format === 'epub') await (forward ? rendition.next() : rendition.prev());
+        } catch (err) {
+          setError(err instanceof Error ? err.message : 'Unable to turn the page');
+        }
+      })();
+    }, 180);
 
-    let animation = animate(flat, `perspective(2000px) rotateY(${outgoing}deg)`, forward ? 'left' : 'right', 200, 'ease-in');
-    turnRef.current = animation;
-    try {
-      await animation.finished;
-      page.style.opacity = '0';
-      animation.cancel();
-      await advance();
-      // epub.js maps the new location on the next frame using untransformed bounds.
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      if (turnRef.current !== animation) return;
-      page.style.opacity = '';
-      animation = animate(`perspective(2000px) rotateY(${-outgoing}deg)`, flat, forward ? 'right' : 'left', 240, 'ease-out');
-      turnRef.current = animation;
-      await animation.finished;
-    } catch (err) {
-      if (turnRef.current === animation) {
-        setError(err instanceof Error ? err.message : 'Unable to turn the page');
-      }
-    } finally {
-      page.style.opacity = '';
-      if (turnRef.current === animation) {
-        animation.cancel();
-        turnRef.current = null;
-      }
-    }
-  }, [format, pdfPage, pdfTotal, pagesPerTurn, loading, error]);
+    turnTimerRef.current = setTimeout(() => {
+      setTurnAnim(null);
+    }, 520);
+  }, [format, pdfPage, pdfTotal, pagesPerTurn, loading, error, turnAnim]);
 
   const goPrev = useCallback(() => { void turnPage(false); }, [turnPage]);
   const goNext = useCallback(() => { void turnPage(true); }, [turnPage]);
@@ -193,9 +163,9 @@ export function BookReader({
         renditionRef.current = rendition;
 
         rendition.themes.default({
-          html: { background: '#fff !important' },
+          html: { background: '#f7f1e3 !important' },
           body: {
-            background: '#fff !important',
+            background: '#f7f1e3 !important',
             color: '#231c14 !important',
             'font-family': '"Palatino Linotype", "Book Antiqua", Palatino, Georgia, serif !important',
             'line-height': '1.78 !important',
@@ -434,7 +404,20 @@ export function BookReader({
         {/* Stacked Paper Edges Effect */}
         <div className="relative w-full h-full rounded-[11px] bg-[#dfd3be] p-[5px] sm:p-[7px] shadow-[inset_0_0_0_1px_#b8a286,inset_0_0_0_3px_#e9ddc7,inset_0_0_0_4px_#c7b598]">
           {/* Open Book Cream Spread */}
-          <div ref={pageRef} className="relative w-full h-full rounded-[8px] isolate border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+          <div className="relative w-full h-full rounded-[8px] isolate border border-[#d4c3a8] bg-[#f7f1e3] shadow-[inset_0_0_55px_rgba(120,90,55,0.22)] overflow-hidden flex flex-col justify-between">
+            {/* Classic iBooks-style Page Curl Overlay */}
+            {turnAnim && (
+              <div className="pointer-events-none absolute inset-0 z-30 overflow-hidden">
+                <div
+                  className={
+                    turnAnim === 'next'
+                      ? 'hs-ibooks-curl-next absolute inset-y-0 right-0 w-full'
+                      : 'hs-ibooks-curl-prev absolute inset-y-0 left-0 w-full'
+                  }
+                />
+              </div>
+            )}
+
             {/* Running Book Header inside Paper Margins */}
             <div className="pointer-events-none z-20 flex items-center justify-between gap-3 shrink-0 px-5 sm:px-12 pt-2.5 text-[11px] tracking-[0.18em] uppercase font-serif text-[#7b6a55]/80">
               <span className="min-w-0 flex-1 break-words line-clamp-2 italic">{book.author}</span>
@@ -490,12 +473,12 @@ export function BookReader({
               {format === 'epub' && (
                 <div
                   ref={epubContainerRef}
-                  className="w-full h-full overflow-hidden mix-blend-multiply"
+                  className="w-full h-full overflow-hidden bg-[#f7f1e3]"
                 />
               )}
 
               {format === 'pdf' && !loading && !error && (
-                <div ref={pdfAreaRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2">
+                <div ref={pdfAreaRef} className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center justify-items-center w-full h-full overflow-hidden py-2 bg-[#f7f1e3]">
                   <canvas ref={leftCanvasRef} className="rounded-sm mix-blend-multiply max-w-full" />
                   <canvas ref={rightCanvasRef} className="rounded-sm mix-blend-multiply max-w-full hidden md:block" />
                 </div>
@@ -510,6 +493,67 @@ export function BookReader({
           </div>
         </div>
       </div>
+
+      <style jsx>{`
+        .hs-ibooks-curl-next {
+          background: linear-gradient(
+            100deg,
+            transparent 0%,
+            rgba(35, 22, 12, 0.28) 36%,
+            #efe5d0 42%,
+            #fdf9f0 48%,
+            #e5d6bc 55%,
+            rgba(25, 16, 8, 0.24) 61%,
+            transparent 70%
+          );
+          animation: ibooksCurlNext 520ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        .hs-ibooks-curl-prev {
+          background: linear-gradient(
+            -100deg,
+            transparent 0%,
+            rgba(35, 22, 12, 0.28) 36%,
+            #efe5d0 42%,
+            #fdf9f0 48%,
+            #e5d6bc 55%,
+            rgba(25, 16, 8, 0.24) 61%,
+            transparent 70%
+          );
+          animation: ibooksCurlPrev 520ms cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
+        }
+        @keyframes ibooksCurlNext {
+          0% {
+            transform: translateX(65%) skewX(-8deg);
+            opacity: 0;
+          }
+          18% {
+            opacity: 1;
+          }
+          82% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(-75%) skewX(-16deg);
+            opacity: 0;
+          }
+        }
+        @keyframes ibooksCurlPrev {
+          0% {
+            transform: translateX(-65%) skewX(8deg);
+            opacity: 0;
+          }
+          18% {
+            opacity: 1;
+          }
+          82% {
+            opacity: 1;
+          }
+          100% {
+            transform: translateX(75%) skewX(16deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
