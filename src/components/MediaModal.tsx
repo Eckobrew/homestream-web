@@ -2,6 +2,18 @@
 import { apiFetch } from '@/api/client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+
+function formatFutureReleaseLabel(releaseDate?: string): string | null {
+  if (!releaseDate) return null;
+  const parsed = Date.parse(releaseDate);
+  if (!Number.isFinite(parsed) || parsed <= Date.now()) return null;
+  const formatted = new Intl.DateTimeFormat(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(new Date(parsed));
+  return `Coming Soon · ${formatted}`;
+}
 import {
   X,
   Play,
@@ -334,32 +346,50 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 </button>
               ) : (
                 <div className="flex items-center space-x-2 sm:space-x-3">
-                  <button
-                    onClick={() => {
-                      const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
-                      if (tmdbId) {
-                        apiFetch('/api/request', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            mediaType: currentItem.type === 'Series' ? 'tv' : 'movie',
-                            mediaId: tmdbId,
-                            seasons: currentItem.type === 'Series' ? [1] : undefined,
-                          }),
-                        }).catch(console.error);
-                      }
-                      onPlay({
-                        ...currentItem,
-                        status: 'processing',
-                        isDownloading: true,
-                        downloadProgress: currentItem.downloadProgress || 0,
-                      });
-                    }}
-                    className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
-                  >
-                    <Play size={18} className="fill-white" />
-                    <span>Download &amp; Stream</span>
-                  </button>
+                  {(() => {
+                    const comingSoonLabel = formatFutureReleaseLabel(currentItem.releaseDate);
+                    if (comingSoonLabel) {
+                      return (
+                        <button
+                          type="button"
+                          disabled
+                          className="flex items-center space-x-2 bg-neutral-800 text-neutral-300 border border-neutral-700 font-bold px-5 sm:px-6 py-2 rounded cursor-not-allowed opacity-90"
+                        >
+                          <Clock size={18} className="text-amber-400" />
+                          <span>{comingSoonLabel}</span>
+                        </button>
+                      );
+                    }
+                    const hasStreamResume = (currentItem.playbackPositionTicks || 0) > 0;
+                    return (
+                      <button
+                        onClick={() => {
+                          const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+                          if (tmdbId) {
+                            apiFetch('/api/request', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({
+                                mediaType: currentItem.type === 'Series' ? 'tv' : 'movie',
+                                mediaId: tmdbId,
+                                seasons: currentItem.type === 'Series' ? [1] : undefined,
+                              }),
+                            }).catch(console.error);
+                          }
+                          onPlay({
+                            ...currentItem,
+                            status: 'processing',
+                            isDownloading: true,
+                            downloadProgress: currentItem.downloadProgress || 0,
+                          });
+                        }}
+                        className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
+                      >
+                        <Play size={18} className="fill-white" />
+                        <span>{hasStreamResume ? 'Resume Stream' : 'Download & Stream'}</span>
+                      </button>
+                    );
+                  })()}
 
                   <button
                     onClick={() => onRequest(currentItem)}
