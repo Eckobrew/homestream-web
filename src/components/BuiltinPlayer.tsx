@@ -6,6 +6,8 @@ import { useMediaDelivery } from '@/player/useMediaDelivery';
 import { useCastSession } from '@/player/useCastSession';
 import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
+import { useMediaSession } from '@/player/useMediaSession';
+import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 import { negotiatePlayback } from '@/player/transport';
 import { playbackState } from '@/player/state';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
@@ -918,6 +920,55 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setIsScrubbing(true);
     resetControlsTimer();
   };
+
+  const mediaSessionDuration = duration > 0 ? duration : (knownDurationSeconds || videoRef.current?.duration || 0);
+  const mediaSessionSubtitle = episode
+    ? `S${episode.seasonNumber} E${episode.episodeNumber}${episode.name ? ` · ${episode.name}` : ''}`
+    : (item.year ? String(item.year) : '');
+  const mediaSessionArtwork = episode?.thumbnailUrl || item.backdropUrl || item.posterUrl;
+
+  useMediaSession({
+    active: !stopped,
+    title: item.title,
+    artist: mediaSessionSubtitle,
+    album: episode ? item.title : '',
+    artworkUrl: mediaSessionArtwork,
+    isPlaying,
+    currentTime,
+    duration: mediaSessionDuration,
+    onPlay: () => {
+      if (!isPlaying) togglePlay();
+    },
+    onPause: () => {
+      if (isPlaying) togglePlay();
+    },
+    onSeekTo: (time) => {
+      seek(time - currentTime);
+    },
+    onSeekBackward: (offset) => {
+      seek(-offset);
+    },
+    onSeekForward: (offset) => {
+      seek(offset);
+    },
+    onNextTrack: (nextEpisode || onNextEpisode) ? () => nextEpisodeHandler.current() : undefined,
+    onStop: onClose,
+  });
+
+  useSessionHeartbeat({
+    active: !stopped,
+    mediaId: episode?.id || item.id,
+    mediaType: 'video',
+    title: item.title,
+    subtitle: mediaSessionSubtitle,
+    artworkUrl: mediaSessionArtwork,
+    isPlaying,
+    positionMs: currentTime * 1000,
+    durationMs: mediaSessionDuration * 1000,
+    canSeek: mediaSessionDuration > 0,
+    canSkipNext: Boolean(nextEpisode || onNextEpisode),
+    canSkipPrev: false,
+  });
 
   const handleScrubEnd = () => {
     setIsScrubbing(false);

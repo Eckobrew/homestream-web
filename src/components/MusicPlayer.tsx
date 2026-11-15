@@ -2,6 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import type { MusicTrack } from '@/types';
+import { useMediaSession } from '@/player/useMediaSession';
+import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 import {
   Play,
   Pause,
@@ -123,6 +125,59 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
     const s = Math.floor(secs % 60);
     return `${m}:${s.toString().padStart(2, '0')}`;
   };
+
+  const effectiveDuration = duration || track?.durationSeconds || 0;
+
+  useMediaSession({
+    active: Boolean(track),
+    title: track?.title || '',
+    artist: track?.artist || '',
+    album: track?.album || '',
+    artworkUrl: track?.coverUrl,
+    isPlaying,
+    currentTime,
+    duration: effectiveDuration,
+    onPlay: () => {
+      audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+    },
+    onPause: () => {
+      audioRef.current?.pause();
+      setIsPlaying(false);
+    },
+    onSeekTo: (time) => {
+      const clamped = Math.max(0, effectiveDuration > 0 ? Math.min(time, effectiveDuration) : time);
+      setCurrentTime(clamped);
+      if (audioRef.current) audioRef.current.currentTime = clamped;
+    },
+    onSeekBackward: (offset) => {
+      const next = Math.max(0, currentTime - offset);
+      setCurrentTime(next);
+      if (audioRef.current) audioRef.current.currentTime = next;
+    },
+    onSeekForward: (offset) => {
+      const next = effectiveDuration > 0 ? Math.min(effectiveDuration, currentTime + offset) : currentTime + offset;
+      setCurrentTime(next);
+      if (audioRef.current) audioRef.current.currentTime = next;
+    },
+    onPreviousTrack: handleSkipPrev,
+    onNextTrack: handleSkipNext,
+    onStop: onClose,
+  });
+
+  useSessionHeartbeat({
+    active: Boolean(track),
+    mediaId: track?.id || '',
+    mediaType: 'music',
+    title: track?.title || '',
+    subtitle: track ? [track.artist, track.album].filter(Boolean).join(' · ') : '',
+    artworkUrl: track?.coverUrl,
+    isPlaying,
+    positionMs: currentTime * 1000,
+    durationMs: effectiveDuration * 1000,
+    canSeek: effectiveDuration > 0,
+    canSkipNext: tracks.length > 1,
+    canSkipPrev: tracks.length > 1,
+  });
 
   if (!track) return null;
 
