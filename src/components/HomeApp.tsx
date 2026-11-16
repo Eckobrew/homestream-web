@@ -5,7 +5,6 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { DiscoverHub } from '@/components/DiscoverHub';
 import { RequestedPanel } from '@/components/RequestedPanel';
 import { AdminIntegrations } from '@/components/AdminIntegrations';
-import { AdminDownloadManager } from '@/components/AdminDownloadManager';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicBrowser } from '@/components/MusicBrowser';
 import { BooksBrowser } from '@/components/BooksBrowser';
@@ -583,14 +582,8 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         />
       ) : activeTab==='requested' ? (
         <RequestedPanel key={activeProfile?.id || 'default'} onDiscover={()=>handleTabChange('discover')} onOpenMedia={handleOpenModal}/>
-      ) : activeTab==='downloads' ? (
-        <AdminDownloadManager
-          key={activeProfile?.id || 'default'}
-          activeProfileId={activeProfile?.id}
-          onOpenAdminSettings={() => handleTabChange('admin')}
-        />
-      ) : activeTab==='admin' ? (
-        <AdminIntegrations key={activeProfile?.id || 'default'}/>
+      ) : activeTab === 'downloads' || activeTab === 'admin' ? (
+        <AdminIntegrations key={`${activeProfile?.id || 'default'}-${activeTab}`} initialTab={activeTab === 'downloads' ? 'media' : 'modules'} />
       ) : activeTab==='discover' ? (
         <DiscoverHub key={activeProfile?.id || 'default'} sections={displayedSections} onPlay={handlePlay} onOpenModal={handleOpenModal} onRequest={handleRequest} onMusic={(tracks,index)=>{setPlayingState(null);setMusic({tracks,index});}} onAdmin={()=>handleTabChange('admin')}/>
       ) : loading ? (

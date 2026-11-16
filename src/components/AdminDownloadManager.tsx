@@ -82,9 +82,11 @@ function stateBadge(state: string) {
 export function AdminDownloadManager({
   activeProfileId,
   onOpenAdminSettings,
+  embedded = false,
 }: {
   activeProfileId?: string;
   onOpenAdminSettings?: () => void;
+  embedded?: boolean;
 }) {
   const [data, setData] = useState<AdminDownloadManagerResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -269,8 +271,9 @@ export function AdminDownloadManager({
     return true;
   });
 
+  const Wrapper = embedded ? 'div' : 'main';
   return (
-    <main className="pt-24 md:pt-28 pb-36 px-4 md:px-12 max-w-screen-2xl mx-auto">
+    <Wrapper className={embedded ? 'space-y-6' : 'pt-24 md:pt-28 pb-36 px-4 md:px-12 max-w-screen-2xl mx-auto'}>
       {/* Toast Notification */}
       {toastMsg && (
         <div className="fixed bottom-6 right-6 z-50 bg-neutral-900 border border-red-500/50 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center gap-3 text-sm animate-in fade-in slide-in-from-bottom-3">
@@ -995,6 +998,6 @@ export function AdminDownloadManager({
           </div>
         </div>
       )}
-    </main>
+    </Wrapper>
   );
 }
