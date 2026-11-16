@@ -53,7 +53,12 @@ export function MusicBrowser({
   const [total, setTotal] = useState(0);
   const [albums, setAlbums] = useState<MusicAlbum[]>([]);
   const [selected, setSelected] = useState<MusicAlbumResponse | null>(null);
-  const [category, setCategory] = useState<'albums' | 'playlists'>('albums');
+  const [selectedSource, setSelectedSource] = useState<'quick' | 'grid'>('grid');
+  const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
+  const [category, setCategory] = useState<'albums' | 'artists' | 'songs' | 'playlists'>('albums');
+  const [librarySongs, setLibrarySongs] = useState<MusicTrack[]>([]);
+  const [songsLoading, setSongsLoading] = useState(false);
+  const [songSort, setSongSort] = useState<'title' | 'artist' | 'album' | 'recent'>('title');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistDetailResponse | null>(null);
   const [showImportModal, setShowImportModal] = useState(false);
@@ -286,7 +291,94 @@ export function MusicBrowser({
     onPlay(playable, readyIdx);
   }
 
-  async function openAlbum(album: MusicAlbum) {
+  const artistGroups = useMemo(() => {
+    const map = new Map<string, { artist: string; albums: MusicAlbum[]; coverUrl?: string }>();
+    for (const album of albums) {
+      const name = (album.artist || 'Unknown Artist').trim() || 'Unknown Artist';
+      const key = name.toLowerCase();
+      const existing = map.get(key);
+      if (existing) {
+        existing.albums.push(album);
+        if (!existing.coverUrl && album.coverUrl) existing.coverUrl = album.coverUrl;
+      } else {
+        map.set(key, { artist: name, albums: [album], coverUrl: album.coverUrl });
+      }
+    }
+    return Array.from(map.values()).sort((a, b) => a.artist.localeCompare(b.artist));
+  }, [albums]);
+
+  useEffect(() => {
+    if (category !== 'songs') return;
+    const inLib = albums.filter((a) => a.inLibrary);
+    if (!inLib.length) {
+      setLibrarySongs([]);
+      return;
+    }
+    let cancelled = false;
+    setSongsLoading(true);
+    (async () => {
+      try {
+        const results = await Promise.all(
+          inLib.map(async (album) => {
+            const params = new URLSearchParams({ albumId: album.id });
+            if (currentProfileId) params.set('userId', currentProfileId);
+            const r = await apiFetch(`/api/music/album?${params.toString()}`);
+            if (!r.ok) return [] as MusicTrack[];
+            const d: MusicAlbumResponse = await r.json();
+            return (d.tracks || []).map((t) => ({
+              ...t,
+              album: t.album || album.title,
+              coverUrl: t.coverUrl || album.coverUrl,
+            }));
+          })
+        );
+        if (!cancelled) {
+          setLibrarySongs(results.flat());
+        }
+      } catch {
+        // Keep previously loaded tracks if transient failure
+      } finally {
+        if (!cancelled) setSongsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [category, albums, currentProfileId]);
+
+  const sortedSongs = useMemo(() => {
+    const needle = q.trim().toLowerCase();
+    const filtered = needle
+      ? librarySongs.filter((t) =>
+          [t.title, t.artist, t.album].some((v) => v?.toLowerCase().includes(needle))
+        )
+      : librarySongs.slice();
+    if (songSort === 'recent') return filtered;
+    return filtered.sort((a, b) => {
+      if (songSort === 'artist') {
+        const cmp = (a.artist || '').localeCompare(b.artist || '');
+        return cmp !== 0 ? cmp : (a.title || '').localeCompare(b.title || '');
+      }
+      if (songSort === 'album') {
+        const cmp = (a.album || '').localeCompare(b.album || '');
+        if (cmp !== 0) return cmp;
+        return (a.trackNumber || 0) - (b.trackNumber || 0) || (a.title || '').localeCompare(b.title || '');
+      }
+      return (a.title || '').localeCompare(b.title || '');
+    });
+  }, [librarySongs, q, songSort]);
+
+  function handleShuffleAllSongs() {
+    if (!sortedSongs.length) return;
+    const copy = [...sortedSongs];
+    for (let i = copy.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [copy[i], copy[j]] = [copy[j], copy[i]];
+    }
+    onPlay(copy, 0);
+  }
+
+  async function openAlbum(album: MusicAlbum, source: 'quick' | 'grid' = 'grid') {
     setBusy(album.id);
     setError('');
     try {
@@ -295,6 +387,7 @@ export function MusicBrowser({
       const r = await apiFetch(`/api/music/album?${params.toString()}`);
       const d = await r.json();
       if (!r.ok) throw new Error(d.error || 'Album unavailable');
+      setSelectedSource(source);
       setSelected(d);
     } catch (e: any) {
       setError(e.message || 'Album unavailable');
@@ -380,6 +473,159 @@ export function MusicBrowser({
 
   // Top 6 albums for Spotify's iconic quick-access grid
   const quickAccessAlbums = albums.slice(0, 6);
+
+  const renderSelectedAlbumPanel = () => {
+    if (!selected) return null;
+    return (
+      <section className="rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
+        <button
+          onClick={() => setSelected(null)}
+          className="absolute top-4 right-4 p-2 rounded-full bg-black/40 hover:bg-neutral-700 text-neutral-400 hover:text-white transition"
+          title="Close"
+        >
+          <X size={20} />
+        </button>
+
+        <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end">
+          <div className="w-40 h-40 sm:w-52 sm:h-52 flex-shrink-0 bg-neutral-900 rounded-lg overflow-hidden shadow-2xl">
+            {selected.album.coverUrl ? (
+              <img
+                src={selected.album.coverUrl}
+                alt={selected.album.title}
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center">
+                <Music2 size={64} className="text-neutral-600" />
+              </div>
+            )}
+          </div>
+
+          <div className="min-w-0 flex-1 space-y-2">
+            <span className="text-[11px] uppercase tracking-widest font-bold text-neutral-400">
+              Album
+            </span>
+            <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
+              {selected.album.title}
+            </h2>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-300 font-medium">
+              <span className="font-bold text-white">{selected.album.artist}</span>
+              {selected.album.year && <span>• {selected.album.year}</span>}
+              <span>• {selected.tracks.length} songs</span>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 pt-3">
+              {selected.tracks.length > 0 && (
+                <button
+                  onClick={() => onPlay(selected.tracks, 0)}
+                  className="w-14 h-14 rounded-full bg-[#1DB954] hover:bg-[#1ed760] hover:scale-105 text-black shadow-xl flex items-center justify-center transition"
+                  title="Play Album"
+                >
+                  <Play size={24} className="fill-black ml-1" />
+                </button>
+              )}
+
+              {selected.album.inLibrary && selected.tracks.length > 0 && (
+                <a href={downloadUrl({ albumId: selected.album.id })} download
+                  className={musicDownloadButton}>
+                  <Download size={16} /> Download ZIP
+                </a>
+              )}
+              {selected.album.inLibrary ? (
+                <button
+                  onClick={() => handleRemoveFromProfile(selected.album)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-600 hover:border-red-500 hover:text-red-400 text-neutral-300 text-xs font-bold transition"
+                  title="Remove from your profile library"
+                >
+                  <Check size={16} className="text-[#1DB954]" />
+                  <span>In Library</span>
+                </button>
+              ) : selected.album.isDownloaded ? (
+                <button
+                  onClick={() => handleAddOrRequest(selected.album)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold transition shadow"
+                >
+                  <Plus size={16} />
+                  <span>Add to Library (Instant)</span>
+                </button>
+              ) : (
+                <button
+                  onClick={() => handleAddOrRequest(selected.album)}
+                  disabled={Boolean(busy) || selected.album.requested}
+                  className="flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-neutral-200 text-black text-xs font-bold transition disabled:opacity-50"
+                >
+                  <Download size={16} />
+                  <span>{selected.album.requested ? 'Requested' : 'Download Album'}</span>
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Tracklist Table */}
+        {selected.tracks.length > 0 ? (
+          <div className="mt-8">
+            <div className="grid grid-cols-[36px_1fr_60px] px-3 py-2 border-b border-neutral-800 text-xs font-bold text-neutral-400 uppercase tracking-wider">
+              <span>#</span>
+              <span>Title</span>
+              <span className="flex justify-end">
+                <Clock size={14} />
+              </span>
+            </div>
+
+            <div className="divide-y divide-neutral-800/40 mt-1">
+              {selected.tracks.map((track, i) => (
+                <div key={track.id} className="flex items-center gap-2">
+                  <button
+                    onClick={() => onPlay(selected.tracks, i)}
+                    className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
+                  >
+                    <span className="text-sm text-neutral-400 group-hover:hidden">
+                      {track.trackNumber || i + 1}
+                    </span>
+                    <span className="hidden group-hover:flex items-center text-white">
+                      <Play size={14} className="fill-white" />
+                    </span>
+
+                    <div className="min-w-0 pr-4">
+                      <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
+                        {track.title}
+                      </p>
+                      <p className="text-xs text-neutral-400 truncate">{track.artist}</p>
+                    </div>
+
+                    <span className="text-xs text-neutral-400 text-right">
+                      {track.durationSeconds
+                        ? `${Math.floor(track.durationSeconds / 60)}:${String(
+                            Math.floor(track.durationSeconds % 60)
+                          ).padStart(2, '0')}`
+                        : '--:--'}
+                    </span>
+                  </button>
+                  {selected.album.inLibrary && (
+                    <a href={downloadUrl({ trackId: track.id })} download aria-label={`Download ${track.title}`}
+                      title="Download track" className="p-3 text-neutral-400 hover:text-white">
+                      <Download size={16} />
+                    </a>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="mt-8 py-6 text-center text-neutral-400">
+            <p>This album has not been downloaded to the server yet.</p>
+            <button
+              onClick={() => handleAddOrRequest(selected.album)}
+              className="mt-3 px-5 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold text-xs transition"
+            >
+              Download with slskd
+            </button>
+          </div>
+        )}
+      </section>
+    );
+  };
 
   return (
     <div className="bg-[#121212] min-h-screen text-white pb-32">
@@ -500,7 +746,7 @@ export function MusicBrowser({
             {quickAccessAlbums.map((album) => (
               <div
                 key={album.id}
-                onClick={() => openAlbum(album)}
+                onClick={() => openAlbum(album, 'quick')}
                 className="group relative flex items-center bg-[#2a2a2a]/60 hover:bg-[#343434] rounded-md overflow-hidden cursor-pointer transition shadow-md duration-200"
               >
                 <div className="w-16 h-16 sm:w-20 sm:h-20 flex-shrink-0 bg-neutral-800 relative">
@@ -524,7 +770,7 @@ export function MusicBrowser({
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    openAlbum(album);
+                    openAlbum(album, 'quick');
                   }}
                   className="mr-3 w-10 h-10 rounded-full bg-[#1DB954] hover:scale-105 hover:bg-[#1ed760] text-black shadow-xl flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200"
                   title="Play"
@@ -557,8 +803,38 @@ export function MusicBrowser({
             </button>
             <button
               onClick={() => {
+                setCategory('artists');
+                setSelectedPlaylist(null);
+                setSelected(null);
+              }}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                category === 'artists'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700'
+              }`}
+            >
+              Artists
+            </button>
+            <button
+              onClick={() => {
+                setCategory('songs');
+                setSelectedPlaylist(null);
+                setSelected(null);
+                setSelectedArtist(null);
+              }}
+              className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
+                category === 'songs'
+                  ? 'bg-white text-black'
+                  : 'bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700'
+              }`}
+            >
+              Songs
+            </button>
+            <button
+              onClick={() => {
                 setCategory('playlists');
                 setSelected(null);
+                setSelectedArtist(null);
               }}
               className={`px-4 py-1.5 rounded-full text-xs font-bold transition ${
                 category === 'playlists'
@@ -578,156 +854,8 @@ export function MusicBrowser({
           </button>
         </div>
 
-        {/* Selected Album Detail View (Modal / Slide-down) */}
-        {category === 'albums' && selected && (
-          <section className="rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
-            <button
-              onClick={() => setSelected(null)}
-              className="absolute top-4 right-4 p-2 rounded-full bg-black/40 hover:bg-neutral-700 text-neutral-400 hover:text-white transition"
-              title="Close"
-            >
-              <X size={20} />
-            </button>
-
-            <div className="flex flex-col sm:flex-row gap-6 items-start sm:items-end">
-              <div className="w-40 h-40 sm:w-52 sm:h-52 flex-shrink-0 bg-neutral-900 rounded-lg overflow-hidden shadow-2xl">
-                {selected.album.coverUrl ? (
-                  <img
-                    src={selected.album.coverUrl}
-                    alt={selected.album.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Music2 size={64} className="text-neutral-600" />
-                  </div>
-                )}
-              </div>
-
-              <div className="min-w-0 flex-1 space-y-2">
-                <span className="text-[11px] uppercase tracking-widest font-bold text-neutral-400">
-                  Album
-                </span>
-                <h2 className="text-2xl sm:text-4xl font-extrabold text-white tracking-tight">
-                  {selected.album.title}
-                </h2>
-                <div className="flex flex-wrap items-center gap-2 text-sm text-neutral-300 font-medium">
-                  <span className="font-bold text-white">{selected.album.artist}</span>
-                  {selected.album.year && <span>• {selected.album.year}</span>}
-                  <span>• {selected.tracks.length} songs</span>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-3 pt-3">
-                  {selected.tracks.length > 0 && (
-                    <button
-                      onClick={() => onPlay(selected.tracks, 0)}
-                      className="w-14 h-14 rounded-full bg-[#1DB954] hover:bg-[#1ed760] hover:scale-105 text-black shadow-xl flex items-center justify-center transition"
-                      title="Play Album"
-                    >
-                      <Play size={24} className="fill-black ml-1" />
-                    </button>
-                  )}
-
-                  {selected.album.inLibrary && selected.tracks.length > 0 && (
-                    <a href={downloadUrl({ albumId: selected.album.id })} download
-                      className={musicDownloadButton}>
-                      <Download size={16} /> Download ZIP
-                    </a>
-                  )}
-                  {selected.album.inLibrary ? (
-                    <button
-                      onClick={() => handleRemoveFromProfile(selected.album)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full border border-neutral-600 hover:border-red-500 hover:text-red-400 text-neutral-300 text-xs font-bold transition"
-                      title="Remove from your profile library"
-                    >
-                      <Check size={16} className="text-[#1DB954]" />
-                      <span>In Library</span>
-                    </button>
-                  ) : selected.album.isDownloaded ? (
-                    <button
-                      onClick={() => handleAddOrRequest(selected.album)}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold transition shadow"
-                    >
-                      <Plus size={16} />
-                      <span>Add to Library (Instant)</span>
-                    </button>
-                  ) : (
-                    <button
-                      onClick={() => handleAddOrRequest(selected.album)}
-                      disabled={Boolean(busy) || selected.album.requested}
-                      className="flex items-center gap-2 px-4 py-2 rounded-full bg-white hover:bg-neutral-200 text-black text-xs font-bold transition disabled:opacity-50"
-                    >
-                      <Download size={16} />
-                      <span>{selected.album.requested ? 'Requested' : 'Download Album'}</span>
-                    </button>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Tracklist Table */}
-            {selected.tracks.length > 0 ? (
-              <div className="mt-8">
-                <div className="grid grid-cols-[36px_1fr_60px] px-3 py-2 border-b border-neutral-800 text-xs font-bold text-neutral-400 uppercase tracking-wider">
-                  <span>#</span>
-                  <span>Title</span>
-                  <span className="flex justify-end">
-                    <Clock size={14} />
-                  </span>
-                </div>
-
-                <div className="divide-y divide-neutral-800/40 mt-1">
-                  {selected.tracks.map((track, i) => (
-                    <div key={track.id} className="flex items-center gap-2">
-                      <button
-                        onClick={() => onPlay(selected.tracks, i)}
-                        className="group grid grid-cols-[36px_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
-                      >
-                        <span className="text-sm text-neutral-400 group-hover:hidden">
-                          {track.trackNumber || i + 1}
-                        </span>
-                        <span className="hidden group-hover:flex items-center text-white">
-                          <Play size={14} className="fill-white" />
-                        </span>
-
-                        <div className="min-w-0 pr-4">
-                          <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
-                            {track.title}
-                          </p>
-                          <p className="text-xs text-neutral-400 truncate">{track.artist}</p>
-                        </div>
-
-                        <span className="text-xs text-neutral-400 text-right">
-                          {track.durationSeconds
-                            ? `${Math.floor(track.durationSeconds / 60)}:${String(
-                                Math.floor(track.durationSeconds % 60)
-                              ).padStart(2, '0')}`
-                            : '--:--'}
-                        </span>
-                      </button>
-                      {selected.album.inLibrary && (
-                        <a href={downloadUrl({ trackId: track.id })} download aria-label={`Download ${track.title}`}
-                          title="Download track" className="p-3 text-neutral-400 hover:text-white">
-                          <Download size={16} />
-                        </a>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="mt-8 py-6 text-center text-neutral-400">
-                <p>This album has not been downloaded to the server yet.</p>
-                <button
-                  onClick={() => handleAddOrRequest(selected.album)}
-                  className="mt-3 px-5 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black font-bold text-xs transition"
-                >
-                  Download with slskd
-                </button>
-              </div>
-            )}
-          </section>
-        )}
+        {/* Selected Album Detail View (Quick Access fallback when not in grid) */}
+        {category === 'albums' && selected && (selectedSource === 'quick' || !albums.some((a) => a.id === selected.album.id)) && renderSelectedAlbumPanel()}
 
         {/* Section: Albums Grid */}
         {category === 'albums' && (
@@ -758,10 +886,14 @@ export function MusicBrowser({
             ) : (
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
                 {albums.map((album) => (
+                  <React.Fragment key={album.id}>
                   <article
-                    key={album.id}
-                    onClick={() => openAlbum(album)}
-                    className="group relative p-3 rounded-xl bg-[#181818] hover:bg-[#282828] transition duration-200 cursor-pointer flex flex-col justify-between"
+                    onClick={() => selected?.album.id === album.id && selectedSource === 'grid' ? setSelected(null) : openAlbum(album, 'grid')}
+                    className={`group relative p-3 rounded-xl transition duration-200 cursor-pointer flex flex-col justify-between ${
+                      selected?.album.id === album.id && selectedSource === 'grid'
+                        ? 'bg-[#282828] ring-1 ring-[#1DB954]/60'
+                        : 'bg-[#181818] hover:bg-[#282828]'
+                    }`}
                   >
                     <div>
                       <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-neutral-900 shadow-lg">
@@ -844,6 +976,10 @@ export function MusicBrowser({
                       )}
                     </div>
                   </article>
+                  {selected?.album.id === album.id && selectedSource === 'grid' && (
+                    <div className="col-span-full">{renderSelectedAlbumPanel()}</div>
+                  )}
+                  </React.Fragment>
                 ))}
               </div>
             )}
@@ -856,6 +992,234 @@ export function MusicBrowser({
                 >
                   Load more albums ({albums.length} of {total})
                 </button>
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Section: Artists Grid */}
+        {category === 'artists' && (
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xl font-bold tracking-tight">
+                {q ? `Artists matching "${q}"` : `Your Artists (${artistGroups.length})`}
+              </h3>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-24 text-neutral-500 gap-3">
+                <Loader2 size={24} className="animate-spin text-[#1DB954]" />
+                <span>Loading artists...</span>
+              </div>
+            ) : artistGroups.length === 0 ? (
+              <div className="text-center py-20 text-neutral-400 space-y-2">
+                <Music2 size={48} className="mx-auto text-neutral-600 mb-3" />
+                <p className="text-base font-semibold">No artists found.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                {artistGroups.map((group) => {
+                  const isOpen = selectedArtist === group.artist;
+                  return (
+                    <React.Fragment key={group.artist}>
+                      <article
+                        onClick={() => {
+                          setSelectedArtist(isOpen ? null : group.artist);
+                          setSelected(null);
+                        }}
+                        className={`group relative p-3 rounded-xl transition duration-200 cursor-pointer flex flex-col justify-between ${
+                          isOpen
+                            ? 'bg-[#282828] ring-1 ring-[#1DB954]/60'
+                            : 'bg-[#181818] hover:bg-[#282828]'
+                        }`}
+                      >
+                        <div className="relative aspect-square w-full rounded-full overflow-hidden bg-neutral-900 shadow-lg">
+                          {group.coverUrl ? (
+                            <img
+                              src={group.coverUrl}
+                              alt={group.artist}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full flex items-center justify-center">
+                              <Music2 size={40} className="text-neutral-600" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="mt-3 text-center">
+                          <h4 className="font-bold text-sm text-white truncate group-hover:text-[#1DB954] transition">
+                            {group.artist}
+                          </h4>
+                          <p className="text-[11px] text-neutral-400 mt-1">
+                            {group.albums.length} {group.albums.length === 1 ? 'album' : 'albums'}
+                          </p>
+                        </div>
+                      </article>
+                      {isOpen && (
+                        <div className="col-span-full rounded-2xl bg-[#1a1a1a] p-5 border border-neutral-800 space-y-4">
+                          <div className="flex items-center justify-between">
+                            <h4 className="text-lg font-bold text-white">{group.artist}</h4>
+                            <button
+                              onClick={() => {
+                                setSelectedArtist(null);
+                                setSelected(null);
+                              }}
+                              className="p-1.5 rounded-full bg-black/40 hover:bg-neutral-700 text-neutral-400 hover:text-white transition"
+                              title="Close"
+                            >
+                              <X size={18} />
+                            </button>
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                            {group.albums.map((album) => (
+                              <React.Fragment key={album.id}>
+                                <article
+                                  onClick={() => selected?.album.id === album.id ? setSelected(null) : openAlbum(album, 'grid')}
+                                  className={`group relative p-3 rounded-xl transition duration-200 cursor-pointer flex flex-col justify-between ${
+                                    selected?.album.id === album.id
+                                      ? 'bg-[#282828] ring-1 ring-[#1DB954]/60'
+                                      : 'bg-[#121212] hover:bg-[#242424]'
+                                  }`}
+                                >
+                                  <div className="relative aspect-square w-full rounded-lg overflow-hidden bg-neutral-900 shadow">
+                                    {album.coverUrl ? (
+                                      <img src={album.coverUrl} alt={album.title} className="w-full h-full object-cover" />
+                                    ) : (
+                                      <div className="w-full h-full flex items-center justify-center">
+                                        <Music2 size={32} className="text-neutral-600" />
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="mt-2.5">
+                                    <h5 className="font-bold text-xs text-white truncate">{album.title}</h5>
+                                    <p className="text-[11px] text-neutral-400 mt-0.5">
+                                      {album.year || 'Album'}
+                                      {album.trackCount ? ` • ${album.trackCount} tracks` : ''}
+                                    </p>
+                                  </div>
+                                </article>
+                                {selected?.album.id === album.id && (
+                                  <div className="col-span-full">{renderSelectedAlbumPanel()}</div>
+                                )}
+                              </React.Fragment>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </React.Fragment>
+                  );
+                })}
+              </div>
+            )}
+          </section>
+        )}
+
+        {/* Section: Songs List */}
+        {category === 'songs' && (
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <h3 className="text-xl font-bold tracking-tight">
+                  {q ? `Songs matching "${q}" (${sortedSongs.length})` : `Your Songs (${sortedSongs.length})`}
+                </h3>
+                {sortedSongs.length > 0 && (
+                  <button
+                    onClick={handleShuffleAllSongs}
+                    className="px-4 py-1.5 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center gap-1.5 transition shadow"
+                  >
+                    <Shuffle size={14} />
+                    <span>Shuffle All</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <span className="text-xs text-neutral-400 mr-1">Sort:</span>
+                {([
+                  ['title', 'Title'],
+                  ['artist', 'Artist'],
+                  ['album', 'Album'],
+                  ['recent', 'Recently Added'],
+                ] as const).map(([key, label]) => (
+                  <button
+                    key={key}
+                    onClick={() => setSongSort(key)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold transition ${
+                      songSort === key
+                        ? 'bg-white text-black'
+                        : 'bg-neutral-800 text-neutral-300 hover:text-white hover:bg-neutral-700'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {songsLoading && sortedSongs.length === 0 ? (
+              <div className="flex items-center justify-center py-24 text-neutral-500 gap-3">
+                <Loader2 size={24} className="animate-spin text-[#1DB954]" />
+                <span>Loading songs...</span>
+              </div>
+            ) : sortedSongs.length === 0 ? (
+              <div className="text-center py-20 text-neutral-400 space-y-2">
+                <Music2 size={48} className="mx-auto text-neutral-600 mb-3" />
+                <p className="text-base font-semibold">
+                  {q ? 'No matching songs found.' : 'No imported songs in your library yet.'}
+                </p>
+              </div>
+            ) : (
+              <div className="rounded-2xl bg-[#181818] border border-neutral-800 p-4">
+                <div className="grid grid-cols-[36px_1fr_1fr_60px] px-3 py-2 border-b border-neutral-800 text-xs font-bold text-neutral-400 uppercase tracking-wider">
+                  <span>#</span>
+                  <span>Title</span>
+                  <span className="hidden sm:block">Album</span>
+                  <span className="flex justify-end">
+                    <Clock size={14} />
+                  </span>
+                </div>
+                <div className="divide-y divide-neutral-800/40 mt-1">
+                  {sortedSongs.map((track, i) => (
+                    <div key={`${track.id}-${i}`} className="flex items-center gap-2">
+                      <button
+                        onClick={() => onPlay(sortedSongs, i)}
+                        className="group grid grid-cols-[36px_1fr_60px] sm:grid-cols-[36px_1fr_1fr_60px] items-center px-3 py-2.5 rounded-md hover:bg-white/10 cursor-pointer transition w-full text-left"
+                      >
+                        <span className="text-sm text-neutral-400 group-hover:hidden">
+                          {i + 1}
+                        </span>
+                        <span className="hidden group-hover:flex items-center text-white">
+                          <Play size={14} className="fill-white" />
+                        </span>
+                        <div className="min-w-0 pr-4">
+                          <p className="text-sm font-semibold text-white group-hover:text-[#1DB954] truncate">
+                            {track.title}
+                          </p>
+                          <p className="text-xs text-neutral-400 truncate">{track.artist}</p>
+                        </div>
+                        <span className="hidden sm:block text-xs text-neutral-400 truncate pr-4">
+                          {track.album}
+                        </span>
+                        <span className="text-xs text-neutral-400 text-right">
+                          {track.durationSeconds
+                            ? `${Math.floor(track.durationSeconds / 60)}:${String(
+                                Math.floor(track.durationSeconds % 60)
+                              ).padStart(2, '0')}`
+                            : '--:--'}
+                        </span>
+                      </button>
+                      <a
+                        href={downloadUrl({ trackId: track.id })}
+                        download
+                        aria-label={`Download ${track.title}`}
+                        title="Download track"
+                        className="p-3 text-neutral-400 hover:text-white"
+                      >
+                        <Download size={16} />
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>
