@@ -284,20 +284,30 @@ export function AdminIntegrations({
   }, []);
 
   const loadMediaOverview = useCallback(async () => {
-    const [moviesRes, seriesRes, reqRes, musicRes, booksRes] = await Promise.all([
-      apiFetch('/api/library?type=Movie&limit=1').then((r) => (r.ok ? r.json() : null)).catch(() => null),
-      apiFetch('/api/library?type=Series&limit=1').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+    const [moviesRes, seriesRes, nativeRes, reqRes, musicStatusRes, musicLibRes, booksRes] = await Promise.all([
+      apiFetch('/api/library/movies').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      apiFetch('/api/library/tv').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      apiFetch('/api/native/library').then((r) => (r.ok ? r.json() : null)).catch(() => null),
       apiFetch('/api/requested').then((r) => (r.ok ? r.json() : null)).catch(() => null),
       apiFetch('/api/music/import-status').then((r) => (r.ok ? r.json() : null)).catch(() => null),
+      apiFetch('/api/music?offset=0').then((r) => (r.ok ? r.json() : null)).catch(() => null),
       apiFetch('/api/books?limit=1').then((r) => (r.ok ? r.json() : null)).catch(() => null),
     ]);
+    const nativeItems = Array.isArray(nativeRes?.items) ? (nativeRes.items as Array<{ type?: string }>) : [];
+    const nativeMovies = nativeItems.filter((i) => i.type === 'Movie').length;
+    const nativeSeries = nativeItems.filter((i) => i.type === 'Series').length;
+    const jfMovies = Number(moviesRes?.totalCount ?? moviesRes?.items?.length ?? 0);
+    const jfSeries = Number(seriesRes?.totalCount ?? seriesRes?.items?.length ?? 0);
+    const useNative = nativeRes?.settings?.mediaEngine === 'native' || (jfMovies === 0 && nativeMovies > 0) || (jfSeries === 0 && nativeSeries > 0);
+    const readyFromImport = Number(musicStatusRes?.ready ?? 0);
+    const readyFromAlbums = Number(musicLibRes?.total ?? musicLibRes?.albums?.length ?? 0);
     setMediaStats({
-      moviesCount: Number(moviesRes?.totalCount ?? moviesRes?.items?.length ?? 0),
-      seriesCount: Number(seriesRes?.totalCount ?? seriesRes?.items?.length ?? 0),
+      moviesCount: useNative ? nativeMovies : jfMovies,
+      seriesCount: useNative ? nativeSeries : jfSeries,
       requestedCount: Array.isArray(reqRes?.items) ? reqRes.items.length : 0,
-      musicReady: Number(musicRes?.ready ?? 0),
-      musicActive: Number((musicRes?.queued ?? 0) + (musicRes?.searching ?? 0) + (musicRes?.downloading ?? 0) + (musicRes?.importing ?? 0)),
-      musicFailed: Number(musicRes?.failed ?? 0),
+      musicReady: readyFromImport > 0 ? readyFromImport : readyFromAlbums,
+      musicActive: Number((musicStatusRes?.queued ?? 0) + (musicStatusRes?.searching ?? 0) + (musicStatusRes?.downloading ?? 0) + (musicStatusRes?.importing ?? 0)),
+      musicFailed: Number(musicStatusRes?.failed ?? 0),
       booksCount: Number(booksRes?.total ?? booksRes?.books?.length ?? 0),
     });
   }, []);
