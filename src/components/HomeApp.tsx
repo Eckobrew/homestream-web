@@ -106,6 +106,13 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           isLocalOrTailscale: Boolean(data.isLocalOrTailscale),
           isAuthenticated: Boolean(data.isAuthenticated),
         });
+        const acctRes = await apiFetch('/api/accounts?status=1');
+        if (acctRes.ok) {
+          const acctData = await acctRes.json();
+          if (acctData.needsFirstStart && typeof window !== 'undefined' && window.location.pathname !== '/first-start') {
+            window.location.href = '/first-start';
+          }
+        }
       }
     } catch (e) {
       console.error('Failed to check auth status:', e);

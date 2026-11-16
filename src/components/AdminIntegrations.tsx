@@ -36,8 +36,18 @@ interface MediaOverviewStats {
 interface SystemProfile {
   id: string;
   name: string;
+  accountId?: string;
   isKids?: boolean;
   isAdministrator?: boolean;
+}
+
+interface AccountSummary {
+  id: string;
+  username: string;
+  displayName: string;
+  isAdmin: boolean;
+  hasPassword: boolean;
+  legacyJellyfinAuth: boolean;
 }
 
 interface ActiveSession {
@@ -238,6 +248,11 @@ export function AdminIntegrations({ initialTab = 'modules' }: { initialTab?: Adm
   const [error, setError] = useState('');
   const [mediaStats, setMediaStats] = useState<MediaOverviewStats | null>(null);
   const [profiles, setProfiles] = useState<SystemProfile[]>([]);
+  const [accounts, setAccounts] = useState<AccountSummary[]>([]);
+  const [newAcctUser, setNewAcctUser] = useState('');
+  const [newAcctPass, setNewAcctPass] = useState('');
+  const [newAcctAdmin, setNewAcctAdmin] = useState(false);
+  const [acctMsg, setAcctMsg] = useState('');
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
   const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
   const [refreshingSystem, setRefreshingSystem] = useState(false);
@@ -271,18 +286,37 @@ export function AdminIntegrations({ initialTab = 'modules' }: { initialTab?: Adm
   const loadSystemOverview = useCallback(async () => {
     setRefreshingSystem(true);
     try {
-      const [capRes, profRes, sessRes] = await Promise.all([
+      const [capRes, profRes, sessRes, acctRes] = await Promise.all([
         apiFetch('/api/capabilities').then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
         apiFetch('/api/profiles').then((r) => (r.ok ? r.json() : { profiles: [] })).catch(() => ({ profiles: [] })),
         apiFetch('/api/sessions').then((r) => (r.ok ? r.json() : { sessions: [] })).catch(() => ({ sessions: [] })),
+        apiFetch('/api/accounts').then((r) => (r.ok ? r.json() : { accounts: [], profiles: [] })).catch(() => ({ accounts: [], profiles: [] })),
       ]);
       setCapabilities(capRes || {});
-      setProfiles(Array.isArray(profRes?.profiles) ? profRes.profiles : []);
+      setProfiles(Array.isArray(acctRes?.profiles) && acctRes.profiles.length ? acctRes.profiles : Array.isArray(profRes?.profiles) ? profRes.profiles : []);
+      setAccounts(Array.isArray(acctRes?.accounts) ? acctRes.accounts : []);
       setSessions(Array.isArray(sessRes?.sessions) ? sessRes.sessions : []);
     } finally {
       setRefreshingSystem(false);
     }
   }, []);
+
+  async function submitAccountAction(payload: Record<string, unknown>) {
+    setAcctMsg('');
+    const r = await apiFetch('/api/accounts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const d = await r.json();
+    if (!r.ok) {
+      setAcctMsg(d.error || 'Account action failed');
+      return false;
+    }
+    if (Array.isArray(d.accounts)) setAccounts(d.accounts);
+    await loadSystemOverview();
+    return true;
+  }
 
   useEffect(() => {
     const c = new AbortController();
@@ -497,27 +531,111 @@ export function AdminIntegrations({ initialTab = 'modules' }: { initialTab?: Adm
               </div>
             </div>
 
-            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4">
               <h3 className="font-semibold text-base flex items-center gap-2">
-                <Users size={16} className="text-blue-400" /> Profiles ({profiles.length})
+                <Users size={16} className="text-blue-400" /> Accounts ({accounts.length}) &amp; Profiles ({profiles.length})
               </h3>
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  const ok = await submitAccountAction({
+                    action: 'create',
+                    username: newAcctUser,
+                    password: newAcctPass,
+                    isAdmin: newAcctAdmin,
+                  });
+                  if (ok) {
+                    setNewAcctUser('');
+                    setNewAcctPass('');
+                    setNewAcctAdmin(false);
+                    setAcctMsg('Account created (user will create their first profile on login).');
+                  }
+                }}
+                className="flex flex-wrap items-center gap-2"
+              >
+                <input
+                  required
+                  value={newAcctUser}
+                  onChange={(e) => setNewAcctUser(e.target.value)}
+                  placeholder="New username"
+                  className="flex-1 min-w-[120px] rounded-lg border border-neutral-700 bg-black/40 px-3 py-1.5 text-xs text-white"
+                />
+                <input
+                  required
+                  type="password"
+                  minLength={4}
+                  value={newAcctPass}
+                  onChange={(e) => setNewAcctPass(e.target.value)}
+                  placeholder="Password (min 4)"
+                  className="flex-1 min-w-[120px] rounded-lg border border-neutral-700 bg-black/40 px-3 py-1.5 text-xs text-white"
+                />
+                <label className="flex items-center gap-1.5 text-xs text-neutral-300">
+                  <input type="checkbox" checked={newAcctAdmin} onChange={(e) => setNewAcctAdmin(e.target.checked)} />
+                  Admin
+                </label>
+                <button type="submit" className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-semibold">
+                  + Add Account
+                </button>
+              </form>
+              {acctMsg && <p className="text-xs text-neutral-300">{acctMsg}</p>}
               <div className="space-y-2">
-                {profiles.map((p) => (
-                  <div
-                    key={p.id}
-                    className="flex items-center justify-between px-3 py-2 rounded-lg bg-black/30 border border-neutral-800/80 text-sm"
-                  >
-                    <span className="font-medium">{p.name}</span>
-                    <div className="flex items-center gap-1.5">
-                      {p.isAdministrator && (
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-red-500/20 text-red-300">Admin</span>
-                      )}
-                      {p.isKids && (
-                        <span className="px-2 py-0.5 rounded text-[11px] bg-amber-500/20 text-amber-300">Kids</span>
+                {accounts.map((a) => {
+                  const acctProfiles = profiles.filter((p) => p.accountId === a.id);
+                  return (
+                    <div
+                      key={a.id}
+                      className="px-3 py-2.5 rounded-lg bg-black/30 border border-neutral-800/80 text-sm space-y-1.5"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold">{a.displayName}</span>
+                          <span className="text-xs text-neutral-500">@{a.username}</span>
+                          {a.isAdmin && <span className="px-2 py-0.5 rounded text-[11px] bg-red-500/20 text-red-300">Admin</span>}
+                          <span className="px-2 py-0.5 rounded text-[11px] bg-neutral-800 text-neutral-300">
+                            {acctProfiles.length} {acctProfiles.length === 1 ? 'profile' : 'profiles'}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              const pw = window.prompt(`New password for ${a.username} (min 4 chars):`);
+                              if (pw && pw.length >= 4) void submitAccountAction({ action: 'set-password', accountId: a.id, password: pw });
+                            }}
+                            className="px-2 py-1 rounded border border-neutral-700 hover:bg-neutral-800"
+                          >
+                            Set Password
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void submitAccountAction({ action: 'set-admin', accountId: a.id, isAdmin: !a.isAdmin })}
+                            className="px-2 py-1 rounded border border-neutral-700 hover:bg-neutral-800"
+                          >
+                            {a.isAdmin ? 'Demote' : 'Make Admin'}
+                          </button>
+                          {accounts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => void submitAccountAction({ action: 'delete', accountId: a.id })}
+                              className="px-2 py-1 rounded border border-red-800/60 text-red-300 hover:bg-red-950/40"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                      {acctProfiles.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5 pt-1">
+                          {acctProfiles.map((p) => (
+                            <span key={p.id} className="px-2 py-0.5 rounded-full text-[11px] bg-neutral-800/80 text-neutral-300">
+                              {p.name}{p.isKids ? ' (Kids)' : ''}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
           </div>

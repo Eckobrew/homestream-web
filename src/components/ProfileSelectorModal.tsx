@@ -43,13 +43,13 @@ export const ProfileSelectorModal: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
-  // Automatically open import mode on first run if setup is needed
+  // Automatically open First Profile creation screen when an account has 0 profiles
   useEffect(() => {
     if (needsSetup) {
-      setIsImportMode(true);
-      fetchAvailableJellyfinUsers();
+      setIsCreating(true);
+      setIsImportMode(false);
     }
-  }, [needsSetup, fetchAvailableJellyfinUsers]);
+  }, [needsSetup]);
 
   // Unimported Jellyfin users (available on Jellyfin but not yet added in HomeStream)
   const unimportedJellyfinUsers = useMemo(() => {

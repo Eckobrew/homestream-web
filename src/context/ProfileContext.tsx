@@ -50,18 +50,16 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         const data = await res.json();
         const loadedProfiles: UserProfile[] = data.profiles || [];
         const isExt = Boolean(data.isExternal);
-        const canSwitch = data.canSwitchProfile !== false && !isExt;
+        const canSwitch = data.canSwitchProfile !== false;
 
         setProfiles(loadedProfiles);
-        setNeedsSetup(Boolean(data.needsSetup) && !isExt);
+        setNeedsSetup(Boolean(data.needsSetup));
         setCanSwitchProfile(canSwitch);
         setIsExternal(isExt);
         setAvailableJellyfinUsers(data.availableJellyfinUsers || []);
 
-        if (data.needsSetup && !isExt) {
-          setIsSelectorOpen(false);
-        } else if (isExt) {
-          setIsSelectorOpen(false);
+        if (data.needsSetup) {
+          setIsSelectorOpen(true);
         }
 
         const activeId: string = data.activeProfileId;
