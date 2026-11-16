@@ -98,6 +98,7 @@ export function NativeLibraryManager() {
   const [streams, setStreams] = useState<ActiveStream[]>([]);
   const [stats, setStats] = useState<WatchStats | null>(null);
   const [scanning, setScanning] = useState(false);
+  const [scanProgress, setScanProgress] = useState<{ scannedFiles: number; addedItems: number } | null>(null);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [newLibName, setNewLibName] = useState('');
@@ -115,6 +116,12 @@ export function NativeLibraryManager() {
       setStreams(d.activeStreams || []);
       setStats(d.stats || null);
       setScanning(Boolean(d.scanStatus?.running));
+      if (d.scanStatus) {
+        setScanProgress({
+          scannedFiles: Number(d.scanStatus.scannedFiles || 0),
+          addedItems: Number(d.scanStatus.addedItems || 0),
+        });
+      }
     } catch {
       // Ignore transient load error
     }
@@ -123,6 +130,14 @@ export function NativeLibraryManager() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (!scanning) return;
+    const timer = setInterval(() => {
+      void load();
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [scanning, load]);
 
   const postAction = async (payload: Record<string, unknown>, okText: string) => {
     setStatusMsg('');
@@ -165,15 +180,12 @@ export function NativeLibraryManager() {
 
   const handleScan = async (libraryId?: string) => {
     setScanning(true);
-    try {
-      const res = await postAction({ action: 'scan', libraryId }, 'Library scan finished.');
-      if (res?.scanStatus) {
-        setStatusMsg(
-          `Scan complete: ${res.scanStatus.scannedFiles} files checked, ${res.scanStatus.addedItems} new items.`
-        );
-      }
-    } finally {
+    const res = await postAction({ action: 'scan', libraryId }, 'Library scan started...');
+    if (res?.scanStatus && !res.scanStatus.running) {
       setScanning(false);
+      setStatusMsg(
+        `Scan complete: ${res.scanStatus.scannedFiles} files checked, ${res.scanStatus.addedItems} new items.`
+      );
     }
   };
 
@@ -223,9 +235,11 @@ export function NativeLibraryManager() {
           </div>
         </div>
 
-        {statusMsg && (
+        {(statusMsg || scanning) && (
           <div className="text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-lg px-3 py-2">
-            {statusMsg}
+            {scanning && scanProgress
+              ? `Scanning libraries... ${scanProgress.scannedFiles} files checked, ${scanProgress.addedItems} new items added.`
+              : statusMsg}
           </div>
         )}
 
