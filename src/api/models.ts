@@ -72,7 +72,7 @@ export interface MediaItem {
   durationMinutes?: number;
   genres: string[];
   seasonsCount?: number;
-  source: 'jellyfin' | 'seerr' | 'demo' | 'youtube';
+  source: 'jellyfin' | 'native' | 'seerr' | 'demo' | 'youtube';
   jellyfinId?: string;
   seerrId?: number;
   tmdbId?: number;

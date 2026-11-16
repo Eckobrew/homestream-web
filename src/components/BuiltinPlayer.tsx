@@ -226,7 +226,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
   const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
 
-  const isJellyfinItem = Boolean(item.source === 'jellyfin' || item.jellyfinId);
+  const isJellyfinItem = Boolean(item.source === 'jellyfin' || item.source === 'native' || item.jellyfinId || String(item.id || '').startsWith('nat-'));
 
   // Series playlist episodes
   const [seriesEpisodes, setSeriesEpisodes] = useState<Episode[]>(

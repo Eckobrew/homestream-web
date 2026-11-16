@@ -42,7 +42,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
   const libraryPreview = item.videoStreamUrl?.startsWith('/api/preview-stream?')
     ? item.videoStreamUrl : undefined;
-  const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'demo';
+  const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'native' || item.source === 'demo';
   const isRequested = item.status === 'requested' || item.status === 'processing';
 
   // Smooth hover intent delay & preview trigger
@@ -108,7 +108,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         previewTimeoutRef.current = setTimeout(() => setIsPlayingPreview(true), 400);
         return;
       }
-      if (item.source === 'jellyfin') return;
+      if (item.source === 'jellyfin' || item.source === 'native') return;
 
       const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
       const type = item.type === 'Series' ? 'tv' : 'movie';

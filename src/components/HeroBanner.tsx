@@ -68,7 +68,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         setShowVideo(true);
         return;
       }
-      if (currentItem.source === 'jellyfin') return;
+      if (currentItem.source === 'jellyfin' || currentItem.source === 'native') return;
       const tmdb = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
       const type = currentItem.type === 'Series' ? 'tv' : 'movie';
       try {
@@ -171,8 +171,10 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             HF
           </span>
           <span>{currentItem.type === 'Series' ? 'SERIES' : 'FILM'}</span>
-          {currentItem.source === 'jellyfin' && (
-            <span className="text-emerald-400 font-semibold">• Ready to stream on Jellyfin</span>
+          {(currentItem.source === 'jellyfin' || currentItem.source === 'native') && (
+            <span className="text-emerald-400 font-semibold">
+              • {currentItem.source === 'native' ? 'Ready to stream' : 'Ready to stream on Jellyfin'}
+            </span>
           )}
         </div>
 

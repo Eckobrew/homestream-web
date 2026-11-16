@@ -139,7 +139,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   if (!item) return null;
 
   const currentItem = details || item;
-  const isAvailable = currentItem.status === 'available' || currentItem.source === 'jellyfin' || currentItem.source === 'demo';
+  const isAvailable = currentItem.status === 'available' || currentItem.source === 'jellyfin' || currentItem.source === 'native' || currentItem.source === 'demo';
   const isRequested = currentItem.status === 'requested' || currentItem.status === 'processing';
   const hasResume = Boolean(
     (currentItem.playbackPositionTicks && currentItem.playbackPositionTicks > 0) ||
@@ -815,7 +815,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {recommendations.slice(0, 6).map((rec) => {
-                  const recAvailable = rec.status === 'available' || rec.source === 'jellyfin';
+                  const recAvailable = rec.status === 'available' || rec.source === 'jellyfin' || rec.source === 'native';
                   const recRequested = rec.status === 'requested' || rec.status === 'processing';
 
                   return (

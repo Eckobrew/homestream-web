@@ -95,7 +95,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
   // Apply filters
   const filteredResults = results.filter((item) => {
-    if (activeFilter === 'available') return item.status === 'available' || item.source === 'jellyfin';
+    if (activeFilter === 'available') return item.status === 'available' || item.source === 'jellyfin' || item.source === 'native';
     if (activeFilter === 'movies') return item.type === 'Movie';
     if (activeFilter === 'tv') return item.type === 'Series';
     return true;
@@ -226,7 +226,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
       {/* Search Results Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
         {filteredResults.map((item) => {
-          const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'demo';
+          const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'native' || item.source === 'demo';
           const isRequested = item.status === 'requested' || item.status === 'processing';
 
           return (
