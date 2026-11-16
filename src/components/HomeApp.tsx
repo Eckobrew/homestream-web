@@ -65,8 +65,8 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [musicSubTab, setMusicSubTab] = useState<'albums' | 'artists' | 'songs' | 'playlists'>('albums');
   const [booksSubTab, setBooksSubTab] = useState<'shelf' | 'discover' | 'downloads'>('shelf');
   const [youtubeSubTab, setYoutubeSubTab] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
-  const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'system'>(
-    initialTab === 'downloads' ? 'media' : 'modules'
+  const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'downloads' | 'system'>(
+    initialTab === 'downloads' ? 'downloads' : 'modules'
   );
 
   // Netflix-style Category Rows for Movies and TV Shows Pages
@@ -309,7 +309,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
       setSeriesSubTab('featured');
       fetchCategories('series');
     }
-    if (tab === 'downloads') setAdminSubTab('media');
+    if (tab === 'downloads') setAdminSubTab('downloads');
     if (tab === 'admin') setAdminSubTab('modules');
     if (tab === 'discover') fetchCategories('requests');
     if (typeof window !== 'undefined') {
@@ -353,7 +353,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     else if (currentHub === 'music') setMusicSubTab(subTab as 'albums' | 'artists' | 'songs' | 'playlists');
     else if (currentHub === 'books') setBooksSubTab(subTab as 'shelf' | 'discover' | 'downloads');
     else if (currentHub === 'youtube') setYoutubeSubTab(subTab as 'home' | 'search' | 'subscriptions' | 'queue' | 'archive');
-    else if (currentHub === 'admin') setAdminSubTab(subTab as 'modules' | 'media' | 'system');
+    else if (currentHub === 'admin') setAdminSubTab(subTab as 'modules' | 'media' | 'downloads' | 'system');
   };
 
   const handlePlay = (item: MediaItem, episode?: Episode) => {
@@ -682,7 +682,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
       ) : activeTab === 'downloads' || activeTab === 'admin' ? (
         <AdminIntegrations
           key={`${activeProfile?.id || 'default'}-${activeTab}`}
-          initialTab={activeTab === 'downloads' ? 'media' : 'modules'}
+          initialTab={activeTab === 'downloads' ? 'downloads' : 'modules'}
           activeTab={adminSubTab}
           onTabChange={setAdminSubTab}
         />

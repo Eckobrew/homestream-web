@@ -125,7 +125,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                       : 'text-gray-300 hover:text-gray-100'
                   }`}
                 >
-                  Available
+                  Watch Now
                 </button>
                 <button
                   onClick={() => onTabChange('discover')}
@@ -180,6 +180,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : [
                     { id: 'modules', label: 'Modules' },
                     { id: 'media', label: 'Media Management' },
+                    { id: 'downloads', label: 'Downloads' },
                     { id: 'system', label: 'System & Profiles' },
                   ]
               ).map((t) => (
@@ -419,7 +420,7 @@ export const Navbar: React.FC<NavbarProps> = ({
               }`}
             >
               <Home size={19} />
-              <span className="text-[10px] tracking-tight">Available</span>
+              <span className="text-[10px] tracking-tight">Watch Now</span>
             </button>
 
             <button
@@ -517,7 +518,8 @@ export const Navbar: React.FC<NavbarProps> = ({
         ) : (
           [
             { id: 'modules', label: 'Modules', icon: Settings2 },
-            { id: 'media', label: 'Media', icon: Download },
+            { id: 'media', label: 'Media', icon: Server },
+            { id: 'downloads', label: 'Downloads', icon: Download },
             { id: 'system', label: 'System', icon: ShieldCheck },
           ].map(({ id, label, icon: Icon }) => (
             <button

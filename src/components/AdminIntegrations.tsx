@@ -22,7 +22,7 @@ import {
   Download,
 } from 'lucide-react';
 
-type AdminTab = 'modules' | 'media' | 'system';
+type AdminTab = 'modules' | 'media' | 'downloads' | 'system';
 
 interface MediaOverviewStats {
   moviesCount: number;
@@ -399,6 +399,15 @@ export function AdminIntegrations({
             <span>Media Management</span>
           </button>
           <button
+            onClick={() => setTab('downloads')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+              tab === 'downloads' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Download size={16} />
+            <span>Downloads</span>
+          </button>
+          <button
             onClick={() => setTab('system')}
             className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
               tab === 'system' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
@@ -502,9 +511,11 @@ export function AdminIntegrations({
           </div>
 
           <NativeLibraryManager />
-
-          <AdminDownloadManager embedded onOpenAdminSettings={() => setTab('modules')} />
         </div>
+      )}
+
+      {tab === 'downloads' && (
+        <AdminDownloadManager embedded onOpenAdminSettings={() => setTab('modules')} />
       )}
 
       {tab === 'system' && (
