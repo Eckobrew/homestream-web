@@ -191,7 +191,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const handleRestart = () => {
     if (currentItem.type === 'Series') {
       const allEps = currentItem.seasons?.flatMap((s) => s.episodes || []) || [];
-      const firstEp = allEps.find((ep) => ep.videoStreamUrl || ep.jellyfinId) || allEps[0];
+      const firstEp = allEps.find((ep) => ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-')) || allEps[0];
       const restartItem: MediaItem = {
         ...currentItem,
         playbackPositionTicks: 0,
@@ -313,7 +313,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 <>
                   <button
                     onClick={() => {
-                      const firstEp = currentItem.seasons?.flatMap((s) => s.episodes || []).find((ep) => ep.videoStreamUrl || ep.jellyfinId);
+                      const firstEp = currentItem.seasons?.flatMap((s) => s.episodes || []).find((ep) => ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-'));
                       onPlay(currentItem, firstEp);
                     }}
                     className="flex items-center space-x-2 bg-white text-black hover:bg-neutral-200 font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
@@ -618,7 +618,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     const isEpRequested = requestedEpIds.has(epKey) || isRequested;
                     const isEpRequesting = requestingEpId === epKey;
                     const isTorrentDownloading = Boolean(currentItem.isDownloading || currentItem.downloadStreamUrl || ep.downloadStreamUrl);
-                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || ep.jellyfinId)) || isTorrentDownloading;
+                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-'))) || isTorrentDownloading;
 
                     return (
                       <div

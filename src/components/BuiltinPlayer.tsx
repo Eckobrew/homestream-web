@@ -221,7 +221,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     (item.type !== 'Series' ? (item.jellyfinId || item.id) : undefined)
   );
 
-  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined));
+  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), selectedVersionId);
   const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef);
   const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
   const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
@@ -283,11 +283,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     if (item.type === 'Series') {
       if (item.seasons && item.seasons.length > 0) {
         const allEps = item.seasons.flatMap((s) => s.episodes || []);
-        setSeriesEpisodes(allEps.filter(ep => ep.jellyfinId || ep.videoStreamUrl).sort((a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
+        const isPlayableEp = (ep: Episode) => Boolean(ep.jellyfinId || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-'));
+        setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
         if (!activeEpisode) {
           const found = activePlayableId
             ? allEps.find((ep) => ep.jellyfinId === activePlayableId || ep.id === activePlayableId)
-            : allEps.find((ep) => ep.videoStreamUrl || ep.jellyfinId);
+            : allEps.find(isPlayableEp);
           if (found) {
             setActiveEpisode(found);
             if (!activePlayableId) setActivePlayableId(found.jellyfinId || found.id);
@@ -308,11 +309,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           }
           if (media.seasons) {
             const allEps = media.seasons.flatMap((s: any) => s.episodes || []);
-            setSeriesEpisodes(allEps.filter((ep: Episode) => ep.jellyfinId || ep.videoStreamUrl).sort((a: Episode, b: Episode) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
+            const isPlayableEp = (ep: Episode) => Boolean(ep.jellyfinId || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-'));
+            setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a: Episode, b: Episode) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
             if (!activeEpisode) {
               const found = targetPlayableId
                 ? allEps.find((ep: any) => ep.jellyfinId === targetPlayableId || ep.id === targetPlayableId)
-                : allEps.find((ep: any) => ep.videoStreamUrl || ep.jellyfinId);
+                : allEps.find(isPlayableEp);
               if (found) {
                 setActiveEpisode(found);
               }
@@ -418,6 +420,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
       if (targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
+        if (selectedVersionId) params.set('versionId', selectedVersionId);
         if (activeEpisode) {
           if (activeEpisode.seasonNumber) params.set('season', String(activeEpisode.seasonNumber));
           if (activeEpisode.episodeNumber) params.set('episode', String(activeEpisode.episodeNumber));
@@ -474,7 +477,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             idx + 1,
             (window as any).chrome.cast.media.TrackType.TEXT
           );
-          track.trackContentId = new URL(sub.src, window.location.href).href;
+          const normalizedSub = sub.src.startsWith('/api/native/') ? sub.src.replace(/^\/api\/native\//, '/api/v1/native/') : sub.src;
+          track.trackContentId = new URL(normalizedSub, window.location.href).href;
           track.trackContentType = 'text/vtt';
           track.subtype = (window as any).chrome.cast.media.TextTrackType.SUBTITLES;
           track.name = sub.title;
@@ -1188,6 +1192,13 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
       setActivePlayableId(nextEpisode.jellyfinId || nextEpisode.id);
       setStreamUrl('');
+      setStreamDelivery({ url: '', type: '' });
+      setSkipSegments([]);
+      setVersions([]);
+      setSelectedVersionId(undefined);
+      setTrickplayUrl(undefined);
+      setTrickplayCues([]);
+      setHasTriedFallbackTranscode(false);
       setIsLoadingStream(true);
       resetControlsTimer();
     }
@@ -1924,10 +1935,16 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       {activeSkipSegment && (
         <button
           onClick={() => {
-            if (videoRef.current) {
-              videoRef.current.currentTime = activeSkipSegment.endSeconds;
-              setCurrentTime(activeSkipSegment.endSeconds);
+            const targetSec = activeSkipSegment.endSeconds;
+            const castMedia = (window as any).cast?.framework?.CastContext?.getInstance?.()?.getCurrentSession?.()?.getMediaSession?.();
+            if (isCasting && castMedia && (window as any).chrome?.cast?.media?.SeekRequest) {
+              const req = new (window as any).chrome.cast.media.SeekRequest();
+              req.currentTime = targetSec;
+              castMedia.seek(req, () => {}, () => {});
+            } else if (videoRef.current) {
+              videoRef.current.currentTime = targetSec;
             }
+            setCurrentTime(targetSec);
           }}
           className="absolute bottom-24 right-6 z-40 bg-white/95 hover:bg-white text-black font-bold text-xs sm:text-sm px-4 py-2 rounded-lg shadow-2xl transition"
         >
