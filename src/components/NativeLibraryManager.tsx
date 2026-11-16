@@ -32,7 +32,7 @@ interface NativeLibraryConfig {
 interface NativeSettings {
   mediaEngine: 'jellyfin' | 'native';
   libraries: NativeLibraryConfig[];
-  hwAccel: 'none' | 'vaapi' | 'qsv' | 'nvenc' | 'videotoolbox';
+  hwAccel: 'none' | 'auto' | 'vaapi' | 'qsv' | 'nvenc' | 'videotoolbox';
   vaapiDevice: string;
   transcodeTempDir: string;
   maxTranscodeBitrateMbps: number;
@@ -67,6 +67,14 @@ interface NativeItemSummary {
   versions?: Array<{ id: string; label: string }>;
 }
 
+const hardwareLabels = {
+  vaapi: 'VAAPI (Intel / AMD Linux)',
+  qsv: 'Intel QuickSync (QSV)',
+  nvenc: 'NVIDIA NVENC',
+  videotoolbox: 'Apple VideoToolbox',
+} as const;
+type HardwareMode = keyof typeof hardwareLabels;
+
 interface ActiveStream {
   id: string;
   title: string;
@@ -94,12 +102,14 @@ interface WatchStats {
 
 export function NativeLibraryManager() {
   const [settings, setSettings] = useState<NativeSettings | null>(null);
+  const [hardwareAcceleration, setHardwareAcceleration] = useState<HardwareMode[]>([]);
   const [items, setItems] = useState<NativeItemSummary[]>([]);
   const [streams, setStreams] = useState<ActiveStream[]>([]);
   const [stats, setStats] = useState<WatchStats | null>(null);
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ scannedFiles: number; addedItems: number } | null>(null);
   const [saving, setSaving] = useState(false);
+  const [importingHistory, setImportingHistory] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [newLibName, setNewLibName] = useState('');
   const [newLibType, setNewLibType] = useState<'movie' | 'tv'>('movie');
@@ -112,6 +122,8 @@ export function NativeLibraryManager() {
       if (!res.ok) return;
       const d = await res.json();
       setSettings(d.settings || null);
+      const available: string[] = Array.isArray(d.hardwareAcceleration) ? d.hardwareAcceleration : [];
+      setHardwareAcceleration((Object.keys(hardwareLabels) as HardwareMode[]).filter(mode => available.includes(mode)));
       setItems(d.items || []);
       setStreams(d.activeStreams || []);
       setStats(d.stats || null);
@@ -164,6 +176,20 @@ export function NativeLibraryManager() {
       await postAction({ action: 'saveSettings', settings }, 'Native Media Engine settings saved.');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleImportHistory = async () => {
+    setImportingHistory(true);
+    try {
+      const result = await postAction({ action: 'importJellyfinHistory' }, 'Watch history imported.');
+      if (result) {
+        setStatusMsg(`Imported ${result.imported} entries. ${result.alreadyPresent} already present and ${result.unmatched} unmatched.`);
+      }
+    } catch {
+      setStatusMsg('Watch history import failed.');
+    } finally {
+      setImportingHistory(false);
     }
   };
 
@@ -234,6 +260,15 @@ export function NativeLibraryManager() {
             </button>
           </div>
         </div>
+
+        <button
+          type="button"
+          onClick={() => void handleImportHistory()}
+          disabled={importingHistory || scanning}
+          className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
+        >
+          {importingHistory ? 'Importing watch history…' : 'Import Jellyfin watch history'}
+        </button>
 
         {(statusMsg || scanning) && (
           <div className="text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-lg px-3 py-2">
@@ -342,18 +377,20 @@ export function NativeLibraryManager() {
           <label className="space-y-1">
             <span className="text-neutral-400">Hardware Acceleration</span>
             <select
-              value={settings.hwAccel}
+              value={settings.hwAccel === 'none' || (settings.hwAccel === 'auto' && hardwareAcceleration.length > 0) || hardwareAcceleration.includes(settings.hwAccel as HardwareMode)
+                ? settings.hwAccel : 'none'}
               onChange={(e) =>
                 setSettings({ ...settings, hwAccel: e.target.value as NativeSettings['hwAccel'] })
               }
               className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white"
             >
               <option value="none">None (Software libx264)</option>
-              <option value="vaapi">VAAPI (Intel / AMD Linux)</option>
-              <option value="qsv">Intel QuickSync (QSV)</option>
-              <option value="nvenc">NVIDIA NVENC</option>
-              <option value="videotoolbox">Apple VideoToolbox</option>
+              {hardwareAcceleration.length > 0 && <option value="auto">Auto (detected hardware)</option>}
+              {hardwareAcceleration.map(mode => <option key={mode} value={mode}>{hardwareLabels[mode]}</option>)}
             </select>
+            {hardwareAcceleration.length === 0 && (
+              <span className="block text-neutral-400">No working hardware encoder detected on the backend.</span>
+            )}
           </label>
 
           <label className="space-y-1">

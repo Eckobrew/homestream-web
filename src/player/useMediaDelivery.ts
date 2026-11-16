@@ -8,19 +8,31 @@ export function useMediaDelivery({url,contentType,itemId,resumeSeconds,videoRef,
  const error = useRef(onError); error.current=onError;
  useEffect(()=>{
    const video=videoRef.current;if(!url||!video)return;
-   let disposed=false;let resumed=false;let started=false;
+   let disposed=false;let started=false;let failed=false;
    const ready=()=>{
-     if(disposed||started)return;started=true;
-     if(!resumed){resumed=true;const position=Math.max(0,resumeSeconds);if(position>0){video.currentTime=position;setCurrentTime(position);}}
+     if(disposed||started||failed)return;started=true;
+     const position=Math.max(0,resumeSeconds);
+     if(position>0 && video.currentTime < position){video.currentTime=position;setCurrentTime(position);}
      setIsLoadingStream(false);
      void video.play().then(()=>{if(!disposed)setIsPlaying(true);}).catch(()=>{if(!disposed)setIsPlaying(false);});
    };
    const hls=/mpegurl/i.test(contentType)||url.includes('.m3u8');
    video.addEventListener('canplay',ready);
    if(hls&&Hls.isSupported()){
-     const player=new Hls({enableWorker:true,backBufferLength:90,startPosition:resumeSeconds||-1});hlsRef.current=player;
+     const player=new Hls({enableWorker:true,backBufferLength:90,startPosition:Math.max(0,resumeSeconds)});hlsRef.current=player;
+     let mediaRetried = false;
+     player.on(Hls.Events.ERROR, (_event, data) => {
+       if (disposed || failed || !data.fatal) return;
+       if (data.type === Hls.ErrorTypes.MEDIA_ERROR && !mediaRetried) {
+         mediaRetried = true;
+         player.recoverMediaError();
+       } else {
+         failed = true;
+         player.stopLoad();
+         error.current();
+       }
+     });
      player.loadSource(url);player.attachMedia(video);
-     player.on(Hls.Events.ERROR,(_event,data)=>{if(disposed||!data.fatal)return;if(data.type===Hls.ErrorTypes.NETWORK_ERROR)player.startLoad();else if(data.type===Hls.ErrorTypes.MEDIA_ERROR)player.recoverMediaError();else error.current();});
    }else{video.src=url;video.load();}
    return()=>{
      disposed=true;video.removeEventListener('canplay',ready);video.pause();

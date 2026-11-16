@@ -29,7 +29,7 @@ export default async function TvWatchPage({
 
   if (isYouTube) {
     playback = {
-      streamUrl: `/api/v1/youtube/stream-video?id=${encodeURIComponent(id)}`,
+      streamUrl: `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(id)}`,
       contentType: 'video/mp4',
     };
   } else {
@@ -67,16 +67,13 @@ export default async function TvWatchPage({
   }
 
   const streamSrc = playback.streamUrl;
-  const isHls = streamSrc.includes('.m3u8') || playback.contentType?.includes('mpegurl');
+  const isHls = playback.transport === 'HLS' || streamSrc.includes('.m3u8') || /mpegurl/i.test(playback.contentType || '');
 
-  // Locate next episode if viewing a series episode
-  let nextEpisode: any = null;
-  if (media?.episodes && media.episodes.length > 0) {
-    const currentIndex = media.episodes.findIndex((e: any) => e.id === id);
-    if (currentIndex >= 0 && currentIndex + 1 < media.episodes.length) {
-      nextEpisode = media.episodes[currentIndex + 1];
-    }
-  }
+  const series = media?.seriesId ? await fetchTvMedia(media.seriesId) : media;
+  const episodes = series?.seasons?.flatMap((season: { episodes?: Array<{ id: string; jellyfinId?: string }> }) => season.episodes || []) || [];
+  const currentIndex = episodes.findIndex((episode: { id: string; jellyfinId?: string }) => episode.id === id || episode.jellyfinId === id);
+  const nextEpisode = currentIndex >= 0 ? episodes[currentIndex + 1] : null;
+  const resumeSeconds = Math.max(0, Number(media?.playbackPositionTicks || 0) / 10_000_000);
 
   return (
     <div className="tv-player-wrap">
@@ -93,7 +90,7 @@ export default async function TvWatchPage({
         poster={media?.backdropUrl || ''}
         style={{ width: '100%', height: '100%', backgroundColor: '#000000' }}
       >
-        <source src={streamSrc} type={isHls ? 'application/x-mpegURL' : 'video/mp4'} />
+        <source src={streamSrc} type={isHls ? 'application/x-mpegURL' : playback.contentType || 'video/mp4'} />
         {subtitles.map((sub, i) => (
           <track
             key={sub.id || i}
@@ -114,25 +111,34 @@ export default async function TvWatchPage({
             (function() {
               var video = document.getElementById('tv-video');
               var itemId = ${JSON.stringify(id)};
-              var nextEpUrl = ${nextEpisode ? JSON.stringify(`/tv/watch/${nextEpisode.id}`) : 'null'};
+              var nextEpUrl = ${nextEpisode ? JSON.stringify(`/tv/watch/${encodeURIComponent(nextEpisode.jellyfinId || nextEpisode.id)}`) : 'null'};
+              var resumeSeconds = ${JSON.stringify(resumeSeconds)};
+              var isYouTube = ${JSON.stringify(isYouTube)};
               var lastReport = 0;
+              var stopped = false;
 
-              function reportProgress(completed) {
+              function reportProgress(ending) {
                 if (!video) return;
                 var now = Date.now();
-                if (!completed && now - lastReport < 8000) return;
+                if (stopped || (!ending && now - lastReport < 8000)) return;
+                if (ending) stopped = true;
                 lastReport = now;
                 try {
-                  var dur = video.duration || 0;
+                  var dur = isFinite(video.duration) ? video.duration : 0;
                   var cur = video.currentTime || 0;
-                  var payload = JSON.stringify({
+                  var payload = JSON.stringify(isYouTube ? {
+                    videoId: itemId,
+                    positionSeconds: Math.floor(cur),
+                    durationSeconds: Math.floor(dur),
+                    completed: video.ended
+                  } : {
                     itemId: itemId,
                     positionTicks: Math.floor(cur * 10000000),
                     isPaused: video.paused,
-                    isCompleted: completed || (dur > 0 && cur / dur > 0.92)
+                    isStopped: ending
                   });
                   if (navigator.sendBeacon) {
-                    navigator.sendBeacon('/api/v1/playback/progress', payload);
+                    navigator.sendBeacon(isYouTube ? '/api/v1/youtube/progress' : '/api/v1/playback/progress', payload);
                   }
                 } catch (e) {}
               }
@@ -142,20 +148,28 @@ export default async function TvWatchPage({
                 // Return / Back (10009 on Tizen, 27 on Esc, 461 on WebOS)
                 if (code === 10009 || code === 27 || code === 461) {
                   e.preventDefault();
-                  if (video) { video.pause(); reportProgress(false); }
+                  if (video) { video.pause(); reportProgress(true); }
                   window.history.back();
                   return;
                 }
                 // Media remote buttons
                 if (code === 415 && video) { video.play(); } // Play
                 if (code === 19 && video) { video.pause(); reportProgress(false); } // Pause
-                if (code === 413 && video) { video.pause(); reportProgress(false); window.history.back(); } // Stop
+                if (code === 413 && video) { video.pause(); reportProgress(true); window.history.back(); } // Stop
               }
 
               window.addEventListener('keydown', handleKeys);
+              window.addEventListener('pagehide', function() { reportProgress(true); });
 
               if (video) {
                 video.focus();
+                if (resumeSeconds > 0) {
+                  var restorePosition = function() {
+                    if (!isFinite(video.duration) || resumeSeconds < video.duration) video.currentTime = resumeSeconds;
+                  };
+                  if (video.readyState > 0) restorePosition();
+                  else video.addEventListener('loadedmetadata', restorePosition, { once: true });
+                }
                 video.addEventListener('timeupdate', function() { reportProgress(false); });
                 video.addEventListener('pause', function() { reportProgress(false); });
                 video.addEventListener('ended', function() {

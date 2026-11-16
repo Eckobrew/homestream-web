@@ -76,6 +76,27 @@ export default function FirstStartPage() {
     }
   }
 
+  async function handleUseNativeEngine() {
+    setError('');
+    setBusy(true);
+    try {
+      const response = await apiFetch('/api/native/library', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'saveSettings', settings: { mediaEngine: 'native' } }),
+      });
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || 'Could not enable the native media engine');
+      }
+      setStep('done');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not enable the native media engine');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white flex items-center justify-center p-6">
       <div className="w-full max-w-xl rounded-2xl border border-neutral-800 bg-neutral-900/70 p-6 md:p-8 space-y-6 shadow-2xl">
@@ -172,8 +193,16 @@ export default function FirstStartPage() {
         {step === 'integrations' && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-400">
-              Connect Jellyfin, Jellyseerr, Radarr, Sonarr, qBittorrent, Soulseek (slskd), or TMDB.
+              Use HomeStream’s native media engine or connect Jellyfin. You can configure library folders and other integrations in Admin.
             </p>
+            <button
+              type="button"
+              onClick={() => void handleUseNativeEngine()}
+              disabled={busy}
+              className="w-full py-3 rounded-lg border border-neutral-700 hover:bg-neutral-800 font-bold disabled:opacity-50"
+            >
+              Use Native Media Engine
+            </button>
             <button
               onClick={() => setShowIntegrationsModal(true)}
               className="w-full py-3 rounded-lg bg-red-600 hover:bg-red-500 font-bold flex items-center justify-center gap-2 transition"

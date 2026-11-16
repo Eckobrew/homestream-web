@@ -273,7 +273,6 @@ export function AdminIntegrations({
   const [newAcctAdmin, setNewAcctAdmin] = useState(false);
   const [acctMsg, setAcctMsg] = useState('');
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
-  const [capabilities, setCapabilities] = useState<Record<string, boolean>>({});
   const [refreshingSystem, setRefreshingSystem] = useState(false);
 
   const loadIntegrations = useCallback(async (signal?: AbortSignal) => {
@@ -315,20 +314,19 @@ export function AdminIntegrations({
   const loadSystemOverview = useCallback(async () => {
     setRefreshingSystem(true);
     try {
-      const [capRes, profRes, sessRes, acctRes] = await Promise.all([
-        apiFetch('/api/capabilities').then((r) => (r.ok ? r.json() : {})).catch(() => ({})),
+      const [profRes, sessRes, acctRes] = await Promise.all([
         apiFetch('/api/profiles').then((r) => (r.ok ? r.json() : { profiles: [] })).catch(() => ({ profiles: [] })),
         apiFetch('/api/sessions').then((r) => (r.ok ? r.json() : { sessions: [] })).catch(() => ({ sessions: [] })),
         apiFetch('/api/accounts').then((r) => (r.ok ? r.json() : { accounts: [], profiles: [] })).catch(() => ({ accounts: [], profiles: [] })),
+        loadIntegrations().catch(() => {}),
       ]);
-      setCapabilities(capRes || {});
       setProfiles(Array.isArray(acctRes?.profiles) && acctRes.profiles.length ? acctRes.profiles : Array.isArray(profRes?.profiles) ? profRes.profiles : []);
       setAccounts(Array.isArray(acctRes?.accounts) ? acctRes.accounts : []);
       setSessions(Array.isArray(sessRes?.sessions) ? sessRes.sessions : []);
     } finally {
       setRefreshingSystem(false);
     }
-  }, []);
+  }, [loadIntegrations]);
 
   async function submitAccountAction(payload: Record<string, unknown>) {
     setAcctMsg('');
@@ -545,7 +543,7 @@ export function AdminIntegrations({
           <div className="grid md:grid-cols-2 gap-6">
             <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
               <h3 className="font-semibold text-base flex items-center gap-2">
-                <HardDrive size={16} className="text-red-400" /> Storage Paths &amp; Capabilities
+                <HardDrive size={16} className="text-red-400" /> Storage Paths &amp; Integrations
               </h3>
               <div className="text-sm space-y-2 text-neutral-300">
                 <p>
@@ -558,16 +556,16 @@ export function AdminIntegrations({
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
-                {Object.entries(capabilities).map(([key, enabled]) => (
+                {data?.integrations.map(({ id, name, configured }) => (
                   <span
-                    key={key}
+                    key={id}
                     className={`px-2.5 py-1 rounded-full text-xs border ${
-                      enabled
+                      configured
                         ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                         : 'bg-neutral-800 text-neutral-500 border-neutral-700'
                     }`}
                   >
-                    {key}: {enabled ? 'yes' : 'no'}
+                    {name}: {configured ? 'configured' : 'not configured'}
                   </span>
                 ))}
               </div>

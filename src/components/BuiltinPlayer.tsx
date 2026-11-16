@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
-import { negotiatePlayback, MediaVersion, SkipSegment } from '@/player/transport';
+import { negotiatePlayback, MediaAudioTrack, MediaVersion, SkipSegment } from '@/player/transport';
 import { playbackState } from '@/player/state';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -111,6 +111,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
   const [versions, setVersions] = useState<MediaVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined);
+  const [audioTracks, setAudioTracks] = useState<MediaAudioTrack[]>([]);
+  const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(undefined);
   const [versionResumeSec, setVersionResumeSec] = useState<number | null>(null);
   const [trickplayUrl, setTrickplayUrl] = useState<string | undefined>(undefined);
   const [trickplayCues, setTrickplayCues] = useState<Array<{ start: number; end: number; src: string; x: number; y: number; w: number; h: number }>>([]);
@@ -222,8 +224,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     (item.type !== 'Series' ? (item.jellyfinId || item.id) : undefined)
   );
 
-  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), selectedVersionId);
-  const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef);
+  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), selectedVersionId, selectedAudioIndex);
+  const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef, selectedVersionId);
   const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
   const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
 
@@ -422,6 +424,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       if (targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
         if (selectedVersionId) params.set('versionId', selectedVersionId);
+        if (selectedAudioIndex !== undefined) params.set('audioIndex', String(selectedAudioIndex));
         if (activeEpisode) {
           if (activeEpisode.seasonNumber) params.set('season', String(activeEpisode.seasonNumber));
           if (activeEpisode.episodeNumber) params.set('episode', String(activeEpisode.episodeNumber));
@@ -508,7 +511,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     } catch {
       failed();
     }
-  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, selectedVersionId, cancelCastLoad, returnFromFailedCast]);
+  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, selectedVersionId, selectedAudioIndex, cancelCastLoad, returnFromFailedCast]);
   castLoadRef.current = loadCastMedia;
 
   const inspectCastStartup = useCallback((media: unknown) => {
@@ -682,7 +685,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
     const controller = new AbortController();
     let isMounted = true;
-    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal, false, selectedVersionId)
+    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal, false, selectedVersionId, selectedAudioIndex)
       .then((data) => {
         if (!isMounted) return;
         if (data.streamUrl) {
@@ -691,6 +694,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           setIsTranscoding(Boolean(data.isTranscoding));
           setSkipSegments(Array.isArray(data.skipSegments) ? data.skipSegments : []);
           setVersions(Array.isArray(data.versions) ? data.versions : []);
+          setAudioTracks(data.audioTracks || []);
           setTrickplayUrl(data.trickplayUrl);
           if (data.durationSeconds && data.durationSeconds > 0) {
             setPlaybackDuration(data.durationSeconds);
@@ -712,22 +716,20 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => {
       isMounted = false; controller.abort();
     };
-  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId]);
+  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId, selectedAudioIndex]);
 
   // Parse Trickplay WebVTT sprite sheet cues when trickplayUrl is available
   useEffect(() => {
-    if (!trickplayUrl) {
-      setTrickplayCues([]);
-      return;
-    }
-    let cancelled = false;
+    setTrickplayCues([]);
+    if (!trickplayUrl) return;
+    const controller = new AbortController();
     const apiPath = trickplayUrl.startsWith('/api/native/')
       ? trickplayUrl.replace('/api/', '/api/v1/')
       : trickplayUrl;
-    fetch(apiPath, { credentials: 'same-origin' })
+    fetch(apiPath, { credentials: 'same-origin', signal: controller.signal })
       .then((r) => (r.ok ? r.text() : ''))
       .then((text) => {
-        if (cancelled || !text) return;
+        if (controller.signal.aborted || !text) return;
         const parseTs = (ts: string) => {
           const parts = ts.trim().split(':').map(Number);
           if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
@@ -757,9 +759,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         setTrickplayCues(parsed);
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
+    return () => controller.abort();
   }, [trickplayUrl]);
 
   // SyncPlay polling when inside a room
@@ -824,7 +824,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
     setStreamError(true);
     setIsPlaying(false);
-  }, [activePlayableId, item, isJellyfinItem, hasTriedFallbackTranscode]);
+    setIsLoadingStream(false);
+  }, [activePlayableId, item, isJellyfinItem, hasTriedFallbackTranscode, fallbackPlayback]);
 
   const handleRetryPlayback = () => {
     const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
@@ -832,6 +833,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setIsLoadingStream(true);
 
     if (isJellyfinItem && targetId) {
+      setHasTriedFallbackTranscode(true);
       void fallbackPlayback({
         ready: data => {
           setStreamDelivery({url:data.streamUrl,type:data.contentType || ''});
@@ -1199,6 +1201,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       setSkipSegments([]);
       setVersions([]);
       setSelectedVersionId(undefined);
+      setAudioTracks([]);
+      setSelectedAudioIndex(undefined);
       setVersionResumeSec(null);
       setTrickplayUrl(undefined);
       setTrickplayCues([]);
@@ -1358,6 +1362,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             <track
               key={sub.id}
               id={`sub-${sub.id}`}
+              data-subtitle-id={sub.id}
               kind="subtitles"
               src={sub.src}
               srcLang={sub.language}
@@ -1836,7 +1841,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                   value={selectedVersionId || versions[0]?.id || ''}
                   onChange={(e) => {
                     const cur = currentTimeRef.current;
-                    if (Number.isFinite(cur) && cur > 0) setVersionResumeSec(cur);
+                    if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                    setHasTriedFallbackTranscode(false);
+                    setSelectedAudioIndex(undefined);
                     setSelectedVersionId(e.target.value);
                   }}
                   className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
@@ -1847,6 +1854,21 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                       {v.label}
                     </option>
                   ))}
+                </select>
+              )}
+              {audioTracks.length > 1 && (
+                <select
+                  value={selectedAudioIndex ?? ''}
+                  onChange={e => {
+                    setVersionResumeSec(currentTimeRef.current);
+                    setHasTriedFallbackTranscode(false);
+                    setSelectedAudioIndex(e.target.value === '' ? undefined : Number(e.target.value));
+                  }}
+                  className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
+                  aria-label="Select audio track"
+                >
+                  <option value="">Auto audio</option>
+                  {audioTracks.map(track => <option key={track.index} value={track.index}>{track.title}</option>)}
                 </select>
               )}
 
@@ -2025,6 +2047,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                       action: 'create',
                       itemId: activePlayableId || item.id,
                       title: currentTitle,
+                      isPaused: !isPlaying,
                       positionTicks: Math.round(currentTime * 10_000_000),
                     }),
                   });
