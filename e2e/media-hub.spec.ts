@@ -3,6 +3,7 @@ const id='11111111-1111-4111-8111-111111111111';
 const video=(kind:'Movie'|'Series',title:string)=>({id:kind,title,type:kind,source:'seerr',status:'not_requested',overview:'Discovery fixture',genres:[],posterUrl:'/demo-poster.svg',backdropUrl:'/demo-backdrop.svg'});
 async function fixture(page:Page){
  const mutations:Record<string,unknown>[]=[];
+ await page.route('**/api/v1/accounts?status=1', r => r.fulfill({ json: { needsFirstStart: false } }));
  await page.route('**/api/v1/auth',r=>r.fulfill({json:{requiresAuth:false,isAuthenticated:true,isLocalOrTailscale:true,canManageIntegrations:true}}));
  await page.route('**/api/v1/config',r=>r.fulfill({json:{appName:'HomeStream',isConfigured:true,isSetupNeeded:false,isJellyfinConfigured:true}}));
  await page.route('**/api/v1/profiles**',r=>r.fulfill({json:{profiles:[{id:'viewer',name:'Viewer',initials:'V'}],activeProfileId:'viewer',needsSetup:false,canSwitchProfile:true}}));
@@ -29,14 +30,41 @@ test('Discover and Requested cover movies, TV and music, with progress and date 
  await expect(page.getByText('Discover Movie',{exact:true}).first()).toBeVisible();await expect(page.getByText('Discover Series',{exact:true}).first()).toBeVisible();
  await page.goto('/?tab=music');await expect(page.getByText('Library Album',{exact:true})).toBeVisible();await expect(page.getByText('Discover Movie',{exact:true})).toHaveCount(0);
  await page.getByLabel('Search music').fill('New');await expect(page.getByText('New Album',{exact:true})).toBeVisible();await page.getByRole('button',{name:'Request album',exact:true}).click();await expect.poll(()=>mutations.some(m=>m.musicbrainzId===id)).toBe(true);
+ await page.getByRole('button',{name:'Back to Home'}).click();
  await page.getByRole('navigation').getByRole('button',{name:'Requested',exact:true}).click();await expect(page.getByRole('heading',{name:'Requested',exact:true})).toBeVisible();await expect(page.getByRole('progressbar',{name:'Requested Movie download progress'})).toHaveAttribute('aria-valuenow','55');await expect(page.getByText('Release year 2027')).toBeVisible();await expect(page.getByText('Release date unknown')).toBeVisible();await expect(page.getByText('Releases 3 Apr 2027')).toBeVisible();
  await page.getByRole('button',{name:'Music',exact:true}).click();await expect(page.getByText('Requested Album',{exact:true})).toBeVisible();await expect(page.getByText('Requested Movie',{exact:true})).toHaveCount(0);await page.screenshot({path:'test-results/requested-all-media.png',fullPage:true});
 });
 test('music player survives tab navigation and Admin preserves blank stored credentials',async({page})=>{
  const mutations=await fixture(page);await page.goto('/?tab=music');await page.getByRole('button',{name:'Tracks & playback'}).click();await page.getByRole('button',{name:/Library Track/}).click();await expect(page.getByRole('complementary',{name:'Music player'})).toBeVisible();
+ await expect.poll(() => page.locator('audio').evaluate(audio => (audio as HTMLAudioElement).currentTime)).toBeGreaterThan(0);
+ await page.getByRole('button',{name:'Back to Home'}).click();
  await page.getByRole('navigation').getByRole('button',{name:'Requested',exact:true}).click();await expect(page.getByRole('complementary',{name:'Music player'})).toBeVisible();await page.getByRole('button',{name:'Close music player'}).click();await expect(page.locator('audio')).toHaveCount(0);
- await page.getByRole('button',{name:'Admin',exact:true}).click();const form=page.locator('form').filter({has:page.getByRole('heading',{name:'slskd',exact:true})});await expect(form.getByLabel('API key')).toHaveValue('');await form.getByRole('button',{name:'Save integration'}).click();await expect(form.getByText('Integration saved.')).toBeVisible();await expect.poll(()=>mutations.some(m=>m.integration==='slskd'&&m.secret==='')).toBe(true);await form.getByRole('button',{name:'Test connection'}).click();await expect(form.getByText('Connection successful')).toBeVisible();await page.screenshot({path:'test-results/admin-integrations.png',fullPage:true});
+ await page.getByRole('button', { name: 'Profile menu' }).click();
+ await page.getByRole('button', { name: 'Server Settings' }).click();
+ const form=page.locator('form').filter({has:page.getByRole('heading',{name:'slskd',exact:true})});await expect(form.getByLabel('API key')).toHaveValue('');await form.getByRole('button',{name:'Save integration'}).click();await expect(form.getByText('Integration saved.')).toBeVisible();await expect.poll(()=>mutations.some(m=>m.integration==='slskd'&&m.secret==='')).toBe(true);await form.getByRole('button',{name:'Test connection'}).click();await expect(form.getByText('Connection successful')).toBeVisible();await page.screenshot({path:'test-results/admin-integrations.png',fullPage:true});
 });
 test('mobile navigation exposes Discover and Requested next to each other',async({page})=>{
  await page.setViewportSize({width:390,height:844});await fixture(page);await page.goto('/?tab=discover');await page.getByRole('button',{name:'Requested',exact:true}).click();await expect(page.getByRole('heading',{name:'Requested',exact:true})).toBeVisible();await page.screenshot({path:'test-results/requested-mobile.png',fullPage:true});
+});
+
+test('native settings list only hardware modes confirmed by the backend', async ({ page }) => {
+  await fixture(page);
+  let available = ['qsv'];
+  await page.route('**/api/v1/native/library**', route => route.fulfill({ json: {
+    settings: { mediaEngine: 'native', hwAccel: 'vaapi', libraries: [] },
+    hardwareAcceleration: available,
+  } }));
+  const openHardwareSettings = async () => {
+    await page.goto('/admin');
+    await page.getByRole('button', { name: 'Media Management' }).last().click();
+    return page.getByRole('combobox', { name: 'Hardware Acceleration' });
+  };
+  const detected = await openHardwareSettings();
+  await expect(detected.locator('option')).toHaveText(['None (Software libx264)', 'Auto (detected hardware)', 'Intel QuickSync (QSV)']);
+  await expect(detected).toHaveValue('none');
+
+  available = [];
+  const softwareOnly = await openHardwareSettings();
+  await expect(softwareOnly.locator('option')).toHaveText(['None (Software libx264)']);
+  await expect(page.getByText('No working hardware encoder detected on the backend.')).toBeVisible();
 });
