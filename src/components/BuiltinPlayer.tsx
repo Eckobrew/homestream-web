@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
-import { negotiatePlayback } from '@/player/transport';
+import { negotiatePlayback, MediaVersion, SkipSegment } from '@/player/transport';
 import { playbackState } from '@/player/state';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
@@ -31,6 +31,7 @@ import {
   AlertCircle,
   Cast,
   Download,
+  Users,
 } from 'lucide-react';
 import { MediaItem, Episode, SubtitleTrack } from '@/types';
 
@@ -107,6 +108,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [streamDelivery, setStreamDelivery] = useState<{ url: string; type: string } | null>(null);
   const [isTranscoding, setIsTranscoding] = useState(false);
   const [isLoadingStream, setIsLoadingStream] = useState(!streamUrl);
+  const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
+  const [versions, setVersions] = useState<MediaVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined);
+  const [trickplayUrl, setTrickplayUrl] = useState<string | undefined>(undefined);
+  const [trickplayCues, setTrickplayCues] = useState<Array<{ start: number; end: number; src: string; x: number; y: number; w: number; h: number }>>([]);
+  const [syncRoomCode, setSyncRoomCode] = useState('');
+  const [syncJoinCode, setSyncJoinCode] = useState('');
+  const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
+  const [showSyncMenu, setShowSyncMenu] = useState(false);
 
   const isItemDownloading = Boolean(
     isDownloading ||
@@ -667,13 +677,16 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
     const controller = new AbortController();
     let isMounted = true;
-    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal)
+    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal, false, selectedVersionId)
       .then((data) => {
         if (!isMounted) return;
         if (data.streamUrl) {
           setStreamDelivery({ url: data.streamUrl, type: data.contentType || '' });
-            setStreamUrl(data.streamUrl);
+          setStreamUrl(data.streamUrl);
           setIsTranscoding(Boolean(data.isTranscoding));
+          setSkipSegments(Array.isArray(data.skipSegments) ? data.skipSegments : []);
+          setVersions(Array.isArray(data.versions) ? data.versions : []);
+          setTrickplayUrl(data.trickplayUrl);
           if (data.durationSeconds && data.durationSeconds > 0) {
             setPlaybackDuration(data.durationSeconds);
             setDuration(data.durationSeconds);
@@ -694,7 +707,95 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => {
       isMounted = false; controller.abort();
     };
-  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode]);
+  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId]);
+
+  // Parse Trickplay WebVTT sprite sheet cues when trickplayUrl is available
+  useEffect(() => {
+    if (!trickplayUrl) {
+      setTrickplayCues([]);
+      return;
+    }
+    let cancelled = false;
+    const apiPath = trickplayUrl.startsWith('/api/native/')
+      ? trickplayUrl.replace('/api/', '/api/v1/')
+      : trickplayUrl;
+    fetch(apiPath, { credentials: 'same-origin' })
+      .then((r) => (r.ok ? r.text() : ''))
+      .then((text) => {
+        if (cancelled || !text) return;
+        const parseTs = (ts: string) => {
+          const parts = ts.trim().split(':').map(Number);
+          if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+          if (parts.length === 2) return parts[0] * 60 + parts[1];
+          return 0;
+        };
+        const lines = text.split(/\r?\n/);
+        const parsed: Array<{ start: number; end: number; src: string; x: number; y: number; w: number; h: number }> = [];
+        for (let i = 0; i < lines.length; i++) {
+          const m = /^(\d{2}:\d{2}:\d{2}(?:\.\d+)?)\s*-->\s*(\d{2}:\d{2}:\d{2}(?:\.\d+)?)/.exec(lines[i]);
+          if (!m) continue;
+          const nextLine = (lines[i + 1] || '').trim();
+          const xy = /#xywh=(\d+),(\d+),(\d+),(\d+)/.exec(nextLine);
+          if (!xy) continue;
+          const rawSrc = nextLine.split('#')[0];
+          const src = rawSrc.startsWith('/api/native/') ? rawSrc.replace('/api/', '/api/v1/') : rawSrc;
+          parsed.push({
+            start: parseTs(m[1]),
+            end: parseTs(m[2]),
+            src,
+            x: Number(xy[1]),
+            y: Number(xy[2]),
+            w: Number(xy[3]),
+            h: Number(xy[4]),
+          });
+        }
+        setTrickplayCues(parsed);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [trickplayUrl]);
+
+  // SyncPlay polling when inside a room
+  useEffect(() => {
+    if (!syncRoomCode) return;
+    const timer = setInterval(async () => {
+      try {
+        const res = await apiFetch(`/api/syncplay?code=${encodeURIComponent(syncRoomCode)}`);
+        if (!res.ok) return;
+        const d = await res.json();
+        const room = d.room;
+        if (!room) return;
+        setSyncParticipants(Array.isArray(room.participants) ? room.participants : []);
+        const video = videoRef.current;
+        if (video) {
+          const targetSec = (room.positionTicks || 0) / 10_000_000;
+          if (Math.abs(video.currentTime - targetSec) > 2.5) {
+            video.currentTime = targetSec;
+          }
+          if (room.isPaused && !video.paused) {
+            video.pause();
+            setIsPlaying(false);
+          } else if (!room.isPaused && video.paused) {
+            void video.play().catch(() => {});
+            setIsPlaying(true);
+          }
+        }
+      } catch {}
+    }, 2000);
+    return () => clearInterval(timer);
+  }, [syncRoomCode]);
+
+  const activeSkipSegment = useMemo(
+    () => skipSegments.find((s) => currentTime >= s.startSeconds && currentTime < s.endSeconds - 1),
+    [skipSegments, currentTime]
+  );
+
+  const activeHoverCue = useMemo(() => {
+    if (hoverTime === null || trickplayCues.length === 0) return null;
+    return trickplayCues.find((c) => hoverTime >= c.start && hoverTime < c.end) || null;
+  }, [hoverTime, trickplayCues]);
 
   const handlePlaybackError = useCallback(() => {
     const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
@@ -1591,18 +1692,41 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               style={{ left: `${playPercent}%` }}
             />
 
-            {/* Hover Timestamp & Buffer Preview Tooltip */}
+            {/* Hover Timestamp, Trickplay Thumbnail & Buffer Preview Tooltip */}
             {hoverTime !== null && hoverPos !== null && (
               <div
-                className="absolute -top-9 -translate-x-1/2 px-2.5 py-1 bg-black/90 backdrop-blur-md border border-neutral-700 rounded text-[11px] font-mono text-white shadow-xl pointer-events-none whitespace-nowrap z-30"
+                className="absolute bottom-full mb-2 -translate-x-1/2 flex flex-col items-center gap-1 pointer-events-none z-30"
                 style={{ left: `${hoverPos}%` }}
               >
-                <span>{formatTime(hoverTime)}</span>
-                {isItemDownloading && (
-                  <span className="ml-1.5 text-blue-400 text-[10px]">
-                    ({activeDownloadProgress}% dl)
-                  </span>
+                {activeHoverCue && (
+                  <div
+                    className="rounded-md border border-neutral-600 shadow-2xl overflow-hidden bg-black"
+                    style={{
+                      width: `${Math.min(180, activeHoverCue.w)}px`,
+                      height: `${Math.round((Math.min(180, activeHoverCue.w) * activeHoverCue.h) / activeHoverCue.w)}px`,
+                    }}
+                  >
+                    <div
+                      style={{
+                        width: `${activeHoverCue.w}px`,
+                        height: `${activeHoverCue.h}px`,
+                        backgroundImage: `url(${activeHoverCue.src})`,
+                        backgroundPosition: `-${activeHoverCue.x}px -${activeHoverCue.y}px`,
+                        backgroundRepeat: 'no-repeat',
+                        transform: `scale(${Math.min(180, activeHoverCue.w) / activeHoverCue.w})`,
+                        transformOrigin: 'top left',
+                      }}
+                    />
+                  </div>
                 )}
+                <div className="px-2.5 py-1 bg-black/90 backdrop-blur-md border border-neutral-700 rounded text-[11px] font-mono text-white shadow-xl whitespace-nowrap">
+                  <span>{formatTime(hoverTime)}</span>
+                  {isItemDownloading && (
+                    <span className="ml-1.5 text-blue-400 text-[10px]">
+                      ({activeDownloadProgress}% dl)
+                    </span>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1690,8 +1814,35 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               {currentTitle}
             </div>
 
-            {/* Right: Subtitles, Cast, Restart, Next Episode, Fullscreen */}
+            {/* Right: Version, SyncPlay, Subtitles, Cast, Restart, Next Episode, Fullscreen */}
             <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-5 relative shrink-0">
+              {versions.length > 1 && (
+                <select
+                  value={selectedVersionId || versions[0]?.id || ''}
+                  onChange={(e) => setSelectedVersionId(e.target.value)}
+                  className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
+                  aria-label="Select video version"
+                >
+                  {versions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.label}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {/* SyncPlay Button */}
+              <button
+                onClick={() => setShowSyncMenu(!showSyncMenu)}
+                className={`transition-colors p-1 rounded flex items-center gap-1 ${
+                  syncRoomCode ? 'text-emerald-400' : 'text-neutral-300 hover:text-white'
+                }`}
+                title="SyncPlay (Watch Together)"
+              >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                {syncRoomCode && <span className="text-[11px] font-mono">{syncRoomCode}</span>}
+              </button>
+
               {/* Subtitles Button */}
               <button
                 onClick={() => setShowSubtitleMenu(!showSubtitleMenu)}
@@ -1770,6 +1921,130 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       </div>
 
       {/* Universal Subtitles Selection Sheet / Modal (Responsive: Mobile Bottom Sheet + Desktop Centered) */}
+      {activeSkipSegment && (
+        <button
+          onClick={() => {
+            if (videoRef.current) {
+              videoRef.current.currentTime = activeSkipSegment.endSeconds;
+              setCurrentTime(activeSkipSegment.endSeconds);
+            }
+          }}
+          className="absolute bottom-24 right-6 z-40 bg-white/95 hover:bg-white text-black font-bold text-xs sm:text-sm px-4 py-2 rounded-lg shadow-2xl transition"
+        >
+          {activeSkipSegment.type === 'credits' ? 'Skip Credits →' : 'Skip Intro →'}
+        </button>
+      )}
+
+      {showSyncMenu && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="absolute bottom-20 right-6 z-50 w-72 rounded-xl bg-neutral-900/95 border border-neutral-700 p-4 shadow-2xl text-xs space-y-3"
+        >
+          <div className="flex items-center justify-between font-bold text-white">
+            <span>SyncPlay (Watch Together)</span>
+            <button onClick={() => setShowSyncMenu(false)} className="text-neutral-400 hover:text-white">
+              <X size={14} />
+            </button>
+          </div>
+          {syncRoomCode ? (
+            <div className="space-y-2">
+              <div className="bg-black/60 border border-neutral-700 rounded-lg p-2.5 flex items-center justify-between">
+                <span className="text-neutral-400">Room Code</span>
+                <span className="font-mono font-bold text-emerald-400 text-sm">{syncRoomCode}</span>
+              </div>
+              <div className="text-neutral-400">
+                Participants ({syncParticipants.length}): {syncParticipants.map((p) => p.name).join(', ')}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() =>
+                    void apiFetch('/api/syncplay', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'sync',
+                        code: syncRoomCode,
+                        isPaused: !isPlaying,
+                        positionTicks: Math.round(currentTime * 10_000_000),
+                      }),
+                    })
+                  }
+                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-1.5 rounded"
+                >
+                  Push Sync
+                </button>
+                <button
+                  onClick={() => {
+                    void apiFetch('/api/syncplay', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'leave', code: syncRoomCode }),
+                    });
+                    setSyncRoomCode('');
+                    setSyncParticipants([]);
+                  }}
+                  className="px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 py-1.5 rounded"
+                >
+                  Leave
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2.5">
+              <button
+                onClick={async () => {
+                  const res = await apiFetch('/api/syncplay', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      action: 'create',
+                      itemId: activePlayableId || item.id,
+                      title: currentTitle,
+                      positionTicks: Math.round(currentTime * 10_000_000),
+                    }),
+                  });
+                  const d = await res.json().catch(() => ({}));
+                  if (d.room?.code) {
+                    setSyncRoomCode(d.room.code);
+                    setSyncParticipants(d.room.participants || []);
+                  }
+                }}
+                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-lg"
+              >
+                Create SyncPlay Room
+              </button>
+              <div className="flex gap-1.5">
+                <input
+                  type="text"
+                  value={syncJoinCode}
+                  onChange={(e) => setSyncJoinCode(e.target.value.toUpperCase())}
+                  placeholder="Enter room code"
+                  className="flex-1 bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1.5 font-mono text-white"
+                />
+                <button
+                  onClick={async () => {
+                    if (!syncJoinCode.trim()) return;
+                    const res = await apiFetch('/api/syncplay', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'join', code: syncJoinCode.trim() }),
+                    });
+                    const d = await res.json().catch(() => ({}));
+                    if (d.room?.code) {
+                      setSyncRoomCode(d.room.code);
+                      setSyncParticipants(d.room.participants || []);
+                    }
+                  }}
+                  className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-3 py-1.5 rounded"
+                >
+                  Join
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
       {showSubtitleMenu && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
