@@ -136,19 +136,19 @@ export const MediaModal: React.FC<MediaModalProps> = ({
     };
   }, [item]);
 
-  if (!item) return null;
-
   const currentItem = details || item;
+  const seasons: Season[] = currentItem?.seasons || [];
+  const allEpisodes = useMemo(() => seasons.flatMap((s) => s.episodes || []), [seasons]);
+
+  if (!item || !currentItem) return null;
+
   const isAvailable = currentItem.status === 'available' || currentItem.source === 'jellyfin' || currentItem.source === 'native' || currentItem.source === 'demo';
   const isRequested = currentItem.status === 'requested' || currentItem.status === 'processing';
   const hasResume = Boolean(
     (currentItem.playbackPositionTicks && currentItem.playbackPositionTicks > 0) ||
     (currentItem.progressPercent && currentItem.progressPercent > 0)
   );
-  const seasons: Season[] = currentItem.seasons || [];
   const currentSeason = seasons[selectedSeasonIndex] || seasons[0];
-
-  const allEpisodes = useMemo(() => seasons.flatMap((s) => s.episodes || []), [seasons]);
   const totalEpisodesCount = allEpisodes.length;
   const watchedEpisodesCount = allEpisodes.filter((e) => e.played).length;
   const inProgressEpisodesCount = allEpisodes.filter(

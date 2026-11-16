@@ -111,6 +111,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [skipSegments, setSkipSegments] = useState<SkipSegment[]>([]);
   const [versions, setVersions] = useState<MediaVersion[]>([]);
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined);
+  const [versionResumeSec, setVersionResumeSec] = useState<number | null>(null);
   const [trickplayUrl, setTrickplayUrl] = useState<string | undefined>(undefined);
   const [trickplayCues, setTrickplayCues] = useState<Array<{ start: number; end: number; src: string; x: number; y: number; w: number; h: number }>>([]);
   const [syncRoomCode, setSyncRoomCode] = useState('');
@@ -507,7 +508,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     } catch {
       failed();
     }
-  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, cancelCastLoad, returnFromFailedCast]);
+  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, selectedVersionId, cancelCastLoad, returnFromFailedCast]);
   castLoadRef.current = loadCastMedia;
 
   const inspectCastStartup = useCallback((media: unknown) => {
@@ -871,7 +872,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   useMediaDelivery({
     url: streamUrl, contentType: streamDelivery?.url === streamUrl ? streamDelivery.type : '', itemId: activePlayableId,
-    resumeSeconds: (activeEpisode ? activeEpisode.playbackPositionTicks || 0 : item.playbackPositionTicks || 0) / 10000000,
+    resumeSeconds: versionResumeSec !== null
+      ? versionResumeSec
+      : (activeEpisode ? activeEpisode.playbackPositionTicks || 0 : item.playbackPositionTicks || 0) / 10000000,
     videoRef, hlsRef, revision: streamDelivery, setIsLoadingStream, setIsPlaying, setCurrentTime, onError: handlePlaybackError,
   });
 
@@ -1196,6 +1199,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       setSkipSegments([]);
       setVersions([]);
       setSelectedVersionId(undefined);
+      setVersionResumeSec(null);
       setTrickplayUrl(undefined);
       setTrickplayCues([]);
       setHasTriedFallbackTranscode(false);
@@ -1830,7 +1834,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               {versions.length > 1 && (
                 <select
                   value={selectedVersionId || versions[0]?.id || ''}
-                  onChange={(e) => setSelectedVersionId(e.target.value)}
+                  onChange={(e) => {
+                    const cur = currentTimeRef.current;
+                    if (Number.isFinite(cur) && cur > 0) setVersionResumeSec(cur);
+                    setSelectedVersionId(e.target.value);
+                  }}
                   className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
                   aria-label="Select video version"
                 >
