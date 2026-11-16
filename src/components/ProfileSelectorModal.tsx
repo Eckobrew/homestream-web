@@ -541,21 +541,6 @@ export const ProfileSelectorModal: React.FC = () => {
 
           {/* Action Footer Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">
-            {/* Import from Jellyfin button if unimported users exist */}
-            {unimportedJellyfinUsers.length > 0 && (
-              <button
-                onClick={() => {
-                  fetchAvailableJellyfinUsers();
-                  setSelectedImportIds([]);
-                  setIsImportMode(true);
-                }}
-                className="px-4 py-2 border border-neutral-700 hover:border-neutral-400 text-neutral-300 hover:text-white text-xs sm:text-sm font-semibold transition-colors rounded flex items-center space-x-1.5"
-              >
-                <Download size={14} />
-                <span>Import from Jellyfin ({unimportedJellyfinUsers.length})</span>
-              </button>
-            )}
-
             <button
               onClick={() => setIsManageMode(!isManageMode)}
               className="px-4 py-2 border border-neutral-700 hover:border-neutral-400 text-neutral-400 hover:text-white text-xs sm:text-sm font-semibold transition-colors rounded flex items-center space-x-1.5"

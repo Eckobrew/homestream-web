@@ -31,18 +31,32 @@ interface BooksBrowserProps {
   onAdmin?: () => void;
   activeProfileId?: string;
   onBackToHome?: () => void;
+  activeTab?: 'shelf' | 'discover' | 'downloads';
+  onTabChange?: (tab: 'shelf' | 'discover' | 'downloads') => void;
 }
 
 export function BooksBrowser({
   onAdmin,
   activeProfileId,
   onBackToHome,
+  activeTab,
+  onTabChange,
 }: BooksBrowserProps) {
   const { activeProfile } = useProfile();
   const currentProfileId = activeProfileId || activeProfile?.id;
   const kids = Boolean(activeProfile?.isKids);
 
-  const [tab, setTab] = useState<'shelf' | 'discover' | 'downloads'>('shelf');
+  const [tab, setTab] = useState<'shelf' | 'discover' | 'downloads'>(activeTab || 'shelf');
+
+  useEffect(() => {
+    if (activeTab && activeTab !== tab) {
+      setTab(activeTab);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onTabChange?.(tab);
+  }, [tab, onTabChange]);
   const [filterQ, setFilterQ] = useState('');
   const [discoverQ, setDiscoverQ] = useState('');
   const [books, setBooks] = useState<BookItem[]>([]);

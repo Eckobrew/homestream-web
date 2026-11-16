@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect } from 'react';
-import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server, Music, BookOpen } from 'lucide-react';
+import { Film, Tv, PlaySquare, Home, X, ChevronRight, Server, Music, BookOpen, ShieldCheck } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
 
 interface SidebarProps {
@@ -9,6 +9,9 @@ interface SidebarProps {
   onClose: () => void;
   activeLibrary: 'movies' | 'tv' | 'youtube' | 'music' | 'books' | null;
   onSelectLibrary: (lib: 'movies' | 'tv' | 'youtube' | 'music' | 'books' | null) => void;
+  canManageIntegrations?: boolean;
+  isAdminActive?: boolean;
+  onSelectAdmin?: () => void;
   appName?: string;
 }
 
@@ -17,6 +20,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onClose,
   activeLibrary,
   onSelectLibrary,
+  canManageIntegrations = false,
+  isAdminActive = false,
+  onSelectAdmin,
   appName = 'HomeStream',
 }) => {
   const { activeProfile } = useProfile();
@@ -46,39 +52,27 @@ export const Sidebar: React.FC<SidebarProps> = ({
     {
       id: 'movies' as const,
       name: 'Movies',
-      description: 'All movies on your Jellyfin server',
+      description: 'Featured rows, A–Z catalog & genres',
       icon: Film,
-      badge: 'A–Z',
+      badge: 'Hub',
       color: 'from-blue-600 to-indigo-700',
     },
     {
       id: 'tv' as const,
       name: 'TV Shows',
-      description: 'All series on your Jellyfin server',
+      description: 'Featured series, A–Z catalog & genres',
       icon: Tv,
-      badge: 'A–Z',
+      badge: 'Hub',
       color: 'from-purple-600 to-pink-700',
     },
     {
       id: 'music' as const,
-      name: 'Music Hub',
+      name: 'Music',
       description: 'Personal music library & streaming',
       icon: Music,
       badge: 'Hub',
       color: 'from-emerald-600 to-green-700',
     },
-    ...(!isKids
-      ? [
-          {
-            id: 'books' as const,
-            name: 'Books Hub',
-            description: 'Bookshelf, eBook reader & requests',
-            icon: BookOpen,
-            badge: 'Hub',
-            color: 'from-red-600 to-rose-700',
-          },
-        ]
-      : []),
     {
       id: 'youtube' as const,
       name: 'YouTube',
@@ -87,6 +81,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
       badge: 'Hub',
       color: 'from-red-600 to-rose-700',
     },
+    ...(!isKids
+      ? [
+          {
+            id: 'books' as const,
+            name: 'Books',
+            description: 'Bookshelf, eBook reader & requests',
+            icon: BookOpen,
+            badge: 'Hub',
+            color: 'from-red-600 to-rose-700',
+          },
+        ]
+      : []),
   ];
 
   return (
@@ -124,7 +130,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               </div>
               <div className="text-[10px] text-neutral-400 uppercase tracking-widest font-semibold flex items-center space-x-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Jellyfin Library</span>
+                <span>Media Hubs</span>
               </div>
             </div>
           </div>
@@ -148,7 +154,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 onClose();
               }}
               className={`w-full flex items-center justify-between px-4 py-3 rounded-xl transition-all ${
-                activeLibrary === null
+                activeLibrary === null && !isAdminActive
                   ? 'bg-red-600 text-white font-semibold shadow-lg shadow-red-950/40'
                   : 'text-neutral-300 hover:text-white hover:bg-neutral-800/60'
               }`}
@@ -157,7 +163,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <Home size={19} />
                 <div className="text-left">
                   <div className="text-sm font-semibold">Home Streaming Feed</div>
-                  <div className={`text-[11px] ${activeLibrary === null ? 'text-red-100' : 'text-neutral-400'}`}>
+                  <div className={`text-[11px] ${activeLibrary === null && !isAdminActive ? 'text-red-100' : 'text-neutral-400'}`}>
                     Netflix-style rows & categories
                   </div>
                 </div>
@@ -170,10 +176,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="space-y-2">
             <div className="px-2 text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1.5">
               <Server size={12} className="text-red-500" />
-              <span>Jellyfin Media (A–Z)</span>
+              <span>Media Hubs</span>
             </div>
             <p className="px-2 text-[11px] text-neutral-400">
-              Direct access to all media stored on your server, sorted alphabetically.
+              Switch between dedicated Music, Books, and YouTube hubs.
             </p>
 
             <div className="space-y-1.5 pt-1">
@@ -228,6 +234,56 @@ export const Sidebar: React.FC<SidebarProps> = ({
               })}
             </div>
           </div>
+
+          {canManageIntegrations && !isKids && activeProfile?.isAdministrator !== false && onSelectAdmin && (
+            <div className="space-y-2 pt-2 border-t border-neutral-800/80">
+              <div className="px-2 text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1.5">
+                <ShieldCheck size={12} className="text-red-500" />
+                <span>Administration</span>
+              </div>
+              <button
+                onClick={() => {
+                  onSelectAdmin();
+                  onClose();
+                }}
+                className={`w-full flex items-center justify-between px-4 py-3.5 rounded-xl transition-all group ${
+                  isAdminActive
+                    ? 'bg-neutral-800 text-white border border-red-500/50 shadow-md'
+                    : 'text-neutral-300 hover:text-white hover:bg-neutral-800/50 border border-transparent'
+                }`}
+              >
+                <div className="flex items-center space-x-3.5">
+                  <div
+                    className={`w-9 h-9 rounded-lg flex items-center justify-center transition-transform group-hover:scale-105 ${
+                      isAdminActive
+                        ? 'bg-red-600 text-white shadow'
+                        : 'bg-neutral-800 text-neutral-300 group-hover:text-white'
+                    }`}
+                  >
+                    <ShieldCheck size={19} />
+                  </div>
+                  <div className="text-left">
+                    <div className="text-sm font-bold flex items-center space-x-2">
+                      <span>Admin</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-neutral-700/80 text-neutral-300 font-mono font-medium">
+                        Server
+                      </span>
+                    </div>
+                    <div className="text-[11px] text-neutral-400 line-clamp-1">
+                      Modules, downloads, accounts & profiles
+                    </div>
+                  </div>
+                </div>
+
+                <ChevronRight
+                  size={16}
+                  className={`transition-transform duration-200 ${
+                    isAdminActive ? 'text-red-500 translate-x-0.5' : 'text-neutral-400 group-hover:translate-x-0.5'
+                  }`}
+                />
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Footer */}

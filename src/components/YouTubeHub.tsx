@@ -108,6 +108,8 @@ export interface YouTubeContinueItem {
 interface YouTubeHubProps {
   onPlay: (item: MediaItem) => void;
   onBackToHome: () => void;
+  activeTab?: 'home' | 'search' | 'subscriptions' | 'queue' | 'archive';
+  onTabChange?: (tab: 'home' | 'search' | 'subscriptions' | 'queue' | 'archive') => void;
 }
 
 function formatBytes(bytes: number): string {
@@ -127,10 +129,20 @@ function formatDurationSeconds(sec?: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome }) => {
+export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, activeTab, onTabChange }) => {
   const { activeProfile } = useProfile();
   const profileId = activeProfile?.id || 'default';
-  const [currentView, setCurrentView] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
+  const [currentView, setCurrentView] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>(activeTab || 'home');
+
+  useEffect(() => {
+    if (activeTab && activeTab !== currentView) {
+      setCurrentView(activeTab);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onTabChange?.(currentView);
+  }, [currentView, onTabChange]);
 
   // Home / Discovery State
   const [heroVideo, setHeroVideo] = useState<YouTubeSearchResult | null>(null);

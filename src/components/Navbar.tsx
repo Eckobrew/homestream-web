@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks } from 'lucide-react';
+import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks, Music, Disc, Mic2, ListMusic, BookOpen, Youtube, Layers, Settings2 } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
+
+export type NavHub = 'home' | 'movies' | 'series' | 'music' | 'books' | 'youtube' | 'admin';
 
 interface NavbarProps {
   appName?: string;
@@ -12,6 +14,9 @@ interface NavbarProps {
   jellyfinConnected: boolean;
   seerrConnected: boolean;
   activeTab: string;
+  currentHub?: NavHub;
+  hubTab?: string;
+  onHubTabChange?: (tab: string) => void;
   canManageIntegrations?: boolean;
   onTabChange: (tab: string) => void;
   onOpenServerSetup?: () => void;
@@ -24,10 +29,10 @@ export const Navbar: React.FC<NavbarProps> = ({
   appName,
   onSearchChange,
   searchQuery,
-  jellyfinConnected,
-  seerrConnected,
   activeTab,
-  canManageIntegrations,
+  currentHub = 'home',
+  hubTab,
+  onHubTabChange,
   onTabChange,
   onOpenServerSetup,
   isExternal,
@@ -105,55 +110,92 @@ export const Navbar: React.FC<NavbarProps> = ({
             </span>
           </div>
 
-          {/* Navigation Tabs (Desktop / Tablet) */}
+          {/* Navigation Tabs (Desktop / Tablet) — Specific to current Hub */}
           <div className="hidden md:flex items-center space-x-5 text-sm font-medium">
-            <button
-              onClick={() => {
-                onTabChange('home');
-                onSearchChange('');
-              }}
-              className={`transition-colors ${
-                activeTab === 'home' && !searchQuery
-                  ? 'text-white font-bold'
-                  : 'text-gray-300 hover:text-gray-100'
-              }`}
-            >
-              Home
-            </button>
-            <button
-              onClick={() => onTabChange('series')}
-              className={`transition-colors ${
-                activeTab === 'series'
-                  ? 'text-white font-bold'
-                  : 'text-gray-300 hover:text-gray-100'
-              }`}
-            >
-              TV Shows
-            </button>
-            <button
-              onClick={() => onTabChange('movies')}
-              className={`transition-colors ${
-                activeTab === 'movies'
-                  ? 'text-white font-bold'
-                  : 'text-gray-300 hover:text-gray-100'
-              }`}
-            >
-              Movies
-            </button>
-            <button
-              onClick={() => onTabChange('discover')}
-              className={`transition-colors ${
-                activeTab === 'discover'
-                  ? 'text-white font-bold'
-                  : 'text-gray-300 hover:text-gray-100'
-              }`}
-            >
-              Discover
-            </button>
-            <button onClick={()=>onTabChange('requested')} className={'transition-colors '+(activeTab==='requested'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Requested</button>
-
-            {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'transition-colors '+(activeTab==='admin'?'text-white font-bold':'text-gray-300 hover:text-gray-100')}>Admin</button>}
-            <a href="/tv" title="Switch to Leanback TV Mode (Smart TVs, Remotes & Game Consoles)" className="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider text-neutral-400 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 transition">TV Mode</a>
+            {currentHub === 'home' ? (
+              <>
+                <button
+                  onClick={() => {
+                    onTabChange('home');
+                    onSearchChange('');
+                  }}
+                  className={`transition-colors ${
+                    activeTab === 'home' && !searchQuery
+                      ? 'text-white font-bold'
+                      : 'text-gray-300 hover:text-gray-100'
+                  }`}
+                >
+                  Available
+                </button>
+                <button
+                  onClick={() => onTabChange('discover')}
+                  className={`transition-colors ${
+                    activeTab === 'discover'
+                      ? 'text-white font-bold'
+                      : 'text-gray-300 hover:text-gray-100'
+                  }`}
+                >
+                  Discover
+                </button>
+                <button
+                  onClick={() => onTabChange('requested')}
+                  className={`transition-colors ${
+                    activeTab === 'requested'
+                      ? 'text-white font-bold'
+                      : 'text-gray-300 hover:text-gray-100'
+                  }`}
+                >
+                  Requested
+                </button>
+                <a href="/tv" title="Switch to Leanback TV Mode (Smart TVs, Remotes & Game Consoles)" className="hidden xl:inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider text-neutral-400 hover:text-white bg-neutral-800/80 hover:bg-neutral-700 transition">TV Mode</a>
+              </>
+            ) : (
+              (currentHub === 'movies' || currentHub === 'series'
+                ? [
+                    { id: 'featured', label: 'Featured' },
+                    { id: 'all', label: 'All' },
+                    { id: 'genres', label: 'Genres' },
+                  ]
+                : currentHub === 'music'
+                ? [
+                    { id: 'albums', label: 'Albums' },
+                    { id: 'artists', label: 'Artists' },
+                    { id: 'songs', label: 'Songs' },
+                    { id: 'playlists', label: 'Playlists' },
+                  ]
+                : currentHub === 'books'
+                ? [
+                    { id: 'shelf', label: 'My Shelf' },
+                    { id: 'discover', label: 'Discover' },
+                    { id: 'downloads', label: 'Downloads' },
+                  ]
+                : currentHub === 'youtube'
+                ? [
+                    { id: 'home', label: 'Home' },
+                    { id: 'search', label: 'Search' },
+                    { id: 'subscriptions', label: 'Subscriptions' },
+                    { id: 'queue', label: 'Queue' },
+                    { id: 'archive', label: 'Archive' },
+                  ]
+                : [
+                    { id: 'modules', label: 'Modules' },
+                    { id: 'media', label: 'Media Management' },
+                    { id: 'system', label: 'System & Profiles' },
+                  ]
+              ).map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => onHubTabChange?.(t.id)}
+                  className={`transition-colors ${
+                    hubTab === t.id
+                      ? 'text-white font-bold'
+                      : 'text-gray-300 hover:text-gray-100'
+                  }`}
+                >
+                  {t.label}
+                </button>
+              ))
+            )}
           </div>
         </div>
 
@@ -192,35 +234,6 @@ export const Navbar: React.FC<NavbarProps> = ({
                 }}
               />
             )}
-          </div>
-
-          {/* Server status pill (Desktop / Tablet) */}
-          <div
-            onClick={onOpenServerSetup}
-            title="Click to view or edit Server Settings"
-            className="hidden sm:flex items-center space-x-2 bg-neutral-900/80 border border-neutral-700/60 hover:border-neutral-500 hover:bg-neutral-800/80 px-2.5 py-1 rounded-full text-xs select-none cursor-pointer transition"
-          >
-            <div className="flex items-center space-x-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  jellyfinConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'
-                }`}
-              />
-              <span className="font-medium text-gray-300">
-                {jellyfinConnected ? 'Jellyfin' : 'Demo'}
-              </span>
-            </div>
-            <span className="text-neutral-600">|</span>
-            <div className="flex items-center space-x-1.5">
-              <span
-                className={`w-2 h-2 rounded-full ${
-                  seerrConnected ? 'bg-emerald-500' : 'bg-neutral-500'
-                }`}
-              />
-              <span className="font-medium text-gray-400">
-                {seerrConnected ? 'Discovery' : 'Discovery Off'}
-              </span>
-            </div>
           </div>
 
           {/* User Profile Avatar & Dropdown */}
@@ -390,63 +403,135 @@ export const Navbar: React.FC<NavbarProps> = ({
         </div>
       </nav>
 
-      {/* Mobile Bottom Navigation Bar (Pixel 8a / Samsung S26) */}
+      {/* Mobile Bottom Navigation Bar — Specific to current Hub */}
       <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-[#121212]/95 border-t border-neutral-800/80 backdrop-blur-lg flex items-center justify-around gap-1 overflow-x-auto py-1.5 px-1 pb-safe shadow-[0_-10px_25px_rgba(0,0,0,0.8)]">
-        <button
-          onClick={() => {
-            onTabChange('home');
-            onSearchChange('');
-          }}
-          className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
-            activeTab === 'home' && !searchQuery
-              ? 'text-red-500 font-bold'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Home size={19} />
-          <span className="text-[10px] tracking-tight">Home</span>
-        </button>
+        {currentHub === 'home' ? (
+          <>
+            <button
+              onClick={() => {
+                onTabChange('home');
+                onSearchChange('');
+              }}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                activeTab === 'home' && !searchQuery
+                  ? 'text-red-500 font-bold'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Home size={19} />
+              <span className="text-[10px] tracking-tight">Available</span>
+            </button>
 
-        <button
-          onClick={() => onTabChange('series')}
-          className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
-            activeTab === 'series'
-              ? 'text-red-500 font-bold'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Tv size={19} />
-          <span className="text-[10px] tracking-tight">TV Shows</span>
-        </button>
-
-        <button
-          onClick={() => onTabChange('movies')}
-          className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
-            activeTab === 'movies'
-              ? 'text-red-500 font-bold'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Film size={19} />
-          <span className="text-[10px] tracking-tight">Movies</span>
-        </button>
-
-        <button
-          onClick={() => onTabChange('discover')}
-          className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
-            activeTab === 'discover'
-              ? 'text-red-500 font-bold'
-              : 'text-neutral-400 hover:text-white'
-          }`}
-        >
-          <Compass size={19} />
-          <span className="text-[10px] tracking-tight">Discover</span>
-        </button>
-        <button onClick={()=>onTabChange('requested')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='requested'?'text-red-500 font-bold':'text-neutral-400')}><ListChecks size={19}/><span className="text-[10px]">Requested</span></button>
-
-        {canManageIntegrations && <button onClick={()=>onTabChange('admin')} className={'flex flex-col items-center justify-center gap-1 py-1 px-2 '+(activeTab==='admin'?'text-red-500 font-bold':'text-neutral-400')}><ShieldCheck size={19}/><span className="text-[10px]">Admin</span></button>}
-
-
+            <button
+              onClick={() => onTabChange('discover')}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                activeTab === 'discover'
+                  ? 'text-red-500 font-bold'
+                  : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Compass size={19} />
+              <span className="text-[10px] tracking-tight">Discover</span>
+            </button>
+            <button
+              onClick={() => onTabChange('requested')}
+              className={`flex flex-col items-center justify-center gap-1 py-1 px-2 ${
+                activeTab === 'requested' ? 'text-red-500 font-bold' : 'text-neutral-400'
+              }`}
+            >
+              <ListChecks size={19} />
+              <span className="text-[10px]">Requested</span>
+            </button>
+          </>
+        ) : currentHub === 'movies' || currentHub === 'series' ? (
+          [
+            { id: 'featured', label: 'Featured', icon: currentHub === 'movies' ? Film : Tv },
+            { id: 'all', label: 'All', icon: Layers },
+            { id: 'genres', label: 'Genres', icon: Compass },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onHubTabChange?.(id)}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                hubTab === id ? 'text-red-500 font-bold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Icon size={19} />
+              <span className="text-[10px] tracking-tight">{label}</span>
+            </button>
+          ))
+        ) : currentHub === 'music' ? (
+          [
+            { id: 'albums', label: 'Albums', icon: Disc },
+            { id: 'artists', label: 'Artists', icon: Mic2 },
+            { id: 'songs', label: 'Songs', icon: Music },
+            { id: 'playlists', label: 'Playlists', icon: ListMusic },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onHubTabChange?.(id)}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                hubTab === id ? 'text-red-500 font-bold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Icon size={19} />
+              <span className="text-[10px] tracking-tight">{label}</span>
+            </button>
+          ))
+        ) : currentHub === 'books' ? (
+          [
+            { id: 'shelf', label: 'My Shelf', icon: BookOpen },
+            { id: 'discover', label: 'Discover', icon: Compass },
+            { id: 'downloads', label: 'Downloads', icon: Download },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onHubTabChange?.(id)}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                hubTab === id ? 'text-red-500 font-bold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Icon size={19} />
+              <span className="text-[10px] tracking-tight">{label}</span>
+            </button>
+          ))
+        ) : currentHub === 'youtube' ? (
+          [
+            { id: 'home', label: 'Home', icon: Youtube },
+            { id: 'search', label: 'Search', icon: Search },
+            { id: 'subscriptions', label: 'Subs', icon: Users },
+            { id: 'queue', label: 'Queue', icon: Download },
+            { id: 'archive', label: 'Archive', icon: Layers },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onHubTabChange?.(id)}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                hubTab === id ? 'text-red-500 font-bold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Icon size={19} />
+              <span className="text-[10px] tracking-tight">{label}</span>
+            </button>
+          ))
+        ) : (
+          [
+            { id: 'modules', label: 'Modules', icon: Settings2 },
+            { id: 'media', label: 'Media', icon: Download },
+            { id: 'system', label: 'System', icon: ShieldCheck },
+          ].map(({ id, label, icon: Icon }) => (
+            <button
+              key={id}
+              onClick={() => onHubTabChange?.(id)}
+              className={`flex flex-col items-center justify-center space-y-1 py-1 px-2.5 transition-colors ${
+                hubTab === id ? 'text-red-500 font-bold' : 'text-neutral-400 hover:text-white'
+              }`}
+            >
+              <Icon size={19} />
+              <span className="text-[10px] tracking-tight">{label}</span>
+            </button>
+          ))
+        )}
       </div>
     </>
   );

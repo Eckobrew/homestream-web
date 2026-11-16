@@ -17,6 +17,7 @@ import {
 
 interface LibraryCatalogProps {
   libraryType: 'movies' | 'tv' | 'youtube';
+  viewMode?: 'all' | 'genres';
   onPlay: (item: MediaItem) => void;
   onOpenModal: (item: MediaItem) => void;
   onBackToHome: () => void;
@@ -27,6 +28,7 @@ const ALPHABET = ['All', '#', ...'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('')];
 
 export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
   libraryType,
+  viewMode = 'all',
   onPlay,
   onOpenModal,
   onBackToHome,
@@ -36,6 +38,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
   const [totalCount, setTotalCount] = useState<number>(0);
   const [availableLetters, setAvailableLetters] = useState<string[]>([]);
   const [selectedLetter, setSelectedLetter] = useState<string>('All');
+  const [selectedGenre, setSelectedGenre] = useState<string>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [sortOrder, setSortOrder] = useState('title');
   const [watchFilter, setWatchFilter] = useState('all');
@@ -72,11 +75,26 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
     };
   }, [libraryType]);
 
-  // Client-side filtering by letter and search query
+  const availableGenres = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const item of items) {
+      for (const g of item.genres || []) {
+        const clean = g.trim();
+        if (clean) counts.set(clean, (counts.get(clean) || 0) + 1);
+      }
+    }
+    return ['All', ...Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([g]) => g)];
+  }, [items]);
+
+  // Client-side filtering by letter, genre and search query
   const displayedItems = useMemo(() => {
     let result = items;
 
-    if (selectedLetter !== 'All') {
+    if (viewMode === 'genres' && selectedGenre !== 'All') {
+      result = result.filter((item) => item.genres?.includes(selectedGenre));
+    }
+
+    if (viewMode === 'all' && selectedLetter !== 'All') {
       result = result.filter((item) => {
         const clean = (item.title || '').trim();
         if (!clean) return false;
@@ -100,7 +118,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
 
     result = result.filter(item => watchFilter === 'all' || (watchFilter === 'watched' ? item.played : watchFilter === 'unwatched' ? !item.played : !item.played && (item.playbackPositionTicks || 0) > 0));
     return [...result].sort((a, b) => sortOrder === 'year' ? (b.year || 0) - (a.year || 0) || a.title.localeCompare(b.title) : sortOrder === 'reverse' ? b.title.localeCompare(a.title) : a.title.localeCompare(b.title));
-  }, [items, selectedLetter, searchQuery, sortOrder, watchFilter]);
+  }, [items, viewMode, selectedGenre, selectedLetter, searchQuery, sortOrder, watchFilter]);
 
   const libraryMeta = {
     movies: {
@@ -194,32 +212,53 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
           <option value="all">All titles</option><option value="unwatched">Unwatched</option><option value="watched">Watched</option><option value="progress">In progress</option>
         </select>
       </div>
-      {/* Sticky Alphabetical Jump Filter Bar */}
+      {/* Sticky Alphabetical or Genre Filter Bar */}
       <div className="sticky top-16 z-30 bg-[#141414]/95 backdrop-blur-md py-3 border-b border-neutral-800/80 my-4 -mx-4 px-4 sm:-mx-8 sm:px-8 md:-mx-12 md:px-12">
-        <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar py-1">
-          {ALPHABET.map((char) => {
-            const isSelected = selectedLetter === char;
-            const hasItems = char === 'All' || availableLetters.includes(char);
+        {viewMode === 'genres' ? (
+          <div className="flex items-center space-x-2 overflow-x-auto no-scrollbar py-1">
+            {availableGenres.map((genre) => {
+              const isSelected = selectedGenre === genre;
+              return (
+                <button
+                  key={genre}
+                  onClick={() => setSelectedGenre(genre)}
+                  className={`h-8 px-3 rounded-full text-xs font-semibold transition-all shrink-0 flex items-center justify-center ${
+                    isSelected
+                      ? 'bg-red-600 text-white shadow-md shadow-red-950/40'
+                      : 'bg-neutral-900 text-neutral-300 hover:text-white hover:bg-neutral-800 border border-neutral-800'
+                  }`}
+                >
+                  {genre}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="flex items-center space-x-1 overflow-x-auto no-scrollbar py-1">
+            {ALPHABET.map((char) => {
+              const isSelected = selectedLetter === char;
+              const hasItems = char === 'All' || availableLetters.includes(char);
 
-            return (
-              <button
-                key={char}
-                onClick={() => setSelectedLetter(char)}
-                disabled={!hasItems}
-                className={`min-w-8 h-8 px-2 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center justify-center ${
-                  isSelected
-                    ? 'bg-red-600 text-white shadow-md shadow-red-950/40 scale-105'
-                    : hasItems
-                    ? 'text-neutral-300 hover:text-white hover:bg-neutral-800'
-                    : 'text-neutral-600 cursor-not-allowed opacity-40'
-                }`}
-                title={hasItems ? `Filter by ${char}` : `No titles start with ${char}`}
-              >
-                {char}
-              </button>
-            );
-          })}
-        </div>
+              return (
+                <button
+                  key={char}
+                  onClick={() => setSelectedLetter(char)}
+                  disabled={!hasItems}
+                  className={`min-w-8 h-8 px-2 rounded-lg text-xs font-semibold transition-all shrink-0 flex items-center justify-center ${
+                    isSelected
+                      ? 'bg-red-600 text-white shadow-md shadow-red-950/40 scale-105'
+                      : hasItems
+                      ? 'text-neutral-300 hover:text-white hover:bg-neutral-800'
+                      : 'text-neutral-600 cursor-not-allowed opacity-40'
+                  }`}
+                  title={hasItems ? `Filter by ${char}` : `No titles start with ${char}`}
+                >
+                  {char}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Loading State */}

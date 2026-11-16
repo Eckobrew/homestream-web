@@ -8,7 +8,7 @@ import { AdminIntegrations } from '@/components/AdminIntegrations';
 import { MusicPlayer } from '@/components/MusicPlayer';
 import { MusicBrowser } from '@/components/MusicBrowser';
 import { BooksBrowser } from '@/components/BooksBrowser';
-import { Navbar } from '@/components/Navbar';
+import { Navbar, NavHub } from '@/components/Navbar';
 import { HeroBanner } from '@/components/HeroBanner';
 import { MediaRow } from '@/components/MediaRow';
 import { MediaModal } from '@/components/MediaModal';
@@ -55,10 +55,18 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [searchQuery, setSearchQuery] = useState('');
   const [isServerSetupOpen, setIsServerSetupOpen] = useState(false);
 
-  // Dedicated Hideable Sidebar & A-Z Library Catalog States
+  // Dedicated Hideable Sidebar & Hub Sub-Tab States
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [activeLibrary, setActiveLibrary] = useState<'movies' | 'tv' | 'youtube' | 'music' | 'books' | null>(
     initialTab === 'music' ? 'music' : initialTab === 'books' ? 'books' : initialTab === 'youtube' ? 'youtube' : null
+  );
+  const [moviesSubTab, setMoviesSubTab] = useState<'featured' | 'all' | 'genres'>('featured');
+  const [seriesSubTab, setSeriesSubTab] = useState<'featured' | 'all' | 'genres'>('featured');
+  const [musicSubTab, setMusicSubTab] = useState<'albums' | 'artists' | 'songs' | 'playlists'>('albums');
+  const [booksSubTab, setBooksSubTab] = useState<'shelf' | 'discover' | 'downloads'>('shelf');
+  const [youtubeSubTab, setYoutubeSubTab] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
+  const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'system'>(
+    initialTab === 'downloads' ? 'media' : 'modules'
   );
 
   // Netflix-style Category Rows for Movies and TV Shows Pages
@@ -292,13 +300,60 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     if (tab === 'music') setActiveLibrary('music');
     else if (tab === 'books') setActiveLibrary('books');
     else if (tab === 'youtube') setActiveLibrary('youtube');
-    else setActiveLibrary(null); // Exit A-Z sidebar view and return to standard tab streaming rows
-    if (tab === 'movies') fetchCategories('movies');
-    if (tab === 'series') fetchCategories('series');
+    else setActiveLibrary(null);
+    if (tab === 'movies') {
+      setMoviesSubTab('featured');
+      fetchCategories('movies');
+    }
+    if (tab === 'series') {
+      setSeriesSubTab('featured');
+      fetchCategories('series');
+    }
+    if (tab === 'downloads') setAdminSubTab('media');
+    if (tab === 'admin') setAdminSubTab('modules');
     if (tab === 'discover') fetchCategories('requests');
     if (typeof window !== 'undefined') {
       window.history.pushState(null, '', tabToPath(tab));
     }
+  };
+
+  const currentHub: NavHub =
+    activeLibrary === 'music' || activeTab === 'music'
+      ? 'music'
+      : activeLibrary === 'books' || activeTab === 'books'
+      ? 'books'
+      : activeLibrary === 'youtube' || activeTab === 'youtube'
+      ? 'youtube'
+      : activeTab === 'admin' || activeTab === 'downloads'
+      ? 'admin'
+      : activeTab === 'movies'
+      ? 'movies'
+      : activeTab === 'series'
+      ? 'series'
+      : 'home';
+
+  const currentHubTab =
+    currentHub === 'movies'
+      ? moviesSubTab
+      : currentHub === 'series'
+      ? seriesSubTab
+      : currentHub === 'music'
+      ? musicSubTab
+      : currentHub === 'books'
+      ? booksSubTab
+      : currentHub === 'youtube'
+      ? youtubeSubTab
+      : currentHub === 'admin'
+      ? adminSubTab
+      : activeTab;
+
+  const handleHubTabChange = (subTab: string) => {
+    if (currentHub === 'movies') setMoviesSubTab(subTab as 'featured' | 'all' | 'genres');
+    else if (currentHub === 'series') setSeriesSubTab(subTab as 'featured' | 'all' | 'genres');
+    else if (currentHub === 'music') setMusicSubTab(subTab as 'albums' | 'artists' | 'songs' | 'playlists');
+    else if (currentHub === 'books') setBooksSubTab(subTab as 'shelf' | 'discover' | 'downloads');
+    else if (currentHub === 'youtube') setYoutubeSubTab(subTab as 'home' | 'search' | 'subscriptions' | 'queue' | 'archive');
+    else if (currentHub === 'admin') setAdminSubTab(subTab as 'modules' | 'media' | 'system');
   };
 
   const handlePlay = (item: MediaItem, episode?: Episode) => {
@@ -524,6 +579,9 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         seerrConnected={seerrConnected}
         canManageIntegrations={canManageIntegrations && !activeProfile?.isKids && activeProfile?.isAdministrator !== false}
         activeTab={activeTab}
+        currentHub={currentHub}
+        hubTab={currentHubTab}
+        onHubTabChange={handleHubTabChange}
         onTabChange={handleTabChange}
         onOpenServerSetup={canManageIntegrations && !activeProfile?.isKids && activeProfile?.isAdministrator !== false ? ()=>handleTabChange('admin') : undefined}
         isExternal={!authStatus.isLocalOrTailscale}
@@ -531,13 +589,30 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         onToggleSidebar={() => setIsSidebarOpen((prev) => !prev)}
       />
 
-      {/* Hideable Jellyfin Library Sidebar */}
+      {/* Hideable Hub Sidebar */}
       <Sidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        activeLibrary={activeLibrary}
+        activeLibrary={
+          currentHub === 'movies'
+            ? 'movies'
+            : currentHub === 'series'
+            ? 'tv'
+            : currentHub === 'music' || currentHub === 'books' || currentHub === 'youtube'
+            ? currentHub
+            : null
+        }
         onSelectLibrary={(lib) => {
-          setActiveLibrary(lib);
+          if (lib === null) handleTabChange('home');
+          else if (lib === 'movies') handleTabChange('movies');
+          else if (lib === 'tv') handleTabChange('series');
+          else handleTabChange(lib);
+          setIsSidebarOpen(false);
+        }}
+        canManageIntegrations={canManageIntegrations}
+        isAdminActive={currentHub === 'admin'}
+        onSelectAdmin={() => {
+          handleTabChange('admin');
           setIsSidebarOpen(false);
         }}
         appName={configuredAppName}
@@ -557,7 +632,9 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         /* Dedicated YouTube Hub with Search, Stream, Subscriptions, Queue, and Archive */
         <YouTubeHub
           onPlay={handlePlay}
-          onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
+          onBackToHome={() => handleTabChange('home')}
+          activeTab={youtubeSubTab}
+          onTabChange={setYoutubeSubTab}
         />
       ) : activeLibrary === 'books' || activeTab === 'books' ? (
         /* Dedicated Red-Themed Bookshelf Hub */
@@ -565,7 +642,9 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           <BooksBrowser
             onAdmin={canManageIntegrations && !activeProfile?.isKids ? () => handleTabChange('admin') : undefined}
             activeProfileId={activeProfile?.id}
-            onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
+            onBackToHome={() => handleTabChange('home')}
+            activeTab={booksSubTab}
+            onTabChange={setBooksSubTab}
           />
         </div>
       ) : activeLibrary === 'music' || activeTab === 'music' ? (
@@ -575,22 +654,38 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
             onPlay={(t, i) => setMusic({ tracks: t, index: i })}
             onAdmin={() => setIsServerSetupOpen(true)}
             activeProfileId={activeProfile?.id}
-            onBackToHome={() => { setActiveLibrary(null); setActiveTab('home'); }}
+            onBackToHome={() => handleTabChange('home')}
+            activeTab={musicSubTab}
+            onTabChange={setMusicSubTab}
           />
         </div>
-      ) : activeLibrary ? (
-        /* Dedicated A-Z Jellyfin Library Page (Movies / TV Shows) */
+      ) : (activeTab === 'movies' && moviesSubTab !== 'featured') ? (
         <LibraryCatalog
-          libraryType={activeLibrary}
+          libraryType="movies"
+          viewMode={moviesSubTab}
           onPlay={handlePlay}
           onOpenModal={handleOpenModal}
-          onBackToHome={() => setActiveLibrary(null)}
+          onBackToHome={() => setMoviesSubTab('featured')}
+          onRequest={handleRequest}
+        />
+      ) : (activeTab === 'series' && seriesSubTab !== 'featured') ? (
+        <LibraryCatalog
+          libraryType="tv"
+          viewMode={seriesSubTab}
+          onPlay={handlePlay}
+          onOpenModal={handleOpenModal}
+          onBackToHome={() => setSeriesSubTab('featured')}
           onRequest={handleRequest}
         />
       ) : activeTab==='requested' ? (
         <RequestedPanel key={activeProfile?.id || 'default'} onDiscover={()=>handleTabChange('discover')} onOpenMedia={handleOpenModal}/>
       ) : activeTab === 'downloads' || activeTab === 'admin' ? (
-        <AdminIntegrations key={`${activeProfile?.id || 'default'}-${activeTab}`} initialTab={activeTab === 'downloads' ? 'media' : 'modules'} />
+        <AdminIntegrations
+          key={`${activeProfile?.id || 'default'}-${activeTab}`}
+          initialTab={activeTab === 'downloads' ? 'media' : 'modules'}
+          activeTab={adminSubTab}
+          onTabChange={setAdminSubTab}
+        />
       ) : activeTab==='discover' ? (
         <DiscoverHub key={activeProfile?.id || 'default'} sections={displayedSections} onPlay={handlePlay} onOpenModal={handleOpenModal} onRequest={handleRequest} onMusic={(tracks,index)=>{setPlayingState(null);setMusic({tracks,index});}} onAdmin={()=>handleTabChange('admin')}/>
       ) : loading ? (

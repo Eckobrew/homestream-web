@@ -36,6 +36,8 @@ interface MusicBrowserProps {
   onAdmin?: () => void;
   activeProfileId?: string;
   onBackToHome?: () => void;
+  activeTab?: 'albums' | 'artists' | 'songs' | 'playlists';
+  onTabChange?: (tab: 'albums' | 'artists' | 'songs' | 'playlists') => void;
 }
 
 export function MusicBrowser({
@@ -43,6 +45,8 @@ export function MusicBrowser({
   onAdmin,
   activeProfileId,
   onBackToHome,
+  activeTab,
+  onTabChange,
 }: MusicBrowserProps) {
   const { activeProfile } = useProfile();
   const currentProfileId = activeProfileId || activeProfile?.id;
@@ -55,7 +59,17 @@ export function MusicBrowser({
   const [selected, setSelected] = useState<MusicAlbumResponse | null>(null);
   const [selectedSource, setSelectedSource] = useState<'quick' | 'grid'>('grid');
   const [selectedArtist, setSelectedArtist] = useState<string | null>(null);
-  const [category, setCategory] = useState<'albums' | 'artists' | 'songs' | 'playlists'>('albums');
+  const [category, setCategory] = useState<'albums' | 'artists' | 'songs' | 'playlists'>(activeTab || 'albums');
+
+  useEffect(() => {
+    if (activeTab && activeTab !== category) {
+      setCategory(activeTab);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onTabChange?.(category);
+  }, [category, onTabChange]);
   const [librarySongs, setLibrarySongs] = useState<MusicTrack[]>([]);
   const [songsLoading, setSongsLoading] = useState(false);
   const [songSort, setSongSort] = useState<'title' | 'artist' | 'album' | 'recent'>('title');

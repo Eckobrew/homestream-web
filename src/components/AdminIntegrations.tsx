@@ -241,8 +241,26 @@ function IntegrationCard({
   );
 }
 
-export function AdminIntegrations({ initialTab = 'modules' }: { initialTab?: AdminTab } = {}) {
-  const [tab, setTab] = useState<AdminTab>(initialTab);
+export function AdminIntegrations({
+  initialTab = 'modules',
+  activeTab,
+  onTabChange,
+}: {
+  initialTab?: AdminTab;
+  activeTab?: AdminTab;
+  onTabChange?: (tab: AdminTab) => void;
+} = {}) {
+  const [tab, setTab] = useState<AdminTab>(activeTab || initialTab);
+
+  useEffect(() => {
+    if (activeTab && activeTab !== tab) {
+      setTab(activeTab);
+    }
+  }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    onTabChange?.(tab);
+  }, [tab, onTabChange]);
   const [moduleFilter, setModuleFilter] = useState<'all' | 'configured' | 'disconnected'>('all');
   const [data, setData] = useState<IntegrationsResponse | null>(null);
   const [error, setError] = useState('');
