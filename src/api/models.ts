@@ -3,6 +3,28 @@ export type MediaType = 'Movie' | 'Series' | 'Episode';
 
 export type AvailabilityStatus = 'available' | 'partially_available' | 'requested' | 'processing' | 'not_requested';
 
+export interface SkipSegment {
+  type: 'intro' | 'credits';
+  startSeconds: number;
+  endSeconds: number;
+  title?: string;
+}
+
+export interface MediaAudioTrack {
+  index: number;
+  title: string;
+  language?: string;
+}
+
+export interface MediaVersion {
+  id: string;
+  label: string;
+  resolution?: string;
+  videoCodec?: string;
+  audioCodec?: string;
+  fileSize?: number;
+}
+
 export interface SubtitleTrack {
   id: string;
   index: number;
@@ -34,6 +56,9 @@ export interface Episode {
   tmdbId?: number;
   seriesId?: string;
   seriesName?: string;
+  versions?: MediaVersion[];
+  skipSegments?: SkipSegment[];
+  trickplayUrl?: string;
 }
 
 export interface Season {
@@ -77,6 +102,9 @@ export interface MediaItem {
   seerrId?: number;
   tmdbId?: number;
   playableEpisodeId?: string;
+  versions?: MediaVersion[];
+  skipSegments?: SkipSegment[];
+  trickplayUrl?: string;
   status: AvailabilityStatus;
   played?: boolean;
   playbackPositionTicks?: number;
@@ -156,6 +184,7 @@ export interface UserProfile {
   avatarUrl?: string;  // Jellyfin avatar image URL if available
   isAdministrator?: boolean;
   jellyfinUserId?: string;
+  accountId?: string;
 }
 
 export interface RequestMediaPayload {
