@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/api/client';
 import type { IntegrationSummary, IntegrationsResponse } from '@/types';
 import { AdminDownloadManager } from '@/components/AdminDownloadManager';
+import { NativeLibraryManager } from '@/components/NativeLibraryManager';
 import {
   ShieldCheck,
   Loader2,
@@ -499,6 +500,8 @@ export function AdminIntegrations({
               <p className="text-2xl font-bold">{mediaStats ? mediaStats.requestedCount : '—'}</p>
             </div>
           </div>
+
+          <NativeLibraryManager />
 
           <AdminDownloadManager embedded onOpenAdminSettings={() => setTab('modules')} />
         </div>
