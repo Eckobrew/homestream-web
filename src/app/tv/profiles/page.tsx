@@ -1,7 +1,7 @@
 import React from 'react';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { fetchTvProfiles, fetchTvAuth } from '@/lib/tv-api';
+import { fetchTvProfiles, fetchTvAuth, getBackendUrl } from '@/lib/tv-api';
 
 export const metadata = {
   title: "Who's Watching? - HomeStream TV",
@@ -12,6 +12,15 @@ async function selectProfile(formData: FormData) {
   const profileId = formData.get('profileId') as string;
   if (profileId) {
     const cookieStore = await cookies();
+    const session = cookieStore.get('homeflix_session')?.value;
+    await fetch(`${getBackendUrl()}/api/v1/profiles`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(session ? { Cookie: `homeflix_session=${session}` } : {}),
+      },
+      body: JSON.stringify({ action: 'select', profileId }),
+    }).catch(() => null);
     cookieStore.set('homeflix_profile_id', profileId, {
       path: '/',
       maxAge: 31536000,
@@ -22,14 +31,47 @@ async function selectProfile(formData: FormData) {
   redirect('/tv');
 }
 
+async function createProfile(formData: FormData) {
+  'use server';
+  const name = ((formData.get('name') as string) || '').trim();
+  const isKids = formData.get('isKids') === 'on';
+  if (!name) {
+    redirect('/tv/profiles');
+  }
+  const cookieStore = await cookies();
+  const session = cookieStore.get('homeflix_session')?.value;
+  const res = await fetch(`${getBackendUrl()}/api/v1/profiles`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(session ? { Cookie: `homeflix_session=${session}` } : {}),
+    },
+    body: JSON.stringify({ action: 'create', name, isKids }),
+  }).catch(() => null);
+
+  if (res?.ok) {
+    const data = await res.json().catch(() => null);
+    const createdId = data?.profile?.id;
+    if (createdId) {
+      cookieStore.set('homeflix_profile_id', createdId, {
+        path: '/',
+        maxAge: 31536000,
+        sameSite: 'lax',
+        httpOnly: false,
+      });
+    }
+  }
+  redirect('/tv');
+}
+
 export default async function TvProfilesPage() {
   const [auth, profileData] = await Promise.all([
     fetchTvAuth(),
     fetchTvProfiles(),
   ]);
 
-  // If external connection: no profile switcher allowed!
-  if (!auth.isLocalOrTailscale || profileData.isExternal || !profileData.canSwitchProfile) {
+  const needsSetup = Boolean(profileData.needsSetup || profileData.profiles.length === 0);
+  if (!auth.isLocalOrTailscale && !profileData.canSwitchProfile && !needsSetup) {
     redirect('/tv');
   }
 
@@ -48,11 +90,62 @@ export default async function TvProfilesPage() {
   return (
     <div style={{ maxWidth: '900px', margin: '40px auto', padding: '0 24px', textAlign: 'center' }}>
       <h1 style={{ fontSize: '38px', fontWeight: 900, marginBottom: '12px', color: '#ffffff' }}>
-        Who&apos;s Watching?
+        {needsSetup ? 'Create Your First Profile' : "Who's Watching?"}
       </h1>
       <p style={{ color: '#aaaaaa', fontSize: '18px', marginBottom: '40px' }}>
-        Select your profile to customize continue watching, recommendations, and parental settings.
+        {needsSetup
+          ? 'Set up a profile to personalize continue watching, playlists, and parental controls.'
+          : 'Select your profile to customize continue watching, recommendations, and parental settings.'}
       </p>
+
+      {needsSetup && (
+        <form
+          action={createProfile}
+          style={{
+            maxWidth: '480px',
+            margin: '0 auto 40px auto',
+            padding: '28px',
+            backgroundColor: '#1b1b1b',
+            borderRadius: '16px',
+            border: '2px solid #333333',
+            textAlign: 'left',
+          }}
+        >
+          <label style={{ display: 'block', fontSize: '15px', fontWeight: 'bold', color: '#cccccc', marginBottom: '8px' }}>
+            Profile Name
+          </label>
+          <input
+            type="text"
+            name="name"
+            required
+            placeholder="e.g. Nathan or Kids"
+            tabIndex={0}
+            style={{
+              width: '100%',
+              padding: '12px 14px',
+              borderRadius: '8px',
+              backgroundColor: '#262626',
+              border: '2px solid #444444',
+              color: '#ffffff',
+              fontSize: '16px',
+              marginBottom: '16px',
+              boxSizing: 'border-box',
+            }}
+          />
+          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', color: '#cccccc', fontSize: '15px', marginBottom: '20px', cursor: 'pointer' }}>
+            <input type="checkbox" name="isKids" style={{ width: '18px', height: '18px' }} />
+            <span>Kids Profile (PG-rated content only)</span>
+          </label>
+          <button
+            type="submit"
+            tabIndex={0}
+            className="tv-btn tv-btn-play"
+            style={{ width: '100%', padding: '14px', fontSize: '17px', cursor: 'pointer' }}
+          >
+            Create Profile &amp; Continue
+          </button>
+        </form>
+      )}
 
       <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '30px' }}>
         {profiles.map((profile) => {

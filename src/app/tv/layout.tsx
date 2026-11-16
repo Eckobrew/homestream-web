@@ -1,7 +1,7 @@
 import React from 'react';
 import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
-import { fetchTvAuth } from '@/lib/tv-api';
+import { fetchTvAuth, fetchTvProfiles } from '@/lib/tv-api';
 import './tv.css';
 
 export const metadata = {
@@ -13,12 +13,21 @@ export default async function TvLayout({ children }: { children: React.ReactNode
   const headerList = await headers();
   const pathname = headerList.get('x-pathname') || '';
   const isLoginPage = pathname === '/tv/login';
+  const isProfilesPage = pathname === '/tv/profiles';
 
-  const auth = await fetchTvAuth();
+  const [auth, profileData] = await Promise.all([
+    fetchTvAuth(),
+    fetchTvProfiles(),
+  ]);
 
   // If external user requires auth and is not yet authenticated, redirect to /tv/login
   if (auth.requiresAuth && !auth.isAuthenticated && !isLoginPage) {
     redirect('/tv/login');
+  }
+
+  // If authenticated account has 0 profiles, send to /tv/profiles for First Profile setup
+  if (auth.isAuthenticated && profileData.needsSetup && !isLoginPage && !isProfilesPage) {
+    redirect('/tv/profiles');
   }
 
   return (
@@ -54,11 +63,12 @@ export default async function TvLayout({ children }: { children: React.ReactNode
             Search
           </a>
 
-          {auth.isLocalOrTailscale ? (
+          {(auth.isLocalOrTailscale || profileData.canSwitchProfile || profileData.needsSetup) && (
             <a href="/tv/profiles" className="tv-nav-link" tabIndex={0} style={{ backgroundColor: '#2a2a2a' }}>
               Profiles
             </a>
-          ) : (
+          )}
+          {!auth.isLocalOrTailscale && (
             <>
               {auth.user?.name && (
                 <span style={{ display: 'inline-flex', alignItems: 'center', color: '#aaaaaa', fontSize: '14px', margin: '0 8px', fontWeight: 'bold' }}>

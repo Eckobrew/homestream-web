@@ -80,19 +80,20 @@ export async function fetchTvAuth(): Promise<{
 export async function fetchTvProfiles(): Promise<{
   profiles: Array<{ id: string; name: string; avatarColor?: string; avatarBg?: string; initials?: string }>;
   activeProfileId?: string;
+  needsSetup?: boolean;
   canSwitchProfile: boolean;
   isExternal: boolean;
 }> {
   try {
     const hdrs = await getForwardedHeaders();
-    const res = await fetch(`${getBackendUrl()}/api/v1/profiles?includeAvailable=true`, {
+    const res = await fetch(`${getBackendUrl()}/api/v1/profiles`, {
       cache: 'no-store',
       headers: hdrs,
     });
-    if (!res.ok) return { profiles: [], canSwitchProfile: false, isExternal: false };
+    if (!res.ok) return { profiles: [], needsSetup: false, canSwitchProfile: false, isExternal: false };
     return await res.json();
   } catch {
-    return { profiles: [], canSwitchProfile: false, isExternal: false };
+    return { profiles: [], needsSetup: false, canSwitchProfile: false, isExternal: false };
   }
 }
 

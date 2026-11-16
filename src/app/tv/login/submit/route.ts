@@ -36,7 +36,7 @@ export async function POST(request: NextRequest) {
 
     const response = new NextResponse(null, {
       status: 303,
-      headers: { Location: '/tv' },
+      headers: { Location: data.needsProfileSetup ? '/tv/profiles' : '/tv' },
     });
 
     const setCookieHeader = res.headers.get('set-cookie');

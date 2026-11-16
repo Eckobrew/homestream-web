@@ -18,7 +18,7 @@ export default async function TvLoginPage({
           HOMESTREAM <span style={{ fontSize: '18px', color: '#aaaaaa' }}>TV</span>
         </h1>
         <p style={{ color: '#aaaaaa', fontSize: '16px', margin: 0 }}>
-          External Internet Connection Detected. Sign in with your Jellyfin credentials to continue.
+          External Internet Connection Detected. Sign in with your HomeStream account to continue.
         </p>
       </div>
 
