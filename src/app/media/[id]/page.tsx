@@ -1,15 +1,15 @@
 import { Metadata } from 'next';
-import { redirect } from 'next/navigation';
+import HomeApp from '@/components/HomeApp';
+import { buildMediaMetadata } from '@/lib/seo-metadata';
 
 interface MediaPageProps {
   params: Promise<{ id: string }>;
 }
 
-export async function generateMetadata(): Promise<Metadata> {
-  return { title: 'Watch on HomeStream', description: 'Your cinema. Your collection.' };
+export async function generateMetadata({ params }: MediaPageProps): Promise<Metadata> {
+  return buildMediaMetadata((await params).id, 'detail', 'media');
 }
 
 export default async function MediaPage({ params }: MediaPageProps) {
-  // Seamlessly route into the main app with the media modal opened
-  redirect(`/?media=${encodeURIComponent((await params).id)}`);
+  return <HomeApp initialMediaId={(await params).id} />;
 }

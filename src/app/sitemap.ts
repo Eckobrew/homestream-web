@@ -1,37 +1,21 @@
 import { MetadataRoute } from 'next';
 import { headers } from 'next/headers';
 import type { MediaItem } from '@/types';
+import { mediaDetailPath, mediaPlayPath } from '@/lib/seo-routes';
 export const dynamic = 'force-dynamic';
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const siteUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+  const siteUrl = (process.env.NEXT_PUBLIC_APP_URL || 'https://homeflix.eckonet.uk').replace(/\/+$/, '');
   const lastModified = new Date();
 
   const staticRoutes: MetadataRoute.Sitemap = [
-    {
-      url: `${siteUrl}`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 1.0,
-    },
-    {
-      url: `${siteUrl}/?tab=movies`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${siteUrl}/?tab=series`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 0.9,
-    },
-    {
-      url: `${siteUrl}/?tab=requests`,
-      lastModified,
-      changeFrequency: 'daily',
-      priority: 0.7,
-    },
+    { url: `${siteUrl}`, lastModified, changeFrequency: 'daily', priority: 1.0 },
+    { url: `${siteUrl}/movies`, lastModified, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${siteUrl}/tvshows`, lastModified, changeFrequency: 'daily', priority: 0.9 },
+    { url: `${siteUrl}/music`, lastModified, changeFrequency: 'daily', priority: 0.8 },
+    { url: `${siteUrl}/youtube`, lastModified, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${siteUrl}/books`, lastModified, changeFrequency: 'daily', priority: 0.7 },
+    { url: `${siteUrl}/discover`, lastModified, changeFrequency: 'daily', priority: 0.8 },
   ];
 
   try {
@@ -44,12 +28,20 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       });
       if (!response.ok) return staticRoutes;
       const { items } = await response.json() as { items: MediaItem[] };
-      const mediaRoutes: MetadataRoute.Sitemap = items.map((item) => ({
-        url: `${siteUrl}/media/${item.id}`,
-        lastModified,
-        changeFrequency: 'weekly',
-        priority: 0.8,
-      }));
+      const mediaRoutes: MetadataRoute.Sitemap = items.flatMap((item) => [
+        {
+          url: `${siteUrl}${mediaDetailPath(item)}`,
+          lastModified,
+          changeFrequency: 'weekly',
+          priority: 0.8,
+        },
+        {
+          url: `${siteUrl}${mediaPlayPath(item)}`,
+          lastModified,
+          changeFrequency: 'weekly',
+          priority: 0.7,
+        },
+      ]);
 
       return [...staticRoutes, ...mediaRoutes];
     }
