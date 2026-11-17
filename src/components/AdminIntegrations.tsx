@@ -74,6 +74,10 @@ function IntegrationCard({
   const [username, setUsername] = useState(integration.username || '');
   const [path, setPath] = useState(downloadsPath);
   const [bPath, setBPath] = useState(booksPath);
+  const [qualityProfileId, setQualityProfileId] = useState<number>(integration.qualityProfileId || 1);
+  const [qualityPreference, setQualityPreference] = useState<'mp3-320' | 'flac' | 'any-lossless' | 'mp3-any'>(
+    integration.qualityPreference || 'mp3-320'
+  );
   const [pin, setPin] = useState('');
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState('');
@@ -96,6 +100,8 @@ function IntegrationCard({
           parentPin: pin,
           ...(integration.id === 'qbittorrent' ? { downloadsPath: path } : {}),
           ...((integration.id as string) === 'bookshelf' ? { booksPath: bPath } : {}),
+          ...(integration.id === 'radarr' || integration.id === 'sonarr' ? { qualityProfileId } : {}),
+          ...(integration.id === 'slskd' ? { qualityPreference } : {}),
         }),
       });
       const data = await response.json();
@@ -203,6 +209,47 @@ function IntegrationCard({
             onChange={(e) => setPath(e.target.value)}
             className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
           />
+        </label>
+      )}
+      {(integration.id === 'radarr' || integration.id === 'sonarr') && (
+        <label className="block text-sm text-neutral-300">
+          Search quality profile
+          {integration.qualityProfiles && integration.qualityProfiles.length > 0 ? (
+            <select
+              value={qualityProfileId}
+              onChange={(e) => setQualityProfileId(Number(e.target.value))}
+              className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
+            >
+              {integration.qualityProfiles.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name}
+                </option>
+              ))}
+            </select>
+          ) : (
+            <input
+              type="number"
+              min={1}
+              value={qualityProfileId}
+              onChange={(e) => setQualityProfileId(Math.max(1, Number(e.target.value) || 1))}
+              className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
+            />
+          )}
+        </label>
+      )}
+      {integration.id === 'slskd' && (
+        <label className="block text-sm text-neutral-300">
+          Search audio quality
+          <select
+            value={qualityPreference}
+            onChange={(e) => setQualityPreference(e.target.value as 'mp3-320' | 'flac' | 'any-lossless' | 'mp3-any')}
+            className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
+          >
+            <option value="mp3-320">MP3 320kbps (Recommended)</option>
+            <option value="flac">FLAC (Lossless)</option>
+            <option value="any-lossless">Any Lossless (FLAC / ALAC / WAV)</option>
+            <option value="mp3-any">Any MP3 (192kbps+)</option>
+          </select>
         </label>
       )}
       <label className="block text-xs text-neutral-500">
