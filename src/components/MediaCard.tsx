@@ -1,5 +1,6 @@
 'use client';
 import { apiFetch } from '@/api/client';
+import { tmdbIdFor, torrentStreamUrl } from '@/player/torrent-stream';
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Play, Plus, Check, ThumbsUp, ChevronDown, Download, Clock, Volume2, VolumeX } from 'lucide-react';
@@ -338,20 +339,18 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                   >
                     <Play size={16} className="fill-black ml-0.5" />
                   </button>
-                ) : item.isDownloading || item.downloadStreamUrl ? (
+                ) : tmdbIdFor(item) ? (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      onPlay({
-                        ...item,
-                        videoStreamUrl: item.downloadStreamUrl || item.videoStreamUrl,
-                      });
+                      const url = torrentStreamUrl(item, { seasonNumber: 1, episodeNumber: 1 });
+                      if (url) onPlay({ ...item, videoStreamUrl: url });
                     }}
                     className="px-2.5 h-8 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center space-x-1.5 transition-transform hover:scale-105 shadow text-xs font-semibold"
-                    title={`Watch In-Progress (${item.downloadProgress || 0}% downloaded)`}
+                    title="Stream straight from the swarm"
                   >
                     <Play size={13} className="fill-white" />
-                    <span>Watch ({item.downloadProgress || 0}%)</span>
+                    <span>Stream</span>
                   </button>
                 ) : (
                   <button

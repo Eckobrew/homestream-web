@@ -4,6 +4,7 @@ import { apiFetch } from '@/api/client';
 import React, { useState, useEffect } from 'react';
 import { Search, Play, Download, Clock, CheckCircle2, Film, Tv, Loader2 } from 'lucide-react';
 import { MediaItem } from '@/types';
+import { torrentStreamUrl } from '@/player/torrent-stream';
 
 interface SearchOverlayProps {
   query: string;
@@ -49,50 +50,6 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     return () => { controller.abort(); clearTimeout(timer); };
   }, [query]);
 
-  // Poll /api/downloads to keep torrent download progress & stream links live in search results
-  useEffect(() => {
-    let isMounted = true;
-    const pollDownloads = async () => {
-      try {
-        const res = await apiFetch('/api/downloads');
-        if (!res.ok) return;
-        const data = await res.json();
-        const dlList = data.items || [];
-        if (!isMounted || dlList.length === 0) return;
-
-        setResults((prev) =>
-          prev.map((item) => {
-            const cleanTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-            const matched = dlList.find((dl: any) => {
-              const cleanDl = (dl.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-              return cleanTitle.length > 0 && cleanDl.length > 0 && (cleanDl.includes(cleanTitle) || cleanTitle.includes(cleanDl));
-            });
-            if (matched) {
-              return {
-                ...item,
-                isDownloading: true,
-                status: 'processing',
-                downloadProgress: matched.progressPercent,
-                downloadSpeed: matched.downloadSpeed,
-                downloadEta: matched.eta,
-                torrentHash: matched.hash,
-                downloadStreamUrl: matched.streamUrl || `/api/stream/download?hash=${matched.hash}`,
-                videoStreamUrl: matched.streamUrl || `/api/stream/download?hash=${matched.hash}`,
-              };
-            }
-            return item;
-          })
-        );
-      } catch {}
-    };
-
-    const interval = setInterval(pollDownloads, 2500);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, []);
-
   // Apply filters
   const filteredResults = results.filter((item) => {
     if (activeFilter === 'available') return item.status === 'available' || item.source === 'native';
@@ -101,44 +58,14 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
     return true;
   });
 
-  const handleDownloadAndStream = async (item: MediaItem) => {
-    try {
-      // Immediately reflect downloading in search results
-      setResults((prev) =>
-        prev.map((r) =>
-          r.id === item.id
-            ? {
-                ...r,
-                isDownloading: true,
-                status: 'processing',
-                downloadProgress: r.downloadProgress || 0,
-              }
-            : r
-        )
-      );
-
-      const tmdbId = item.tmdbId || (/^tmdb-/.test(item.id) ? Number(item.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
-      if (tmdbId) {
-        apiFetch('/api/request', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            mediaType: item.type === 'Series' ? 'tv' : 'movie',
-            mediaId: tmdbId,
-            seasons: item.type === 'Series' ? [1] : undefined,
-          }),
-        }).catch(console.error);
-      }
-      onPlay({
-        ...item,
-        status: 'processing',
-        isDownloading: true,
-        downloadProgress: item.downloadProgress || 0,
-      });
-    } catch (e) {
-      console.error('Failed to trigger download and stream:', e);
-      onPlay(item);
+  // Titles that are not in the library stream straight from the swarm (no qBittorrent download).
+  const handleStreamNow = (item: MediaItem) => {
+    const url = torrentStreamUrl(item, { seasonNumber: 1, episodeNumber: 1 });
+    if (!url) {
+      onOpenModal(item);
+      return;
     }
+    onPlay({ ...item, videoStreamUrl: url });
   };
 
   return (
@@ -251,11 +178,6 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
                       <CheckCircle2 size={11} />
                       <span>IN LIBRARY</span>
                     </span>
-                  ) : item.isDownloading || item.downloadStreamUrl ? (
-                    <span className="bg-blue-600/95 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
-                      <Download size={11} className="animate-bounce" />
-                      <span>DOWNLOADING ({item.downloadProgress || 0}%)</span>
-                    </span>
                   ) : isRequested ? (
                     <span className="bg-amber-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
                       <Clock size={11} />
@@ -283,31 +205,17 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
                         <Play size={14} className="fill-black" />
                         <span>Stream Now</span>
                       </button>
-                    ) : item.isDownloading || item.downloadStreamUrl ? (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onPlay({
-                            ...item,
-                            videoStreamUrl: item.downloadStreamUrl || item.videoStreamUrl,
-                          });
-                        }}
-                        className="w-full py-2 rounded bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center space-x-1 transition-colors shadow"
-                      >
-                        <Play size={14} className="fill-white" />
-                        <span>Stream In-Progress ({item.downloadProgress || 0}%)</span>
-                      </button>
                     ) : (
                       <>
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
-                            handleDownloadAndStream(item);
+                            handleStreamNow(item);
                           }}
                           className="w-full py-2 rounded bg-red-600 hover:bg-red-500 text-white font-bold text-xs flex items-center justify-center space-x-1 transition-colors shadow"
                         >
                           <Play size={14} className="fill-white" />
-                          <span>Download &amp; Stream</span>
+                          <span>Stream Now</span>
                         </button>
                         <button
                           onClick={(e) => {

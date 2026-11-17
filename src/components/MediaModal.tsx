@@ -28,6 +28,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { MediaItem, Season, Episode } from '@/types';
+import { tmdbIdFor, torrentStreamUrl } from '@/player/torrent-stream';
 
 interface MediaModalProps {
   item: MediaItem | null;
@@ -127,45 +128,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
       })
       .catch(() => {})
       .finally(() => setIsLoadingRecs(false));
-  }, [item]);
-
-  // Keep live track of active qBittorrent downloads while modal is open
-  useEffect(() => {
-    if (!item) return;
-    let isMounted = true;
-    const pollDl = async () => {
-      try {
-        const res = await apiFetch('/api/downloads');
-        if (!res.ok) return;
-        const data = await res.json();
-        const dlList = data.items || [];
-        const cleanTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-        const matched = dlList.find((dl: any) => {
-          const cleanDl = (dl.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return cleanDl.includes(cleanTitle) || cleanTitle.includes(cleanDl);
-        });
-        if (matched && isMounted && item) {
-          setDetails((prev) => ({
-            ...(prev || item),
-            isDownloading: true,
-            status: 'processing',
-            downloadProgress: matched.progressPercent,
-            downloadSpeed: matched.downloadSpeed,
-            downloadEta: matched.eta,
-            torrentHash: matched.hash,
-            downloadStreamUrl: matched.streamUrl || `/api/stream/download?hash=${matched.hash}`,
-            videoStreamUrl: matched.streamUrl || `/api/stream/download?hash=${matched.hash}`,
-          }));
-        }
-      } catch {}
-    };
-
-    pollDl();
-    const interval = setInterval(pollDl, 2500);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
   }, [item]);
 
   const currentItem = details || item;
@@ -366,19 +328,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     <span>Restart</span>
                   </button>
                 </>
-              ) : currentItem.isDownloading || currentItem.downloadStreamUrl ? (
-                <button
-                  onClick={() => {
-                    onPlay({
-                      ...currentItem,
-                      videoStreamUrl: currentItem.downloadStreamUrl || currentItem.videoStreamUrl,
-                    });
-                  }}
-                  className="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 text-white font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
-                >
-                  <Play size={18} className="fill-white" />
-                  <span>Watch In-Progress ({currentItem.downloadProgress || 0}%)</span>
-                </button>
               ) : (
                 <div className="flex items-center space-x-2 sm:space-x-3">
                   {(() => {
@@ -396,32 +345,21 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                       );
                     }
                     const hasStreamResume = (currentItem.playbackPositionTicks || 0) > 0;
+                    const canStream = Boolean(tmdbIdFor(currentItem));
                     return (
                       <button
+                        disabled={!canStream}
                         onClick={() => {
-                          const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('tmdb-') ? Number(currentItem.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
-                          if (tmdbId) {
-                            apiFetch('/api/request', {
-                              method: 'POST',
-                              headers: { 'Content-Type': 'application/json' },
-                              body: JSON.stringify({
-                                mediaType: currentItem.type === 'Series' ? 'tv' : 'movie',
-                                mediaId: tmdbId,
-                                seasons: currentItem.type === 'Series' ? [1] : undefined,
-                              }),
-                            }).catch(console.error);
-                          }
-                          onPlay({
-                            ...currentItem,
-                            status: 'processing',
-                            isDownloading: true,
-                            downloadProgress: currentItem.downloadProgress || 0,
-                          });
+                          const target = currentSeason?.episodes?.[0];
+                          const url = torrentStreamUrl(currentItem, target || { seasonNumber: currentSeason?.seasonNumber || 1, episodeNumber: 1 });
+                          if (!url) return;
+                          onPlay({ ...currentItem, videoStreamUrl: url }, target ? { ...target, seasonNumber: target.seasonNumber || currentSeason?.seasonNumber || 1, videoStreamUrl: url } : undefined);
                         }}
-                        className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 text-white font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
+                        className="flex items-center space-x-2 bg-red-600 hover:bg-red-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
+                        title={canStream ? 'Stream straight from the swarm' : 'No TMDB id available to stream'}
                       >
                         <Play size={18} className="fill-white" />
-                        <span>{hasStreamResume ? 'Resume Stream' : 'Download & Stream'}</span>
+                        <span>{hasStreamResume ? 'Resume Stream' : 'Stream Now'}</span>
                       </button>
                     );
                   })()}
@@ -740,13 +678,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                       Available in your library. Instant playback ready.
                     </span>
                   </>
-                ) : currentItem.isDownloading ? (
-                  <>
-                    <Download size={16} className="text-blue-400 shrink-0 animate-pulse" />
-                    <span className="text-blue-300 font-medium">
-                      Currently downloading ({currentItem.downloadProgress || 0}%). Stream in-progress is ready to watch!
-                    </span>
-                  </>
                 ) : isRequested ? (
                   <>
                     <Clock size={16} className="text-amber-500 shrink-0" />
@@ -758,7 +689,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                   <>
                     <AlertCircle size={16} className="text-blue-400 shrink-0" />
                     <span className="text-blue-300 font-medium">
-                      Not yet in your library. Click &quot;Request Only&quot; or &quot;Download &amp; Stream&quot; to fetch it.
+                      Not yet in your library. Click &quot;Stream Now&quot; to watch it from the swarm or &quot;Request Only&quot; to add it to your library.
                     </span>
                   </>
                 )}
@@ -851,31 +782,20 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     const epKey = `${currentSeason?.seasonNumber || 1}-${ep.episodeNumber}`;
                     const isEpRequested = requestedEpIds.has(epKey) || isRequested;
                     const isEpRequesting = requestingEpId === epKey;
-                    const isTorrentDownloading = Boolean(currentItem.isDownloading || currentItem.downloadStreamUrl || ep.downloadStreamUrl);
-                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (currentItem.source === 'native' && ep.id))) || isTorrentDownloading;
+                    const canStreamEp = !isAvailable && Boolean(tmdbIdFor(currentItem));
+                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (currentItem.source === 'native' && ep.id))) || canStreamEp;
 
                     return (
                       <div
                         key={ep.id}
                         onClick={() => {
                           if (canPlayEp) {
-                            if (isTorrentDownloading) {
-                              const hash = currentItem.torrentHash || (currentItem.downloadStreamUrl?.match(/hash=([^&]+)/)?.[1]);
-                              const sNum = currentSeason?.seasonNumber || 1;
-                              const epNum = ep.episodeNumber;
-                              const epStreamUrl = hash
-                                ? `/api/stream/download?hash=${hash}&season=${sNum}&episode=${epNum}`
-                                : currentItem.downloadStreamUrl;
-
-                              onPlay({
-                                ...currentItem,
-                                isDownloading: true,
-                                downloadStreamUrl: epStreamUrl,
-                                videoStreamUrl: epStreamUrl,
-                              }, {
-                                ...ep,
-                                videoStreamUrl: epStreamUrl,
+                            if (canStreamEp) {
+                              const epStreamUrl = torrentStreamUrl(currentItem, {
+                                seasonNumber: currentSeason?.seasonNumber || 1,
+                                episodeNumber: ep.episodeNumber,
                               });
+                              onPlay({ ...currentItem, videoStreamUrl: epStreamUrl }, { ...ep, seasonNumber: currentSeason?.seasonNumber || 1, videoStreamUrl: epStreamUrl });
                             } else {
                               onPlay(currentItem, ep);
                             }
@@ -943,10 +863,10 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                                   {ep.progressPercent}% watched
                                 </span>
                               ) : null}
-                              {isTorrentDownloading && (
+                              {canStreamEp && (
                                 <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-blue-950/70 text-blue-400 border border-blue-800/80 flex items-center space-x-1">
-                                  <Download size={10} className="animate-bounce" />
-                                  <span>Stream In-Progress</span>
+                                  <Download size={10} />
+                                  <span>Torrent stream</span>
                                 </span>
                               )}
                               {!canPlayEp && (

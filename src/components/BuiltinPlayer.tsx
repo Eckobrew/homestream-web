@@ -1,4 +1,5 @@
 'use client';
+import { browserDecoderParameters } from '@/lib/playback-capabilities';
 import { apiFetch } from '@/api/client';
 
 import { usePlaybackFallback } from '@/player/usePlaybackFallback';
@@ -10,6 +11,7 @@ import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 import { negotiatePlayback, MediaAudioTrack, MediaVersion, SkipSegment, type QualityMode } from '@/player/transport';
 import { playbackState } from '@/player/state';
+import { isTorrentStreamUrl, torrentStreamUrl } from '@/player/torrent-stream';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
@@ -41,9 +43,6 @@ interface BuiltinPlayerProps {
   episode?: Episode;
   onClose: () => void;
   onNextEpisode?: () => void;
-  isDownloading?: boolean;
-  downloadProgress?: number;
-  torrentHash?: string;
 }
 
 export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
@@ -51,9 +50,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   episode,
   onClose,
   onNextEpisode,
-  isDownloading,
-  downloadProgress,
-  torrentHash,
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const castLoadRef = useRef<(compatible?: boolean) => Promise<void>>(async () => {});
@@ -101,9 +97,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     if (item.videoStreamUrl?.includes('/api/youtube/') || item.downloadStreamUrl?.includes('/api/youtube/') || item.id?.startsWith('yt-')) {
       return item.videoStreamUrl || item.downloadStreamUrl || '';
     }
-    return (item.downloaded ?? 0) >= 15 * 1024 * 1024 || (downloadProgress ?? item.downloadProgress ?? 0) >= 99
-      ? item.downloadStreamUrl || item.videoStreamUrl || ''
-      : '';
+    return '';
   });
   const [streamDelivery, setStreamDelivery] = useState<{ url: string; type: string } | null>(null);
   const [isTranscoding, setIsTranscoding] = useState(false);
@@ -124,74 +118,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
   const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'syncplay' | 'settings' | null>(null);
 
-  const isItemDownloading = Boolean(
-    isDownloading ||
-    item.isDownloading ||
-    item.downloadStreamUrl?.includes('/api/stream/download') ||
-    item.videoStreamUrl?.includes('/api/stream/download')
-  );
+  // Titles that are not in the library stream straight from the swarm via the in-process torrent engine.
+  const isTorrentStream = [item.videoStreamUrl, item.downloadStreamUrl, episode?.videoStreamUrl].some(isTorrentStreamUrl);
 
-  const [activeDownloadProgress, setActiveDownloadProgress] = useState<number>(
-    downloadProgress ?? item.downloadProgress ?? 0
-  );
-  const [activeDownloadSpeed, setActiveDownloadSpeed] = useState<number>(
-    item.downloadSpeed ?? 0
-  );
-  const [downloadedBytes, setDownloadedBytes] = useState<number>(item.downloaded || 0);
-  const [resolvedTorrentHash, setResolvedTorrentHash] = useState<string | null>(
-    torrentHash ||
-    item.torrentHash ||
-    (item.downloadStreamUrl?.match(/hash=([^&]+)/)?.[1]) ||
-    (item.videoStreamUrl?.match(/hash=([^&]+)/)?.[1]) ||
-    null
-  );
-
-  useEffect(() => {
-    if (!isItemDownloading) return;
-
-    let isMounted = true;
-    const poll = async () => {
-      try {
-        const res = await apiFetch('/api/downloads');
-        if (!res.ok) return;
-        const data = await res.json();
-        const cleanItemTitle = (item.title || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-
-        const found = data.items?.find((t: any) => {
-          if (resolvedTorrentHash) return t.hash.toLowerCase() === resolvedTorrentHash.toLowerCase();
-          const cleanName = (t.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-          return Boolean(cleanName && cleanItemTitle && (cleanName.includes(cleanItemTitle) || cleanItemTitle.includes(cleanName)));
-        });
-
-        if (found && isMounted) {
-          if (!resolvedTorrentHash) {
-            setResolvedTorrentHash(found.hash);
-          }
-          setActiveDownloadProgress(found.progressPercent);
-          setActiveDownloadSpeed(found.downloadSpeed);
-          if (typeof found.downloaded === 'number') {
-            setDownloadedBytes(found.downloaded);
-          }
-
-          const minBuffer = 15 * 1024 * 1024; // 15MB initial buffer threshold
-          if (found.downloaded >= minBuffer || found.progressPercent >= 99) {
-            const nextStreamUrl = found.streamUrl || `/api/stream/download?hash=${found.hash}`;
-            setStreamUrl(current => current || item.downloadStreamUrl || item.videoStreamUrl || nextStreamUrl);
-            setIsLoadingStream(false);
-          }
-        }
-      } catch {
-        // Ignore background polling errors
-      }
-    };
-
-    poll();
-    const interval = setInterval(poll, 2000);
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-  }, [isItemDownloading, resolvedTorrentHash, item.title, item.downloadStreamUrl, item.videoStreamUrl]);
   const [hasTriedFallbackTranscode, setHasTriedFallbackTranscode] = useState(false);
   const [playbackDuration, setPlaybackDuration] = useState<number>(0);
 
@@ -256,36 +185,28 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     }
   }, [item.id, item.durationMinutes, item.totalDurationTicks, activeEpisode?.durationMinutes]);
 
-  // For active torrent streaming, probe the exact duration directly from ffprobe
+  // For torrent streaming, probe the exact duration from the swarm before playback starts
   useEffect(() => {
-    if (isItemDownloading) {
-      const hash =
-        resolvedTorrentHash ||
-        torrentHash ||
-        item.torrentHash ||
-        (item.downloadStreamUrl?.match(/hash=([^&]+)/)?.[1]) ||
-        (item.videoStreamUrl?.match(/hash=([^&]+)/)?.[1]);
-
-      if (hash) {
-        apiFetch(`/api/stream/download?hash=${hash}&probe=1`)
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data) => {
-            if (data?.durationSeconds && data.durationSeconds > 0) {
-              setPlaybackDuration(data.durationSeconds);
-              setDuration(data.durationSeconds);
-            }
-          })
-          .catch(() => {});
-      }
-    }
-  }, [isItemDownloading, resolvedTorrentHash, torrentHash, item.torrentHash, item.downloadStreamUrl, item.videoStreamUrl]);
+    if (!isTorrentStream || !isTorrentStreamUrl(streamUrl)) return;
+    const controller = new AbortController();
+    apiFetch(`${streamUrl}${streamUrl.includes('?') ? '&' : '?'}probe=1`, { signal: controller.signal })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.durationSeconds && data.durationSeconds > 0) {
+          setPlaybackDuration(data.durationSeconds);
+          setDuration(data.durationSeconds);
+        }
+      })
+      .catch(() => {});
+    return () => controller.abort();
+  }, [isTorrentStream, streamUrl]);
 
   // If item is a series, ensure series seasons/episodes are loaded for navigation & next episode
   useEffect(() => {
     if (item.type === 'Series') {
       if (item.seasons && item.seasons.length > 0) {
         const allEps = item.seasons.flatMap((s) => s.episodes || []);
-        const isPlayableEp = (ep: Episode) => Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (item.source === 'native' && ep.id));
+        const isPlayableEp = (ep: Episode) => Boolean(isTorrentStream || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (item.source === 'native' && ep.id));
         setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
         if (!activeEpisode) {
           const found = activePlayableId
@@ -311,7 +232,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           }
           if (media.seasons) {
             const allEps = media.seasons.flatMap((s: any) => s.episodes || []);
-            const isPlayableEp = (ep: Episode) => Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (media.source === 'native' && ep.id));
+            const isPlayableEp = (ep: Episode) => Boolean(isTorrentStream || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (media.source === 'native' && ep.id));
             setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a: Episode, b: Episode) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
             if (!activeEpisode) {
               const found = targetPlayableId
@@ -427,7 +348,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       let rawUrl = localUrl;
       let negotiatedContentType = '';
       let negotiatedDuration = 0;
-      const targetId = activePlayableId || activeEpisode?.id || item.playableEpisodeId || item.id;
+      const torrentTarget = isTorrentStream ? torrentStreamUrl(item, activeEpisode) : undefined;
+      const torrentTmdbId = torrentTarget ? new URL(torrentTarget, window.location.origin).searchParams.get('tmdbId') : undefined;
+      const targetId = torrentTmdbId ? `tmdb-${item.type === 'Movie' ? 'movie' : 'tv'}-${torrentTmdbId}`
+        : activePlayableId || activeEpisode?.id || item.playableEpisodeId || item.id;
       if (targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3', forceTranscode: String(compatible) });
         if (selectedVersionId) params.set('versionId', selectedVersionId);
@@ -521,7 +445,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     } catch {
       failed();
     }
-  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isItemDownloading, selectedSubtitleId, selectedVersionId, selectedAudioIndex, cancelCastLoad, returnFromFailedCast]);
+  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isTorrentStream, selectedSubtitleId, selectedVersionId, selectedAudioIndex, cancelCastLoad, returnFromFailedCast]);
   castLoadRef.current = loadCastMedia;
 
   const inspectCastStartup = useCallback((media: unknown) => {
@@ -674,7 +598,24 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   // Negotiate dynamic playback stream (DirectPlay / Transcoding)
   useEffect(() => {
-    if (isItemDownloading) return;
+    if (isTorrentStream) {
+      const controller = new AbortController();
+      const raw = torrentStreamUrl(item, activeEpisode) || activeEpisode?.videoStreamUrl || item.videoStreamUrl || item.downloadStreamUrl;
+      setIsLoadingStream(true);
+      setStreamError(false);
+      void browserDecoderParameters(mime => videoRef.current?.canPlayType(mime) || '',
+        navigator.mediaCapabilities?.decodingInfo.bind(navigator.mediaCapabilities)).then(capabilities => {
+        if (controller.signal.aborted) return;
+        if (!raw) { setStreamError(true); setIsLoadingStream(false); return; }
+        const url = new URL(raw, window.location.origin);
+        capabilities.forEach((value, key) => url.searchParams.set(key, value));
+        if (qualityMode === '720p') { url.searchParams.set('maxWidth', '1280'); url.searchParams.set('maxHeight', '720'); }
+        if (qualityMode === '1080p') { url.searchParams.set('maxWidth', '1920'); url.searchParams.set('maxHeight', '1080'); }
+        setStreamDelivery({ url: url.pathname + url.search, type: 'video/mp4' });
+        setStreamUrl(url.pathname + url.search);
+      }).catch(() => { if (!controller.signal.aborted) setStreamError(true); });
+      return () => controller.abort();
+    }
 
     if (!activePlayableId && item.type === 'Series') {
       return;
@@ -736,7 +677,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => {
       isMounted = false; controller.abort();
     };
-  }, [activePlayableId, item, isLibraryItem, activeEpisode, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode]);
+  }, [activePlayableId, item, isLibraryItem, isTorrentStream, activeEpisode, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode]);
 
   // Parse Trickplay WebVTT sprite sheet cues when trickplayUrl is available
   useEffect(() => {
@@ -1244,13 +1185,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       setDuration(nextEpisode.totalDurationTicks ? nextEpisode.totalDurationTicks / 10000000 : 0);
       setPlaybackDuration(0);
 
-      if (isItemDownloading) {
-        const hash = resolvedTorrentHash || item.torrentHash || (item.downloadStreamUrl?.match(/hash=([^&]+)/)?.[1]);
-        if (hash) {
-          const sNum = nextEpisode.seasonNumber || 1;
-          const epNum = nextEpisode.episodeNumber;
-          setStreamUrl(`/api/stream/download?hash=${hash}&season=${sNum}&episode=${epNum}`);
-          setIsLoadingStream(false);
+      if (isTorrentStream) {
+        const nextUrl = torrentStreamUrl(item, nextEpisode);
+        if (nextUrl) {
+          setStreamUrl('');
+          setStreamDelivery(null);
+          setIsLoadingStream(true);
           resetControlsTimer();
           return;
         }
@@ -1335,7 +1275,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         <div className="absolute inset-0 bg-black flex flex-col items-center justify-center z-40 space-y-4 p-6 text-center">
           <div className="relative">
             <div className="w-14 h-14 border-4 border-red-600/30 border-t-red-600 rounded-full animate-spin" />
-            {isItemDownloading && (
+            {isTorrentStream && (
               <div className="absolute inset-0 flex items-center justify-center">
                 <Download size={18} className="text-red-500 animate-pulse" />
               </div>
@@ -1343,21 +1283,17 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           </div>
           <div className="space-y-1.5 max-w-sm">
             <span className="text-sm font-bold text-white">
-              {isItemDownloading
-                ? downloadedBytes < 15 * 1024 * 1024
-                  ? `Downloading initial pieces (${(downloadedBytes / 1024 / 1024).toFixed(1)} MB / 15 MB)...`
-                  : `Preparing live stream (${activeDownloadProgress}%)...`
+              {isTorrentStream
+                ? 'Connecting to torrent swarm...'
                 : isLoadingEpisode
                 ? 'Loading series episode...'
                 : isTranscoding
                 ? 'Preparing hardware-accelerated stream...'
                 : 'Loading media stream...'}
             </span>
-            {isItemDownloading && (
+            {isTorrentStream && (
               <p className="text-xs text-neutral-400">
-                {activeDownloadSpeed > 0
-                  ? `Download speed: ${(activeDownloadSpeed / 1024 / 1024).toFixed(1)} MB/s • Playback begins automatically once initial pieces arrive`
-                  : 'Contacting qBittorrent downloader...'}
+                Playback begins automatically once enough data has arrived
               </p>
             )}
           </div>
@@ -1472,15 +1408,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               <div className="w-10 h-10 border-4 border-red-600 border-t-transparent rounded-full animate-spin" />
               <div className="text-center">
                 <p className="text-xs sm:text-sm font-semibold text-white/95">
-                  {isItemDownloading
-                    ? `Buffering stream (${activeDownloadProgress}% downloaded)...`
-                    : 'Buffering stream...'}
+                  {isTorrentStream ? 'Buffering torrent stream...' : 'Buffering stream...'}
                 </p>
-                {isItemDownloading && activeDownloadSpeed > 0 && (
-                  <p className="text-[11px] text-blue-400 font-mono mt-0.5">
-                    {(activeDownloadSpeed / 1024 / 1024).toFixed(1)} MB/s
-                  </p>
-                )}
               </div>
             </div>
           </div>
@@ -1580,13 +1509,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               <div className="relative w-full flex items-center py-1">
                 {/* Track background */}
                 <div className="relative w-full h-1.5 bg-neutral-800 rounded-full overflow-hidden">
-                  {/* Download progress on disk */}
-                  {isItemDownloading && activeDownloadProgress > 0 && (
-                    <div
-                      className="absolute left-0 top-0 bottom-0 bg-blue-500/35 transition-all duration-300"
-                      style={{ width: `${Math.min(100, activeDownloadProgress)}%` }}
-                    />
-                  )}
                   {/* Browser buffer in RAM */}
                   <div
                     className="absolute left-0 top-0 bottom-0 bg-white/40 transition-all duration-150"
@@ -1612,11 +1534,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               </div>
               <div className="flex justify-between text-xs font-mono text-neutral-400">
                 <span>{formatTime(currentTime)}</span>
-                {isItemDownloading && (
-                  <span className="text-[10px] text-blue-400 font-sans">
-                    Downloaded: {activeDownloadProgress}%
-                  </span>
-                )}
+
                 <span>{formatTime(displayDuration)}</span>
               </div>
             </div>
@@ -1728,13 +1646,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 <h2 className="text-white font-bold text-base sm:text-lg md:text-xl drop-shadow truncate">
                   {item.title}
                 </h2>
-                {isItemDownloading && (
+                {isTorrentStream && (
                   <div className="flex items-center space-x-1.5 px-2.5 py-0.5 bg-blue-600/30 border border-blue-500/40 rounded-full text-blue-300 text-xs backdrop-blur-md shrink-0 shadow">
-                    <Download className="w-3 h-3 animate-pulse" />
-                    <span>
-                      In-Progress ({activeDownloadProgress}%
-                      {activeDownloadSpeed > 0 ? ` • ${(activeDownloadSpeed / 1024 / 1024).toFixed(1)} MB/s` : ''})
-                    </span>
+                    <Download className="w-3 h-3" />
+                    <span>Torrent stream</span>
                   </div>
                 )}
               </div>
@@ -1780,13 +1695,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           >
             {/* Scrubber Track Bar */}
             <div className="relative w-full h-1 group-hover/scrubber:h-2 bg-neutral-800 rounded-full overflow-hidden transition-all duration-150">
-              {/* Torrent Downloaded Bar (on disk) */}
-              {isItemDownloading && activeDownloadProgress > 0 && (
-                <div
-                  className="absolute left-0 top-0 bottom-0 bg-blue-500/35 transition-all duration-300"
-                  style={{ width: `${Math.min(100, activeDownloadProgress)}%` }}
-                />
-              )}
 
               {/* Browser Buffered Bar (in memory) */}
               <div
@@ -1836,11 +1744,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 )}
                 <div className="px-2.5 py-1 bg-black/90 backdrop-blur-md border border-neutral-700 rounded text-[11px] font-mono text-white shadow-xl whitespace-nowrap">
                   <span>{formatTime(hoverTime)}</span>
-                  {isItemDownloading && (
-                    <span className="ml-1.5 text-blue-400 text-[10px]">
-                      ({activeDownloadProgress}% dl)
-                    </span>
-                  )}
+
                 </div>
               </div>
             )}
