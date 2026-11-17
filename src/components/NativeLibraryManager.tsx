@@ -36,6 +36,7 @@ interface NativeSettings {
   vaapiDevice: string;
   transcodeTempDir: string;
   maxTranscodeBitrateMbps: number;
+  maxConcurrentTranscodes: number;
   transcodePreset: 'ultrafast' | 'superfast' | 'veryfast' | 'faster' | 'fast' | 'medium';
   hdrToneMapping: boolean;
   allowDirectPlay: boolean;
@@ -488,6 +489,14 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
             {hardwareAcceleration.length === 0 && (
               <span className="block text-neutral-400">No working hardware encoder detected on the backend.</span>
             )}
+          </label>
+
+          <label className="space-y-1">
+            <span className="text-neutral-400">Maximum simultaneous video encodes (1080p)</span>
+            <input type="number" min={1} max={32} value={settings.maxConcurrentTranscodes ?? 2}
+              onChange={e => setSettings({ ...settings, maxConcurrentTranscodes: Math.max(1, Math.min(32, Number(e.target.value) || 1)) })}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white" />
+            <span className="block text-neutral-400">4K and high frame rate sources reserve extra capacity. Additional encodes receive a busy response; direct playback and remuxing use no encoder slots.</span>
           </label>
 
           <label className="space-y-1">

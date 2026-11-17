@@ -50,10 +50,14 @@ test('mobile navigation exposes Discover and Requested next to each other',async
 test('native settings list only hardware modes confirmed by the backend', async ({ page }) => {
   await fixture(page);
   let available = ['qsv'];
-  await page.route('**/api/v1/native/library**', route => route.fulfill({ json: {
-    settings: { mediaEngine: 'native', hwAccel: 'vaapi', libraries: [] },
-    hardwareAcceleration: available,
-  } }));
+  let savedLimit = 2;
+  await page.route('**/api/v1/native/library**', route => {
+    if (route.request().method() === 'POST') savedLimit = route.request().postDataJSON().settings.maxConcurrentTranscodes;
+    return route.fulfill({ json: {
+      settings: { mediaEngine: 'native', hwAccel: 'vaapi', libraries: [], maxConcurrentTranscodes: savedLimit },
+      hardwareAcceleration: available,
+    } });
+  });
   const openHardwareSettings = async () => {
     await page.goto('/admin');
     await page.getByRole('button', { name: 'Playback' }).last().click();
@@ -62,6 +66,12 @@ test('native settings list only hardware modes confirmed by the backend', async 
   const detected = await openHardwareSettings();
   await expect(detected.locator('option')).toHaveText(['None (Software libx264)', 'Auto (detected hardware)', 'Intel QuickSync (QSV)']);
   await expect(detected).toHaveValue('none');
+  const limit = page.getByLabel('Maximum simultaneous video encodes (1080p)');
+  await expect(limit).toHaveValue('2');
+  await limit.fill('3');
+  await page.getByRole('button', { name: 'Save Settings', exact: true }).click();
+  await expect.poll(() => savedLimit).toBe(3);
+  await expect(limit).toHaveValue('3');
 
   available = [];
   const softwareOnly = await openHardwareSettings();
