@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { apiFetch } from '@/api/client';
 import type { MusicAlbum, MusicTrack, MusicResponse, MusicAlbumResponse, Playlist, PlaylistTrack, PlaylistDetailResponse } from '@/types';
 import { useProfile } from '@/context/ProfileContext';
@@ -88,6 +88,33 @@ export function MusicBrowser({
   const [reload, setReload] = useState(0);
 
   const [importStatus, setImportStatus] = useState<ImportStatus | null>(null);
+  const albumPanelRef = useRef<HTMLElement>(null);
+  const artistPanelRef = useRef<HTMLDivElement>(null);
+  const playlistPanelRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (!selected?.album.id) return;
+    const frame = requestAnimationFrame(() => {
+      albumPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selected?.album.id]);
+
+  useEffect(() => {
+    if (!selectedArtist) return;
+    const frame = requestAnimationFrame(() => {
+      artistPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedArtist]);
+
+  useEffect(() => {
+    if (!selectedPlaylist?.playlist.id) return;
+    const frame = requestAnimationFrame(() => {
+      playlistPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [selectedPlaylist?.playlist.id]);
   useEffect(() => {
     setImportStatus(null);
     if (kids) return;
@@ -491,7 +518,7 @@ export function MusicBrowser({
   const renderSelectedAlbumPanel = () => {
     if (!selected) return null;
     return (
-      <section className="rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
+      <section ref={albumPanelRef} className="scroll-mt-24 rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
         <button
           onClick={() => setSelected(null)}
           className="absolute top-4 right-4 p-2 rounded-full bg-black/40 hover:bg-neutral-700 text-neutral-400 hover:text-white transition"
@@ -1070,7 +1097,7 @@ export function MusicBrowser({
                         </div>
                       </article>
                       {isOpen && (
-                        <div className="col-span-full rounded-2xl bg-[#1a1a1a] p-5 border border-neutral-800 space-y-4">
+                        <div ref={artistPanelRef} className="col-span-full scroll-mt-24 rounded-2xl bg-[#1a1a1a] p-5 border border-neutral-800 space-y-4">
                           <div className="flex items-center justify-between">
                             <h4 className="text-lg font-bold text-white">{group.artist}</h4>
                             <button
@@ -1241,7 +1268,7 @@ export function MusicBrowser({
 
         {/* Selected Playlist Detail View */}
         {category === 'playlists' && selectedPlaylist && (
-          <section className="rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
+          <section ref={playlistPanelRef} className="scroll-mt-24 rounded-2xl bg-gradient-to-b from-[#282828] to-[#181818] p-6 border border-neutral-800 shadow-2xl relative">
             <button
               onClick={() => setSelectedPlaylist(null)}
               className="absolute top-4 right-4 p-2 rounded-full bg-black/40 hover:bg-neutral-700 text-neutral-400 hover:text-white transition"

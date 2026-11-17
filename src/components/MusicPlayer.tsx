@@ -30,8 +30,15 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
   const [isPlaying, setIsPlaying] = useState(true);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
-  const [volume, setVolume] = useState(0.8);
-  const [isMuted, setIsMuted] = useState(false);
+  const [volume, setVolume] = useState(() => {
+    if (typeof window === 'undefined') return 0.8;
+    const saved = Number(window.localStorage.getItem('homestream.music.volume'));
+    return Number.isFinite(saved) && saved >= 0 && saved <= 1 ? saved : 0.8;
+  });
+  const [isMuted, setIsMuted] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('homestream.music.muted') === 'true';
+  });
   const [isShuffle, setIsShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
   const [error, setError] = useState('');
@@ -54,9 +61,16 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
 
   useEffect(() => {
     if (audioRef.current) {
+      audioRef.current.muted = isMuted;
       audioRef.current.volume = isMuted ? 0 : volume;
     }
-  }, [volume, isMuted]);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem('homestream.music.volume', String(volume));
+        window.localStorage.setItem('homestream.music.muted', String(isMuted));
+      } catch {}
+    }
+  }, [volume, isMuted, track?.id]);
 
   const togglePlayPause = () => {
     if (!audioRef.current) return;
