@@ -122,8 +122,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [syncRoomCode, setSyncRoomCode] = useState('');
   const [syncJoinCode, setSyncJoinCode] = useState('');
   const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
-  const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'settings' | null>(null);
-  const [settingsSubView, setSettingsSubView] = useState<'main' | 'syncplay'>('main');
+  const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'syncplay' | 'settings' | null>(null);
 
   const isItemDownloading = Boolean(
     isDownloading ||
@@ -1306,7 +1305,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       if (e.key === 'f') toggleFullscreen();
       if (e.key === 'm') toggleMute();
       if (e.key === 'c' || e.key === 'C') {
-        setSettingsSubView('main');
         setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'));
       }
     };
@@ -1681,7 +1679,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80 px-1">
               <button
                 onClick={() => {
-                  setSettingsSubView('main');
                   setActiveMenu('subtitles');
                 }}
                 className={`flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
@@ -1932,14 +1929,24 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               {currentTitle}
             </div>
 
-            {/* Right: Audio, Subtitles, Settings, Next Episode (Series), Fullscreen */}
+            {/* Right: SyncPlay, Audio, Subtitles, Settings, Next Episode (Series), Fullscreen */}
             <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 relative shrink-0">
+              {/* SyncPlay Button */}
+              <button
+                onClick={() => setActiveMenu((prev) => (prev === 'syncplay' ? null : 'syncplay'))}
+                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 flex items-center gap-1 ${
+                  syncRoomCode ? 'text-emerald-400' : 'text-neutral-300 hover:text-white'
+                }`}
+                title="SyncPlay (Watch Together)"
+                aria-label="SyncPlay"
+              >
+                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                {syncRoomCode && <span className="text-[11px] font-mono">{syncRoomCode}</span>}
+              </button>
+
               {/* Audio Button */}
               <button
-                onClick={() => {
-                  setSettingsSubView('main');
-                  setActiveMenu((prev) => (prev === 'audio' ? null : 'audio'));
-                }}
+                onClick={() => setActiveMenu((prev) => (prev === 'audio' ? null : 'audio'))}
                 className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
                   selectedAudioIndex !== undefined ? 'text-red-500' : 'text-neutral-300 hover:text-white'
                 }`}
@@ -1951,10 +1958,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
               {/* Subtitles Button */}
               <button
-                onClick={() => {
-                  setSettingsSubView('main');
-                  setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'));
-                }}
+                onClick={() => setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'))}
                 className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
                   selectedSubtitleId ? 'text-red-500' : 'text-neutral-300 hover:text-white'
                 }`}
@@ -1964,14 +1968,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 <Subtitles className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
-              {/* Settings Button (Quality, Video Version, SyncPlay, Cast, Restart, Playback Info) */}
+              {/* Settings Button (Quality, Video Version, Cast, Restart, Playback Info) */}
               <button
-                onClick={() => {
-                  setSettingsSubView('main');
-                  setActiveMenu((prev) => (prev === 'settings' ? null : 'settings'));
-                }}
+                onClick={() => setActiveMenu((prev) => (prev === 'settings' ? null : 'settings'))}
                 className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 relative ${
-                  activeMenu === 'settings' || syncRoomCode || isCasting
+                  activeMenu === 'settings' || isCasting
                     ? 'text-white'
                     : 'text-neutral-300 hover:text-white'
                 }`}
@@ -1979,14 +1980,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 aria-label="Settings"
               >
                 <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-                {(syncRoomCode || isCasting || isCastConnecting) && (
+                {(isCasting || isCastConnecting) && (
                   <span
                     className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-full ${
                       isCasting
                         ? 'bg-red-500'
-                        : isCastConnecting
-                        ? 'bg-amber-400 animate-pulse'
-                        : 'bg-emerald-400'
+                        : 'bg-amber-400 animate-pulse'
                     }`}
                   />
                 )}
@@ -2195,6 +2194,140 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         </div>
       )}
 
+      {activeMenu === 'syncplay' && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setActiveMenu(null)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-fade-in shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="SyncPlay"
+          >
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div className="flex items-center space-x-2 text-white font-bold text-base">
+                <Users size={18} className="text-emerald-400" />
+                <span>SyncPlay (Watch Together)</span>
+              </div>
+              <button
+                onClick={() => setActiveMenu(null)}
+                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                aria-label="Close SyncPlay"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {syncRoomCode ? (
+              <div className="space-y-3 text-xs">
+                <div className="bg-black/60 border border-neutral-700 rounded-lg p-3 flex items-center justify-between">
+                  <span className="text-neutral-400">Room Code</span>
+                  <span className="font-mono font-bold text-emerald-400 text-sm">{syncRoomCode}</span>
+                </div>
+                <div className="text-neutral-400">
+                  Participants ({syncParticipants.length}): {syncParticipants.map((p) => p.name).join(', ')}
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() =>
+                      void apiFetch('/api/syncplay', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'sync',
+                          code: syncRoomCode,
+                          itemId: activePlayableId || item.id,
+                          isPaused: !isPlaying,
+                          positionTicks: Math.round(currentTime * 10_000_000),
+                        }),
+                      })
+                    }
+                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg"
+                  >
+                    Push Sync
+                  </button>
+                  <button
+                    onClick={() => {
+                      void apiFetch('/api/syncplay', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'leave', code: syncRoomCode }),
+                      });
+                      setSyncRoomCode('');
+                      setSyncParticipants([]);
+                    }}
+                    className="px-4 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 py-2 rounded-lg"
+                  >
+                    Leave
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-3 text-xs">
+                <button
+                  onClick={async () => {
+                    const res = await apiFetch('/api/syncplay', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({
+                        action: 'create',
+                        itemId: activePlayableId || item.id,
+                        title: currentTitle,
+                        isPaused: !isPlaying,
+                        positionTicks: Math.round(currentTime * 10_000_000),
+                      }),
+                    });
+                    const d = await res.json().catch(() => ({}));
+                    if (d.room?.code) {
+                      setSyncRoomCode(d.room.code);
+                      setSyncParticipants(d.room.participants || []);
+                    }
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg"
+                >
+                  Create SyncPlay Room
+                </button>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={syncJoinCode}
+                    onChange={(e) => setSyncJoinCode(e.target.value.toUpperCase())}
+                    placeholder="Enter room code"
+                    className="flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 font-mono text-white"
+                  />
+                  <button
+                    onClick={async () => {
+                      if (!syncJoinCode.trim()) return;
+                      const res = await apiFetch('/api/syncplay', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          action: 'join',
+                          code: syncJoinCode.trim(),
+                          itemId: activePlayableId || item.id,
+                        }),
+                      });
+                      const d = await res.json().catch(() => ({}));
+                      if (res.ok && d.room?.code) {
+                        setSyncRoomCode(d.room.code);
+                        setSyncParticipants(d.room.participants || []);
+                        setSyncJoinCode('');
+                      } else if (d?.error) {
+                        alert(d.error);
+                      }
+                    }}
+                    className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-4 py-2 rounded-lg"
+                  >
+                    Join
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {activeMenu === 'settings' && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
@@ -2206,257 +2339,113 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             role="dialog"
             aria-label="Player settings"
           >
-            {settingsSubView === 'syncplay' ? (
-              <>
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-                  <div className="flex items-center space-x-2 text-white font-bold text-base">
-                    <button
-                      onClick={() => setSettingsSubView('main')}
-                      className="p-1 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-                      aria-label="Back to settings"
-                    >
-                      <ArrowLeft size={16} />
-                    </button>
-                    <Users size={18} className="text-emerald-400" />
-                    <span>SyncPlay (Watch Together)</span>
-                  </div>
-                  <button
-                    onClick={() => setActiveMenu(null)}
-                    className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-                    aria-label="Close settings"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div className="flex items-center space-x-2 text-white font-bold text-base">
+                <Settings size={18} className="text-red-500" />
+                <span>Settings</span>
+              </div>
+              <button
+                onClick={() => setActiveMenu(null)}
+                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                aria-label="Close settings"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
-                {syncRoomCode ? (
-                  <div className="space-y-3 text-xs">
-                    <div className="bg-black/60 border border-neutral-700 rounded-lg p-3 flex items-center justify-between">
-                      <span className="text-neutral-400">Room Code</span>
-                      <span className="font-mono font-bold text-emerald-400 text-sm">{syncRoomCode}</span>
-                    </div>
-                    <div className="text-neutral-400">
-                      Participants ({syncParticipants.length}): {syncParticipants.map((p) => p.name).join(', ')}
-                    </div>
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() =>
-                          void apiFetch('/api/syncplay', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              action: 'sync',
-                              code: syncRoomCode,
-                              itemId: activePlayableId || item.id,
-                              isPaused: !isPlaying,
-                              positionTicks: Math.round(currentTime * 10_000_000),
-                            }),
-                          })
-                        }
-                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg"
-                      >
-                        Push Sync
-                      </button>
-                      <button
-                        onClick={() => {
-                          void apiFetch('/api/syncplay', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ action: 'leave', code: syncRoomCode }),
-                          });
-                          setSyncRoomCode('');
-                          setSyncParticipants([]);
-                        }}
-                        className="px-4 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 py-2 rounded-lg"
-                      >
-                        Leave
-                      </button>
-                    </div>
-                  </div>
-                ) : (
-                  <div className="space-y-3 text-xs">
-                    <button
-                      onClick={async () => {
-                        const res = await apiFetch('/api/syncplay', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({
-                            action: 'create',
-                            itemId: activePlayableId || item.id,
-                            title: currentTitle,
-                            isPaused: !isPlaying,
-                            positionTicks: Math.round(currentTime * 10_000_000),
-                          }),
-                        });
-                        const d = await res.json().catch(() => ({}));
-                        if (d.room?.code) {
-                          setSyncRoomCode(d.room.code);
-                          setSyncParticipants(d.room.participants || []);
-                        }
-                      }}
-                      className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg"
-                    >
-                      Create SyncPlay Room
-                    </button>
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={syncJoinCode}
-                        onChange={(e) => setSyncJoinCode(e.target.value.toUpperCase())}
-                        placeholder="Enter room code"
-                        className="flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 font-mono text-white"
-                      />
-                      <button
-                        onClick={async () => {
-                          if (!syncJoinCode.trim()) return;
-                          const res = await apiFetch('/api/syncplay', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({
-                              action: 'join',
-                              code: syncJoinCode.trim(),
-                              itemId: activePlayableId || item.id,
-                            }),
-                          });
-                          const d = await res.json().catch(() => ({}));
-                          if (res.ok && d.room?.code) {
-                            setSyncRoomCode(d.room.code);
-                            setSyncParticipants(d.room.participants || []);
-                            setSyncJoinCode('');
-                          } else if (d?.error) {
-                            alert(d.error);
-                          }
-                        }}
-                        className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-4 py-2 rounded-lg"
-                      >
-                        Join
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-                  <div className="flex items-center space-x-2 text-white font-bold text-base">
-                    <Settings size={18} className="text-red-500" />
-                    <span>Settings</span>
-                  </div>
+            {/* Quality */}
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                Quality
+              </div>
+              <div className="grid grid-cols-4 gap-1.5">
+                {(['auto', 'original', '1080p', '720p'] as QualityMode[]).map((mode) => (
                   <button
-                    onClick={() => setActiveMenu(null)}
-                    className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-                    aria-label="Close settings"
+                    key={mode}
+                    onClick={() => {
+                      const cur = currentTimeRef.current;
+                      if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                      setHasTriedFallbackTranscode(false);
+                      setQualityMode(mode);
+                    }}
+                    className={`px-2.5 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
+                      qualityMode === mode
+                        ? 'bg-red-600/20 text-red-400 border-red-600/40'
+                        : 'bg-neutral-800/70 text-neutral-300 hover:bg-neutral-800 border-transparent'
+                    }`}
                   >
-                    <X size={18} />
+                    {mode === 'auto' ? 'Auto' : mode === 'original' ? 'Original' : mode}
                   </button>
-                </div>
+                ))}
+              </div>
+            </div>
 
-                {/* Quality */}
-                <div className="space-y-2">
-                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                    Quality
-                  </div>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {(['auto', 'original', '1080p', '720p'] as QualityMode[]).map((mode) => (
+            {/* Video Version */}
+            {versions.length > 1 && (
+              <div className="space-y-2">
+                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                  Video Version
+                </div>
+                <div className="space-y-1.5">
+                  {versions.map((v) => {
+                    const isSelected = (selectedVersionId || versions[0]?.id || '') === v.id;
+                    return (
                       <button
-                        key={mode}
+                        key={v.id}
                         onClick={() => {
                           const cur = currentTimeRef.current;
                           if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
                           setHasTriedFallbackTranscode(false);
-                          setQualityMode(mode);
+                          setSelectedAudioIndex(undefined);
+                          setSelectedVersionId(v.id);
                         }}
-                        className={`px-2.5 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
-                          qualityMode === mode
-                            ? 'bg-red-600/20 text-red-400 border-red-600/40'
-                            : 'bg-neutral-800/70 text-neutral-300 hover:bg-neutral-800 border-transparent'
+                        className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors border ${
+                          isSelected
+                            ? 'bg-red-600/20 text-red-400 font-semibold border-red-600/40'
+                            : 'text-neutral-300 hover:bg-neutral-800 border-transparent'
                         }`}
                       >
-                        {mode === 'auto' ? 'Auto' : mode === 'original' ? 'Original' : mode}
+                        <span className="truncate pr-2">{v.label}</span>
+                        {isSelected && <Check size={16} />}
                       </button>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
+              </div>
+            )}
 
-                {/* Video Version */}
-                {versions.length > 1 && (
-                  <div className="space-y-2">
-                    <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                      Video Version
-                    </div>
-                    <div className="space-y-1.5">
-                      {versions.map((v) => {
-                        const isSelected = (selectedVersionId || versions[0]?.id || '') === v.id;
-                        return (
-                          <button
-                            key={v.id}
-                            onClick={() => {
-                              const cur = currentTimeRef.current;
-                              if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
-                              setHasTriedFallbackTranscode(false);
-                              setSelectedAudioIndex(undefined);
-                              setSelectedVersionId(v.id);
-                            }}
-                            className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors border ${
-                              isSelected
-                                ? 'bg-red-600/20 text-red-400 font-semibold border-red-600/40'
-                                : 'text-neutral-300 hover:bg-neutral-800 border-transparent'
-                            }`}
-                          >
-                            <span className="truncate pr-2">{v.label}</span>
-                            {isSelected && <Check size={16} />}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* Other Controls: SyncPlay, Cast, Restart */}
-                <div className="space-y-1.5 pt-1 border-t border-neutral-800">
-                  <button
-                    onClick={() => setSettingsSubView('syncplay')}
-                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <Users size={16} className={syncRoomCode ? 'text-emerald-400' : 'text-neutral-400'} />
-                      <span>SyncPlay (Watch Together)</span>
-                    </span>
-                    <span className={`text-xs font-mono ${syncRoomCode ? 'text-emerald-400' : 'text-neutral-500'}`}>
-                      {syncRoomCode || 'Off'}
-                    </span>
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      handleCastClick();
-                      setActiveMenu(null);
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <Cast
-                        size={16}
-                        className={
-                          isCasting
-                            ? 'text-red-500'
-                            : isCastConnecting
-                            ? 'text-amber-400 animate-pulse'
-                            : 'text-neutral-400'
-                        }
-                      />
-                      <span>
-                        {isCasting
-                          ? `Casting to ${castDeviceName || 'Chromecast'}`
-                          : isCastConnecting
-                          ? 'Connecting to Chromecast...'
-                          : 'Cast to Chromecast'}
-                      </span>
-                    </span>
-                    <span className="text-xs text-neutral-500">
-                      {isCasting ? 'Disconnect' : isCastAvailable ? 'Ready' : ''}
-                    </span>
-                  </button>
+            {/* Other Controls: Cast, Restart */}
+            <div className="space-y-1.5 pt-1 border-t border-neutral-800">
+              <button
+                onClick={() => {
+                  handleCastClick();
+                  setActiveMenu(null);
+                }}
+                className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Cast
+                    size={16}
+                    className={
+                      isCasting
+                        ? 'text-red-500'
+                        : isCastConnecting
+                        ? 'text-amber-400 animate-pulse'
+                        : 'text-neutral-400'
+                    }
+                  />
+                  <span>
+                    {isCasting
+                      ? `Casting to ${castDeviceName || 'Chromecast'}`
+                      : isCastConnecting
+                      ? 'Connecting to Chromecast...'
+                      : 'Cast to Chromecast'}
+                  </span>
+                </span>
+                <span className="text-xs text-neutral-500">
+                  {isCasting ? 'Disconnect' : isCastAvailable ? 'Ready' : ''}
+                </span>
+              </button>
 
                   <button
                     onClick={() => {
@@ -2492,8 +2481,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                     )}
                   </div>
                 )}
-              </>
-            )}
           </div>
         </div>
       )}
