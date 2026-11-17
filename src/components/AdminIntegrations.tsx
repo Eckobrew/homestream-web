@@ -327,7 +327,22 @@ export function AdminIntegrations({
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sec = new URLSearchParams(window.location.search).get('section') as AdminTab | null;
+    if (sec && ['modules', 'libraries', 'playback', 'maintenance', 'downloads', 'system'].includes(sec)) {
+      setTab(sec);
+    }
+  }, []);
+
+  useEffect(() => {
     onTabChange?.(tab);
+    if (typeof window !== 'undefined' && window.location.pathname === '/admin') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('section') !== tab) {
+        url.searchParams.set('section', tab);
+        window.history.replaceState(null, '', url.toString());
+      }
+    }
   }, [tab, onTabChange]);
   const [moduleFilter, setModuleFilter] = useState<'all' | 'configured' | 'disconnected'>('all');
   const [moduleCategory, setModuleCategory] = useState<'all' | 'media' | 'requests' | 'music_books' | 'downloaders'>('all');

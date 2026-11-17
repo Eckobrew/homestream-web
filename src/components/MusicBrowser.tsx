@@ -68,7 +68,22 @@ export function MusicBrowser({
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sec = new URLSearchParams(window.location.search).get('section');
+    if (sec && ['albums', 'artists', 'songs', 'playlists'].includes(sec)) {
+      setCategory(sec as 'albums' | 'artists' | 'songs' | 'playlists');
+    }
+  }, []);
+
+  useEffect(() => {
     onTabChange?.(category);
+    if (typeof window !== 'undefined' && window.location.pathname === '/music') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('section') !== category) {
+        url.searchParams.set('section', category);
+        window.history.replaceState(null, '', url.toString());
+      }
+    }
   }, [category, onTabChange]);
   const [librarySongs, setLibrarySongs] = useState<MusicTrack[]>([]);
   const [songsLoading, setSongsLoading] = useState(false);

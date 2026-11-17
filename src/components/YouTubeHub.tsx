@@ -141,7 +141,22 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
   }, [activeTab]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const sec = new URLSearchParams(window.location.search).get('section');
+    if (sec && ['home', 'search', 'subscriptions', 'queue', 'archive'].includes(sec)) {
+      setCurrentView(sec as 'home' | 'search' | 'subscriptions' | 'queue' | 'archive');
+    }
+  }, []);
+
+  useEffect(() => {
     onTabChange?.(currentView);
+    if (typeof window !== 'undefined' && window.location.pathname === '/youtube') {
+      const url = new URL(window.location.href);
+      if (url.searchParams.get('section') !== currentView) {
+        url.searchParams.set('section', currentView);
+        window.history.replaceState(null, '', url.toString());
+      }
+    }
   }, [currentView, onTabChange]);
 
   // Home / Discovery State
