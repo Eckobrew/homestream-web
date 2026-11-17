@@ -52,6 +52,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
   const [isLoadingRecs, setIsLoadingRecs] = useState(false);
   const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
+  const [creatingCol, setCreatingCol] = useState(false);
+  const [newColName, setNewColName] = useState('');
   const [seriesOverride, setSeriesOverride] = useState<{ audioLang?: string; subtitleLang?: string; subtitleMode?: string }>({});
 
   useEffect(() => {
@@ -511,19 +513,77 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 </>
               )}
 
-              {collections.length > 0 && (
+              {creatingCol ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    placeholder="Collection name"
+                    value={newColName}
+                    onChange={(e) => setNewColName(e.target.value)}
+                    className="bg-neutral-900 border border-neutral-700 text-xs text-white rounded px-2.5 py-1.5 w-36"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const trimmed = newColName.trim();
+                      if (!trimmed) return;
+                      const res = await apiFetch('/api/collections', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmed }),
+                      });
+                      if (res.ok) {
+                        const d = await res.json();
+                        if (d?.collection?.id) {
+                          const addRes = await apiFetch('/api/collections', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'addItem', collectionId: d.collection.id, itemId: currentItem.id }),
+                          });
+                          if (addRes.ok) {
+                            const addData = await addRes.json();
+                            if (Array.isArray(addData?.collections)) setCollections(addData.collections);
+                          }
+                        }
+                      }
+                      setNewColName('');
+                      setCreatingCol(false);
+                    }}
+                    className="px-2.5 py-1.5 rounded bg-red-600 hover:bg-red-700 text-xs font-semibold text-white"
+                  >
+                    Create
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setCreatingCol(false); setNewColName(''); }}
+                    className="px-2 py-1.5 rounded bg-neutral-800 text-xs text-neutral-300"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
                 <select
                   aria-label="Add to Collection"
                   defaultValue=""
                   onChange={async (e) => {
                     const colId = e.target.value;
+                    e.target.value = '';
                     if (!colId) return;
-                    await apiFetch('/api/collections', {
+                    if (colId === '__new__') {
+                      setCreatingCol(true);
+                      return;
+                    }
+                    const existing = collections.find((c) => c.id === colId);
+                    const action = existing?.itemIds.includes(currentItem.id) ? 'removeItem' : 'addItem';
+                    const res = await apiFetch('/api/collections', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'addItem', collectionId: colId, itemId: currentItem.id }),
-                    }).catch(() => {});
-                    e.target.value = '';
+                      body: JSON.stringify({ action, collectionId: colId, itemId: currentItem.id }),
+                    }).catch(() => null);
+                    if (res?.ok) {
+                      const d = await res.json();
+                      if (Array.isArray(d?.collections)) setCollections(d.collections);
+                    }
                   }}
                   className="bg-neutral-900/90 border border-neutral-700 text-xs text-neutral-200 rounded px-2.5 py-1.5"
                 >
@@ -533,6 +593,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                       {c.itemIds.includes(currentItem.id) ? `✓ ${c.name}` : c.name}
                     </option>
                   ))}
+                  <option value="__new__">+ New Collection…</option>
                 </select>
               )}
 

@@ -56,7 +56,7 @@ test('native settings list only hardware modes confirmed by the backend', async 
   } }));
   const openHardwareSettings = async () => {
     await page.goto('/admin');
-    await page.getByRole('button', { name: 'Media Management' }).last().click();
+    await page.getByRole('button', { name: 'Playback' }).last().click();
     return page.getByRole('combobox', { name: 'Hardware Acceleration' });
   };
   const detected = await openHardwareSettings();

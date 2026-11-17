@@ -68,6 +68,18 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'playback' | 'maintenance' | 'downloads' | 'system'>(
     initialTab === 'downloads' ? 'downloads' : 'modules'
   );
+  const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
+  const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
+  const [newCollectionName, setNewCollectionName] = useState('');
+
+  const loadCollections = useCallback(() => {
+    apiFetch('/api/collections')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.collections)) setCollections(d.collections);
+      })
+      .catch(() => {});
+  }, []);
 
   // Netflix-style Category Rows for Movies and TV Shows Pages
   const [movieCategories, setMovieCategories] = useState<MediaRowSection[]>([]);
@@ -76,6 +88,9 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
 
   // Modals & Overlays
   const [modalItem, setModalItem] = useState<MediaItem | null>(null);
+  useEffect(() => {
+    loadCollections();
+  }, [activeProfile?.id, modalItem, loadCollections]);
   const [playingState, setPlayingState] = useState<{ item: MediaItem; episode?: Episode } | null>(null);
   const [requestItem, setRequestItem] = useState<MediaItem | null>(null);
   const [requestTarget, setRequestTarget] = useState<{
@@ -733,6 +748,93 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
                 onRequest={handleRequest}
               />
             ))}
+
+            {/* Custom Collections Browser */}
+            <div className="px-4 md:px-12 pt-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-lg font-bold text-white">Collections</h2>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    placeholder="New collection name"
+                    value={newCollectionName}
+                    onChange={(e) => setNewCollectionName(e.target.value)}
+                    className="bg-neutral-900 border border-neutral-800 rounded-lg px-3 py-1.5 text-xs text-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const trimmed = newCollectionName.trim();
+                      if (!trimmed) return;
+                      const res = await apiFetch('/api/collections', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ name: trimmed }),
+                      });
+                      if (res.ok) {
+                        const d = await res.json();
+                        if (Array.isArray(d?.collections)) setCollections(d.collections);
+                        if (d?.collection?.id) setSelectedCollectionId(d.collection.id);
+                        setNewCollectionName('');
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-semibold text-white"
+                  >
+                    + Create Collection
+                  </button>
+                </div>
+              </div>
+              {collections.length > 0 && (
+                <div className="flex flex-wrap items-center gap-2">
+                  {collections.map((col) => (
+                    <div key={col.id} className="flex items-center gap-1 rounded-full border border-neutral-800 bg-neutral-900/80 px-3 py-1 text-xs">
+                      <button
+                        type="button"
+                        onClick={() => setSelectedCollectionId(selectedCollectionId === col.id ? null : col.id)}
+                        className={`font-semibold ${selectedCollectionId === col.id ? 'text-red-400' : 'text-neutral-200 hover:text-white'}`}
+                      >
+                        {col.name} ({col.itemIds.length})
+                      </button>
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          const res = await apiFetch(`/api/collections?id=${encodeURIComponent(col.id)}`, { method: 'DELETE' });
+                          if (res.ok) {
+                            const d = await res.json();
+                            if (Array.isArray(d?.collections)) setCollections(d.collections);
+                            if (selectedCollectionId === col.id) setSelectedCollectionId(null);
+                          }
+                        }}
+                        className="ml-1 text-neutral-500 hover:text-red-400"
+                        title={`Delete ${col.name}`}
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {selectedCollectionId && (() => {
+                const activeCol = collections.find((c) => c.id === selectedCollectionId);
+                if (!activeCol) return null;
+                const allItemsMap = new Map<string, MediaItem>();
+                for (const s of displayedSections) {
+                  for (const it of s.items) allItemsMap.set(it.id, it);
+                }
+                const colItems = activeCol.itemIds.map((id) => allItemsMap.get(id)).filter((it): it is MediaItem => Boolean(it));
+                return colItems.length > 0 ? (
+                  <MediaRow
+                    title={activeCol.name}
+                    items={colItems}
+                    onPlay={handlePlay}
+                    onOpenModal={handleOpenModal}
+                    onRequest={handleRequest}
+                  />
+                ) : (
+                  <p className="text-xs text-neutral-500">No items in &ldquo;{activeCol.name}&rdquo; yet. Open any title and use + Collection.</p>
+                );
+              })()}
+            </div>
           </div>
 
           {/* Footer */}
