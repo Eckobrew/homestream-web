@@ -139,3 +139,36 @@ test('version changes preserve position and use their own subtitles, trickplay a
   await page.getByRole('button', { name: 'Skip Credits' }).click();
   await expect.poll(videoTime).toBeGreaterThanOrEqual(55);
 });
+
+for (const width of [1280, 3840]) {
+  test(`TV browser negotiates dynamic ${width}px decoder limits and preserves them on fallback`, async ({ page }) => {
+    await fixture(page);
+    await page.addInitScript(maxWidth => {
+      Object.defineProperty(navigator, 'mediaCapabilities', { value: {
+        decodingInfo: async (config: { video: { width: number; contentType: string } }) => ({
+          supported: config.video.width <= maxWidth && /avc1|vp8/.test(config.video.contentType),
+          smooth: true, powerEfficient: true,
+        }),
+      } });
+    }, width);
+    const requests: URLSearchParams[] = [];
+    page.on('request', request => {
+      const url = new URL(request.url());
+      if (url.pathname === '/api/v1/playback') requests.push(url.searchParams);
+    });
+    await page.goto('/tv/watch/series');
+    await expect.poll(() => requests.length).toBeGreaterThan(0);
+    const query = requests[0];
+    expect(query.get('receiver')).toBe('browser');
+    const profiles = JSON.parse(query.get('videoCapabilities') || '[]');
+    expect(profiles.length).toBeGreaterThan(0);
+    expect(profiles.every((p: { width: number }) => p.width === width)).toBe(true);
+    expect(query.get('videoCodecs')).not.toContain('hevc');
+    await expect.poll(() => page.locator('#tv-video').evaluate(video => (video as HTMLVideoElement).currentTime)).toBeGreaterThan(0);
+    await page.locator('#tv-video').evaluate(video => video.dispatchEvent(new Event('error')));
+    await expect.poll(() => requests.some(q => q.get('forceTranscode') === 'true')).toBe(true);
+    const fallback = requests.find(q => q.get('forceTranscode') === 'true')!;
+    expect(fallback.get('receiver')).toBe('browser');
+    expect(fallback.get('videoCapabilities')).toBe(query.get('videoCapabilities'));
+  });
+}

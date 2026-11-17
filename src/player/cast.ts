@@ -16,19 +16,23 @@ type CapabilitySession = {
   sendMessage(namespace: string, message: object): Promise<unknown>;
 };
 
-export function requestCastCapabilities(session: CapabilitySession): Promise<string | undefined> {
+export function requestCastCapabilities(session: CapabilitySession): Promise<{ video: string; audioCodecs?: string } | undefined> {
   return new Promise(resolve => {
     const requestId = crypto.randomUUID();
-    const finish = (video?: string) => {
+    const finish = (capabilities?: { video: string; audioCodecs?: string }) => {
       clearTimeout(timer);
       try { session.removeMessageListener(CAST_NAMESPACE, receive); } catch { /* Session already ended. */ }
-      resolve(video);
+      resolve(capabilities);
     };
     function receive(_namespace: string, message: string) {
       try {
         const data = JSON.parse(message);
         if (data.type === 'capabilities' && data.requestId === requestId && Array.isArray(data.video)) {
-          finish(data.video.length <= 5 ? JSON.stringify(data.video) : undefined);
+          finish(data.video.length > 0 && data.video.length <= 5 ? {
+            video: JSON.stringify(data.video),
+            audioCodecs: Array.isArray(data.audio) && data.audio.length <= 8
+              ? data.audio.filter((codec: unknown) => ['aac', 'mp3', 'opus', 'vorbis', 'flac', 'ac3', 'eac3'].includes(String(codec))).join(',') : undefined,
+          } : undefined);
         }
       } catch { /* Ignore unrelated receiver messages. */ }
     }

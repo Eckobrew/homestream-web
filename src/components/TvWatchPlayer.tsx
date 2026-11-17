@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
+import { browserDecoderParameters } from '@/lib/playback-capabilities';
 import type { SkipSegment } from '@/player/transport';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 
@@ -25,6 +26,7 @@ interface TrickplayCue {
 
 interface TvWatchPlayerProps {
   itemId: string;
+  playbackExtra?: Record<string, string | number | undefined>;
   streamSrc: string;
   contentType?: string;
   isHls: boolean;
@@ -49,18 +51,25 @@ function parseVttTimestamp(ts: string): number {
 export function TvWatchPlayer({
   itemId,
   streamSrc,
-  contentType,
   isHls,
   poster,
   subtitles,
-  skipSegments = [],
-  trickplayUrl,
-  selectedVersionId,
-  durationSeconds = 0,
+  skipSegments: initialSkipSegments = [],
+  trickplayUrl: initialTrickplayUrl,
+  selectedVersionId: initialVersionId,
+  durationSeconds: initialDuration = 0,
   nextEpUrl,
   resumeSeconds,
   isYouTube,
+  playbackExtra,
 }: TvWatchPlayerProps) {
+  const [skipSegments, setSkipSegments] = useState(initialSkipSegments);
+  const [trickplayUrl, setTrickplayUrl] = useState(initialTrickplayUrl);
+  const [selectedVersionId, setSelectedVersionId] = useState(initialVersionId);
+  const [durationSeconds, setDurationSeconds] = useState(initialDuration);
+  const [playbackError, setPlaybackError] = useState('');
+  const [fallback, setFallback] = useState(false);
+  const decoderQuery = useRef<URLSearchParams | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const logicalOffsetRef = useRef(0);
@@ -111,6 +120,41 @@ export function TvWatchPlayer({
     logicalOffsetRef.current = 0;
     pendingSeekRef.current = null;
   }, [streamSrc, isHls]);
+
+  useEffect(() => {
+    if (isYouTube) return;
+    const controller = new AbortController();
+    setPlaybackError('');
+    void (async () => {
+      const video = videoRef.current;
+      if (!video) return;
+      const query = await browserDecoderParameters(type => video.canPlayType(type),
+        navigator.mediaCapabilities?.decodingInfo.bind(navigator.mediaCapabilities));
+      if (controller.signal.aborted) return;
+      decoderQuery.current = query;
+      query.set('itemId', itemId);
+      for (const [key, value] of Object.entries(playbackExtra || {})) {
+        if (value !== undefined) query.set(key, String(value));
+      }
+      if (fallback) query.set('forceTranscode', 'true');
+      if (resumeSeconds > 0) query.set('startTimeTicks', String(Math.floor(resumeSeconds * 10000000)));
+      const response = await fetch(`/api/v1/playback?${query}`, { signal: controller.signal });
+      const data = await response.json();
+      if (!response.ok || !data.streamUrl) throw new Error(data.error || 'Playback is unavailable');
+      if (controller.signal.aborted) return;
+      const url = String(data.streamUrl).replace(/^\/api\/native\//, '/api/v1/native/');
+      const hls = data.transport === 'HLS' || /mpegurl/i.test(data.contentType || '') || url.includes('.m3u8');
+      logicalOffsetRef.current = hls ? Number(data.startTimeTicks || 0) / 10000000 : 0;
+      pendingSeekRef.current = Math.max(0, resumeSeconds - logicalOffsetRef.current);
+      setSkipSegments(data.skipSegments || []);
+      setTrickplayUrl(data.trickplayUrl);
+      setSelectedVersionId(data.selectedVersionId);
+      setDurationSeconds(data.durationSeconds || 0);
+      setActiveIsHls(hls);
+      setActiveStreamSrc(url);
+    })().catch(error => { if (!controller.signal.aborted) setPlaybackError(error.message || 'Playback is unavailable'); });
+    return () => controller.abort();
+  }, [itemId, isYouTube, playbackExtra, resumeSeconds, fallback]);
 
   useEffect(() => {
     setTrickplayCues([]);
@@ -173,12 +217,10 @@ export function TvWatchPlayer({
 
     // Out-of-range HLS seek (e.g. jumping to credits end): renegotiate at startTimeTicks with native-tv receiver
     try {
-      const q = new URLSearchParams({
-        itemId,
-        receiver: 'native-tv',
-        forceTranscode: 'true',
-        startTimeTicks: String(Math.floor(clamped * 10_000_000)),
-      });
+      const q = new URLSearchParams(decoderQuery.current || { receiver: 'browser' });
+      q.set('itemId', itemId);
+      if (fallback) q.set('forceTranscode', 'true');
+      q.set('startTimeTicks', String(Math.floor(clamped * 10_000_000)));
       if (selectedVersionId) q.set('versionId', selectedVersionId);
       const res = await fetch(`/api/v1/playback?${q}`);
       if (!res.ok) return;
@@ -202,11 +244,11 @@ export function TvWatchPlayer({
         setActiveStreamSrc(nextUrl);
       }
     } catch {}
-  }, [activeIsHls, durationSeconds, isYouTube, itemId, selectedVersionId]);
+  }, [activeIsHls, durationSeconds, isYouTube, itemId, selectedVersionId, fallback]);
 
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || !activeStreamSrc) return;
 
     let hls: Hls | null = null;
     let lastReport = 0;
@@ -262,6 +304,7 @@ export function TvWatchPlayer({
       hls.loadSource(activeStreamSrc);
       hls.attachMedia(video);
       hls.on(Hls.Events.MANIFEST_PARSED, startPlayback);
+      hls.on(Hls.Events.ERROR, (_event, data) => { if (data.fatal) { if (!fallback) setFallback(true); else setPlaybackError('Playback could not start on this device.'); } });
     } else {
       hlsRef.current = null;
       video.src = activeStreamSrc;
@@ -338,7 +381,7 @@ export function TvWatchPlayer({
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
       if (hls) hls.destroy();
     };
-  }, [activeIsHls, activeStreamSrc, durationSeconds, isYouTube, itemId, nextEpUrl, resumeSeconds, skipSegments]);
+  }, [activeIsHls, activeStreamSrc, durationSeconds, isYouTube, itemId, nextEpUrl, resumeSeconds, skipSegments, fallback]);
 
   useSessionHeartbeat({
     active: true,
@@ -400,7 +443,9 @@ export function TvWatchPlayer({
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {playbackError && <p role="alert">{playbackError}</p>}
       <video
+        onError={() => { if (!isYouTube && !fallback) setFallback(true); else setPlaybackError('Playback could not start on this device.'); }}
         ref={videoRef}
         id="tv-video"
         controls
@@ -410,9 +455,6 @@ export function TvWatchPlayer({
         poster={poster || ''}
         style={{ width: '100%', height: '100%', backgroundColor: '#000000' }}
       >
-        {!activeIsHls && (
-          <source src={activeStreamSrc} type={contentType || 'video/mp4'} />
-        )}
         {subtitles.filter((sub) => !sub.burnIn && sub.src).map((sub, i) => (
           <track
             key={sub.id || i}

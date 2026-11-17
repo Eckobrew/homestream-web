@@ -202,30 +202,6 @@ export async function fetchTvMedia(id: string): Promise<any | null> {
   }
 }
 
-export async function fetchTvPlayback(
-  itemId: string,
-  extra?: { tmdbId?: number; type?: string; season?: number; episode?: number; title?: string }
-): Promise<{ streamUrl: string; contentType?: string; isTranscoding?: boolean; durationSeconds?: number } | null> {
-  try {
-    const hdrs = await getForwardedHeaders();
-    const params = new URLSearchParams({ itemId, receiver: 'native-tv' });
-    if (extra?.tmdbId) params.set('tmdbId', String(extra.tmdbId));
-    if (extra?.type) params.set('type', extra.type);
-    if (extra?.season) params.set('season', String(extra.season));
-    if (extra?.episode) params.set('episode', String(extra.episode));
-    if (extra?.title) params.set('title', extra.title);
-
-    const res = await fetch(`${getBackendUrl()}/api/v1/playback?${params.toString()}`, {
-      cache: 'no-store',
-      headers: hdrs,
-    });
-    if (!res.ok) return null;
-    return await res.json();
-  } catch {
-    return null;
-  }
-}
-
 export async function fetchTvSubtitles(itemId: string): Promise<Array<{ id: string; label: string; language: string; src: string; burnIn?: boolean }>> {
   try {
     const hdrs = await getForwardedHeaders();

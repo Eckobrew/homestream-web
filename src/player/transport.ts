@@ -1,12 +1,13 @@
 import { apiFetch } from '@/api/client';
-import { browserPlaybackParameters } from '@/lib/playback-capabilities';
+import { browserDecoderParameters } from '@/lib/playback-capabilities';
 export interface SkipSegment { type: 'intro' | 'recap' | 'credits'; startSeconds: number; endSeconds: number; title?: string; }
 export interface MediaVersion { id: string; label: string; resolution?: string; videoCodec?: string; audioCodec?: string; fileSize?: number; }
 export interface MediaAudioTrack { index: number; title: string; language?: string; }
 export type QualityMode = 'auto' | 'original' | '1080p' | '720p';
 export interface Delivery { streamUrl: string; isTranscoding: boolean; playMethod?: 'DirectPlay' | 'DirectStream' | 'Transcode'; resolution?: string; selectedVersionId?: string; sourceVideoCodec?: string; sourceAudioCodec?: string; transcodeReasons?: string; durationSeconds?: number; contentType?: string; versions?: MediaVersion[]; skipSegments?: SkipSegment[]; trickplayUrl?: string; audioTracks?: MediaAudioTrack[]; }
 export async function negotiatePlayback(itemId: string, canPlay: (mime: string) => string, signal: AbortSignal, fallback = false, versionId?: string, audioIndex?: number, burnSubtitleIndex?: number, quality?: QualityMode): Promise<Delivery> {
-  const query = fallback ? new URLSearchParams({ receiver: 'browser', forceTranscode: 'true' }) : browserPlaybackParameters(canPlay);
+  const query = await browserDecoderParameters(canPlay, typeof navigator !== 'undefined' ? navigator.mediaCapabilities?.decodingInfo.bind(navigator.mediaCapabilities) : undefined);
+  if (fallback) query.set('forceTranscode', 'true');
   query.set('itemId', itemId);
   if (versionId) query.set('versionId', versionId);
   if (audioIndex !== undefined) query.set('audioIndex', String(audioIndex));

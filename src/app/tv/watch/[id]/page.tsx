@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Metadata } from 'next';
-import { fetchTvPlayback, fetchTvMedia, fetchTvSubtitles } from '@/lib/tv-api';
+import { fetchTvMedia, fetchTvSubtitles } from '@/lib/tv-api';
 import { TvWatchPlayer } from '@/components/TvWatchPlayer';
 
 export const revalidate = 0;
@@ -51,18 +51,17 @@ export default async function TvWatchPage({
       title: sp.title,
     };
 
-    const [pb, md, subs] = await Promise.all([
-      fetchTvPlayback(id, extra),
+    const [md, subs] = await Promise.all([
       fetchTvMedia(id),
       fetchTvSubtitles(id),
     ]);
 
-    playback = pb;
+    playback = { streamUrl: '', playbackExtra: extra };
     media = md;
     subtitles = subs;
   }
 
-  if (!playback?.streamUrl) {
+  if (!playback || (isYouTube && !playback.streamUrl)) {
     return (
       <div style={{ padding: '60px 36px', textAlign: 'center', color: '#ffffff' }}>
         <h1 style={{ color: '#e50914' }}>Unable to Play Stream</h1>
@@ -92,7 +91,9 @@ export default async function TvWatchPage({
       </div>
 
       <TvWatchPlayer
+        key={id}
         itemId={id}
+        playbackExtra={playback.playbackExtra}
         streamSrc={streamSrc}
         contentType={playback.contentType}
         isHls={isHls}

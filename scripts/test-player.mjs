@@ -18,7 +18,7 @@ const state={stopped:false,error:false,loading:false,buffering:false,playing:tru
 assert.equal(playbackState(state),'playing');
 for(const [property,expected] of [['loading','loading'],['buffering','buffering'],['error','error'],['stopped','stopped']]) assert.equal(playbackState({...state,[property]:true}),expected);
 assert.equal(playbackState({...state,playing:false}),'paused');
-const {castReceiverId,castStartupState,selectCastSubtitles}=await source('cast');
+const {castReceiverId,castStartupState,selectCastSubtitles,requestCastCapabilities}=await source('cast');
 const previousReceiver=process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID;
 delete process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID;
 assert.equal(castReceiverId(),'CC1AD845');
@@ -39,3 +39,20 @@ assert.equal(castStartupState(pending,castStatus(2,'PAUSED'),500),'ready');
 assert.equal(castStartupState(pending,castStatus(2,'BUFFERING'),30000),'failed');
 assert.equal(castStartupState(pending,castStatus(2,'IDLE','ERROR'),1000),'failed');
 console.info('Playback state, item-bound progress, and Cast track checks passed');
+
+let receiveCapabilities;
+let removedCapabilities = 0;
+const reported = await requestCastCapabilities({
+  addMessageListener(_namespace, listener) { receiveCapabilities = listener; },
+  removeMessageListener() { removedCapabilities++; },
+  async sendMessage(namespace, request) {
+    receiveCapabilities(namespace, JSON.stringify({ type: 'capabilities', requestId: request.requestId,
+      video: [{ codec: 'hevc', width: 1920, height: 1080, profiles: ['main', 'main 10'] }],
+      audio: ['aac', 'eac3', 'invalid'],
+    }));
+  },
+});
+assert.equal(JSON.parse(reported.video)[0].codec, 'hevc');
+assert.equal(reported.audioCodecs, 'aac,eac3');
+assert.equal(removedCapabilities, 1);
+console.log('Cast receiver decoder response and listener cleanup checks passed');

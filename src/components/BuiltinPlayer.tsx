@@ -13,7 +13,6 @@ import { playbackState } from '@/player/state';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
-import { browserPlaybackParameters } from '@/lib/playback-capabilities';
 import {
   ArrowLeft,
   Play,
@@ -431,7 +430,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       let negotiatedDuration = 0;
       const targetId = activePlayableId || activeEpisode?.id || item.playableEpisodeId || item.id;
       if (targetId) {
-        const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
+        const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3', forceTranscode: String(compatible) });
         if (selectedVersionId) params.set('versionId', selectedVersionId);
         if (selectedAudioIndex !== undefined) params.set('audioIndex', String(selectedAudioIndex));
         if (activeEpisode) {
@@ -445,7 +444,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         const capabilities = compatible || castReceiverId() === DEFAULT_RECEIVER_ID
           ? undefined : await requestCastCapabilities(session);
         if (generation !== castLoadGeneration.current) return;
-        if (capabilities) params.set('videoCapabilities', capabilities);
+        if (capabilities) {
+          params.set('videoCapabilities', capabilities.video);
+          if (capabilities.audioCodecs !== undefined) params.set('audioCodecs', capabilities.audioCodecs);
+        }
         const response = await apiFetch(`/api/playback?${params}`);
         if (!response.ok) throw new Error('Cast stream negotiation failed');
         const result = await response.json();
