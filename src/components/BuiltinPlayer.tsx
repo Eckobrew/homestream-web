@@ -11,7 +11,7 @@ import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 import { negotiatePlayback, MediaAudioTrack, MediaVersion, SkipSegment, type QualityMode } from '@/player/transport';
 import { playbackState } from '@/player/state';
-import { isTorrentStreamUrl, torrentStreamUrl } from '@/player/torrent-stream';
+import { isTorrentStreamUrl, torrentStreamUrl, tmdbIdFor, torrentStreamStartSeconds, seekTorrentStreamUrl } from '@/player/torrent-stream';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import Hls from 'hls.js';
@@ -120,6 +120,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   // Titles that are not in the library stream straight from the swarm via the in-process torrent engine.
   const isTorrentStream = [item.videoStreamUrl, item.downloadStreamUrl, episode?.videoStreamUrl].some(isTorrentStreamUrl);
+  const torrentStartSeconds = isTorrentStream && streamUrl ? torrentStreamStartSeconds(streamUrl) : 0;
 
   const [hasTriedFallbackTranscode, setHasTriedFallbackTranscode] = useState(false);
   const [playbackDuration, setPlaybackDuration] = useState<number>(0);
@@ -154,7 +155,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined), selectedVersionId, selectedAudioIndex);
   const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef, selectedVersionId);
-  const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
+  const torrentTmdb = isTorrentStream ? tmdbIdFor(item) : undefined;
+  const torrentProgressId = torrentTmdb ? item.type === 'Movie' ? `tmdb-movie-${torrentTmdb}`
+    : `tmdb-ep-${torrentTmdb}-${activeEpisode?.seasonNumber || item.seasonNumber || 1}-${activeEpisode?.episodeNumber || item.episodeNumber || 1}` : undefined;
+  const reportProgress = useProgress(torrentProgressId || activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined), videoRef, isPlaying && !isLoadingStream,
+    () => isCasting ? currentTimeRef.current : torrentStartSeconds + (videoRef.current?.currentTime || 0));
   const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
 
   const isLibraryItem = Boolean(item.source === 'native' || String(item.id || '').startsWith('nat-'));
@@ -608,6 +613,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         if (controller.signal.aborted) return;
         if (!raw) { setStreamError(true); setIsLoadingStream(false); return; }
         const url = new URL(raw, window.location.origin);
+        const resume = (activeEpisode?.playbackPositionTicks || item.playbackPositionTicks || 0) / 10000000;
+        if (resume > 0) { url.searchParams.set('start', String(resume)); setCurrentTime(resume); }
         capabilities.forEach((value, key) => url.searchParams.set(key, value));
         if (qualityMode === '720p') { url.searchParams.set('maxWidth', '1280'); url.searchParams.set('maxHeight', '720'); }
         if (qualityMode === '1080p') { url.searchParams.set('maxWidth', '1920'); url.searchParams.set('maxHeight', '1080'); }
@@ -842,7 +849,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
   useMediaDelivery({
     url: streamUrl, contentType: streamDelivery?.url === streamUrl ? streamDelivery.type : '', itemId: activePlayableId,
-    resumeSeconds: versionResumeSec !== null
+    resumeSeconds: isTorrentStream ? 0 : versionResumeSec !== null
       ? versionResumeSec
       : (activeEpisode ? activeEpisode.playbackPositionTicks || 0 : item.playbackPositionTicks || 0) / 10000000,
     videoRef, hlsRef, revision: streamDelivery, setIsLoadingStream, setIsPlaying, setCurrentTime, onError: handlePlaybackError,
@@ -865,13 +872,13 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       if (buffEnd === 0 && b.length > 0) {
         buffEnd = b.end(b.length - 1);
       }
-      setBuffered(Math.min(100, Math.max(0, (buffEnd / effectiveDuration) * 100)));
+      setBuffered(Math.min(100, Math.max(0, ((torrentStartSeconds + buffEnd) / effectiveDuration) * 100)));
     }
   };
 
   const handleTimeUpdate = () => {
     if (videoRef.current && !isScrubbing) {
-      const cur = videoRef.current.currentTime;
+      const cur = torrentStartSeconds + videoRef.current.currentTime;
       setCurrentTime(cur);
 
       // Always anchor duration to true whole movie length (knownDurationSeconds)
@@ -968,6 +975,16 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     }
   };
 
+  const seekTorrentTo = (seconds: number) => {
+    const next = seekTorrentStreamUrl(streamUrl, seconds);
+    setStreamError(false);
+    setIsLoadingStream(true);
+    setCurrentTime(seconds);
+    setIsTranscoding(seconds > 0);
+    setStreamDelivery({ url: next, type: 'video/mp4' });
+    setStreamUrl(next);
+  };
+
   const seek = (seconds: number) => {
     const targetDuration = duration > 0 ? duration : (knownDurationSeconds || videoRef.current?.duration || 100);
     const newTime = Math.max(0, Math.min(currentTime + seconds, targetDuration));
@@ -987,6 +1004,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       }
     }
     if (!videoRef.current) return;
+    if (isTorrentStream) { seekTorrentTo(newTime); resetControlsTimer(); return; }
     videoRef.current.currentTime = newTime;
     setCurrentTime(newTime);
     resetControlsTimer();
@@ -1099,9 +1117,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         console.warn('Cast scrub seek error:', err);
       }
     }
-    if (videoRef.current) {
-      videoRef.current.currentTime = currentTime;
-    }
+    if (isTorrentStream) seekTorrentTo(currentTime);
+    else if (videoRef.current) videoRef.current.currentTime = currentTime;
     resetControlsTimer();
   };
 
@@ -1163,6 +1180,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         console.warn('Cast restart error:', err);
       }
     }
+    if (isTorrentStream && !isCasting) { seekTorrentTo(0); resetControlsTimer(); return; }
     if (videoRef.current) {
       videoRef.current.currentTime = 0;
       videoRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false));

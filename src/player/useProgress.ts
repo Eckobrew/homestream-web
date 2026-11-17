@@ -16,7 +16,10 @@ export function useProgress(itemId: string | undefined, video: RefObject<HTMLVid
     });
     session.current = current;
     const timer = setInterval(() => { if (playingRef.current) current.report(); }, 10000);
-    const stop = () => current.report(true);
+    const stop = () => {
+      const seconds = positionRef.current ? positionRef.current() : element?.currentTime || 0;
+      if (seconds > 0 || playingRef.current) current.report(true);
+    };
     window.addEventListener('pagehide', stop);
     return () => { clearInterval(timer); window.removeEventListener('pagehide', stop); stop(); if (session.current === current) session.current = null; };
   }, [itemId, video]);

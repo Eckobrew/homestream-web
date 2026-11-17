@@ -56,3 +56,15 @@ assert.equal(JSON.parse(reported.video)[0].codec, 'hevc');
 assert.equal(reported.audioCodecs, 'aac,eac3');
 assert.equal(removedCapabilities, 1);
 console.log('Cast receiver decoder response and listener cleanup checks passed');
+
+const { torrentStreamUrl, seekTorrentStreamUrl, torrentStreamStartSeconds } = await source('torrent-stream');
+const episodeUrl = torrentStreamUrl({ id: 'tmdb-ep-202-4-3', tmdbId: 202, type: 'Episode', title: 'Episode Three', seriesName: 'Fixture Series', seasonNumber: 4, episodeNumber: 3 });
+const episodeQuery = new URL(episodeUrl, 'http://fixture').searchParams;
+assert.equal(episodeQuery.get('season'), '4'); assert.equal(episodeQuery.get('episode'), '3');
+assert.equal(episodeQuery.get('title'), 'Fixture Series');
+const seeked = seekTorrentStreamUrl(episodeUrl + '&videoCodecs=h264&startTimeTicks=10000000', 123.5);
+const seekedQuery = new URL(seeked, 'http://fixture').searchParams;
+assert.equal(seekedQuery.get('episode'), '3'); assert.equal(seekedQuery.get('videoCodecs'), 'h264');
+assert.equal(seekedQuery.has('startTimeTicks'), false); assert.equal(torrentStreamStartSeconds(seeked), 123.5);
+assert.ok(sent.every(value => Number.isSafeInteger(value.recordedAt)));
+console.log('Torrent episode resume identity, seek offsets and progress timestamps checked');
