@@ -13,15 +13,12 @@ interface ProfileContextType {
   needsSetup: boolean;
   canSwitchProfile: boolean;
   isExternal: boolean;
-  availableJellyfinUsers: UserProfile[];
   openSelector: () => void;
   closeSelector: () => void;
   selectProfile: (profileId: string) => Promise<void>;
   createProfile: (name: string, paletteIndex?: number) => Promise<UserProfile | null>;
   deleteProfile: (profileId: string) => Promise<boolean>;
-  importProfiles: (userIds: string[]) => Promise<boolean>;
   refreshProfiles: () => Promise<void>;
-  fetchAvailableJellyfinUsers: () => Promise<UserProfile[]>;
 }
 
 const ProfileContext = createContext<ProfileContextType | undefined>(undefined);
@@ -40,12 +37,11 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [needsSetup, setNeedsSetup] = useState<boolean>(false);
   const [canSwitchProfile, setCanSwitchProfile] = useState<boolean>(true);
   const [isExternal, setIsExternal] = useState<boolean>(false);
-  const [availableJellyfinUsers, setAvailableJellyfinUsers] = useState<UserProfile[]>([]);
 
   const fetchProfiles = useCallback(async () => {
     try {
       setIsLoadingProfiles(true);
-      const res = await apiFetch('/api/profiles?includeAvailable=true');
+      const res = await apiFetch('/api/profiles');
       if (res.ok) {
         const data = await res.json();
         const loadedProfiles: UserProfile[] = data.profiles || [];
@@ -56,10 +52,8 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         setNeedsSetup(Boolean(data.needsSetup));
         setCanSwitchProfile(canSwitch);
         setIsExternal(isExt);
-        setAvailableJellyfinUsers(data.availableJellyfinUsers || []);
-
         if (data.needsSetup) {
-          setIsSelectorOpen(true);
+          setIsSelectorOpen(false);
         }
 
         const activeId: string = data.activeProfileId;
@@ -150,45 +144,6 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     []
   );
 
-  const importProfiles = useCallback(
-    async (userIds: string[]): Promise<boolean> => {
-      try {
-        const res = await apiFetch('/api/profiles', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ action: 'import', userIds }),
-        });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.profiles) {
-            setProfiles(data.profiles);
-            setNeedsSetup(false);
-          }
-          if (data.activeProfileId) {
-            const matched = (data.profiles || []).find((p: UserProfile) => p.id === data.activeProfileId);
-            if (matched) {
-              setActiveProfile(matched);
-              document.cookie = `homeflix_profile_id=${matched.id}; path=/; max-age=31536000; SameSite=Lax`;
-              if (typeof window !== 'undefined') {
-                window.dispatchEvent(
-                  new CustomEvent('homeflix-profile-changed', {
-                    detail: { profile: matched },
-                  })
-                );
-              }
-            }
-          }
-          setIsSelectorOpen(false);
-          return true;
-        }
-      } catch (err) {
-        console.error('Failed to import profiles from Jellyfin:', err);
-      }
-      return false;
-    },
-    []
-  );
-
   const deleteProfile = useCallback(
     async (profileId: string): Promise<boolean> => {
       try {
@@ -227,21 +182,6 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
     []
   );
 
-  const fetchAvailableJellyfinUsers = useCallback(async (): Promise<UserProfile[]> => {
-    try {
-      const res = await apiFetch('/api/profiles?includeAvailable=true');
-      if (res.ok) {
-        const data = await res.json();
-        const available = data.availableJellyfinUsers || [];
-        setAvailableJellyfinUsers(available);
-        return available;
-      }
-    } catch (err) {
-      console.error('Failed to fetch available Jellyfin users:', err);
-    }
-    return [];
-  }, []);
-
   const openSelector = useCallback(() => {
     if (!canSwitchProfile) return;
     setIsSelectorOpen(true);
@@ -265,15 +205,12 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
         needsSetup,
         canSwitchProfile,
         isExternal,
-        availableJellyfinUsers,
         openSelector,
         closeSelector,
         selectProfile,
         createProfile,
         deleteProfile,
-        importProfiles,
         refreshProfiles: fetchProfiles,
-        fetchAvailableJellyfinUsers,
       }}
     >
       {children}

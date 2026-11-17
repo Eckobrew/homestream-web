@@ -11,8 +11,6 @@ interface NavbarProps {
   onSearchChange: (query: string) => void;
   searchQuery: string;
   isDemoMode?: boolean;
-  jellyfinConnected: boolean;
-  seerrConnected: boolean;
   activeTab: string;
   currentHub?: NavHub;
   hubTab?: string;
@@ -90,8 +88,8 @@ export const Navbar: React.FC<NavbarProps> = ({
             <button
               onClick={onToggleSidebar}
               className="p-1.5 -ml-1 sm:-ml-2 rounded-lg text-neutral-300 hover:text-white hover:bg-neutral-800 transition-colors"
-              title="Browse Jellyfin Libraries (A–Z)"
-              aria-label="Open Jellyfin Library Sidebar"
+              title="Browse Libraries (A–Z)"
+              aria-label="Open Library Sidebar"
             >
               <Menu size={22} />
             </button>

@@ -116,7 +116,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
         role="dialog"
         aria-hidden={!isOpen}
         inert={!isOpen}
-        aria-label="Jellyfin Libraries Sidebar"
+        aria-label="Media Libraries Sidebar"
       >
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
@@ -172,7 +172,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
 
-          {/* Section: Jellyfin A-Z Libraries */}
+          {/* Section: A-Z Libraries */}
           <div className="space-y-2">
             <div className="px-2 text-[11px] font-bold uppercase tracking-wider text-neutral-400 flex items-center space-x-1.5">
               <Server size={12} className="text-red-500" />
@@ -301,7 +301,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="flex items-center justify-between text-xs text-neutral-400">
             <span className="flex items-center space-x-1.5">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
-              <span className="font-medium text-neutral-300">Connected to Jellyfin</span>
+              <span className="font-medium text-neutral-300">HomeStream Native Server</span>
             </span>
             <span className="text-[10px] text-neutral-400">Press Esc to close</span>
           </div>

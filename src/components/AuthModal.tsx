@@ -28,7 +28,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
   const brandName = appName || process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream';
 
   useEffect(() => {
-    // Fetch Jellyfin users for quick profile login
+    // Fetch HomeStream user accounts for quick login
     apiFetch('/api/auth?action=users')
       .then((res) => res.json())
       .then((data) => {
@@ -97,7 +97,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
         <div className="bg-neutral-900/80 border border-neutral-700/60 rounded-lg p-3 text-xs text-neutral-300 flex items-start space-x-2.5">
           <ShieldCheck size={16} className="text-emerald-400 shrink-0 mt-0.5" />
           <p className="leading-relaxed">
-            You are connecting outside your local network / Tailscale. Please sign in with your Jellyfin account to continue.
+            You are connecting outside your local network / Tailscale. Please sign in with your HomeStream account to continue.
           </p>
         </div>
 
@@ -113,7 +113,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
           {users.length > 0 && (
             <div className="space-y-2">
               <label className="text-xs font-semibold text-neutral-400 uppercase tracking-wider">
-                Select Jellyfin User
+                Select Account
               </label>
               <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto no-scrollbar">
                 {users.map((u) => {
@@ -166,7 +166,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
                 type="text"
                 value={selectedUsername}
                 onChange={(e) => setSelectedUsername(e.target.value)}
-                placeholder="Jellyfin Username"
+                placeholder="Username"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-lg py-2.5 pl-9 pr-3 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500"
                 required
               />
@@ -184,7 +184,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Jellyfin Password"
+                placeholder="Password"
                 className="w-full bg-neutral-900 border border-neutral-700 rounded-lg py-2.5 pl-9 pr-10 text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-red-500"
               />
               <Lock size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
@@ -207,7 +207,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ onSuccess, appName }) => {
             {isLoading ? (
               <>
                 <Loader2 size={16} className="animate-spin" />
-                <span>Verifying with Jellyfin...</span>
+                <span>Signing in...</span>
               </>
             ) : (
               <span>Sign In to {brandName}</span>

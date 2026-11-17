@@ -142,7 +142,7 @@ export default async function TvHomePage() {
       {movies.length === 0 && series.length === 0 && (
         <div style={{ padding: '60px 36px', textAlign: 'center', color: '#aaaaaa' }}>
           <h2>No media items found</h2>
-          <p>Verify your Jellyfin server is connected in settings.</p>
+          <p>Verify your media libraries are configured in settings.</p>
         </div>
       )}
     </div>

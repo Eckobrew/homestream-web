@@ -28,7 +28,7 @@ export default async function TvMoviesPage() {
       </div>
       {items.length === 0 && (
         <div style={{ padding: '40px 0', color: '#aaaaaa' }}>
-          No movies found in your Jellyfin library.
+          No movies found in your library.
         </div>
       )}
     </div>

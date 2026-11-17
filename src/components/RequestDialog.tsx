@@ -34,7 +34,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
   const [resultMessage, setResultMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch actual quality profiles from Sonarr/Radarr via Seerr
+  // Fetch quality profiles from Radarr / Sonarr
   useEffect(() => {
     if (!item) return;
     const type = item.type === 'Series' ? 'tv' : 'movie';
@@ -51,7 +51,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
           }
         }
       })
-      .catch(() => { /* Omit profileId and let Seerr use its configured default. */ });
+      .catch(() => { /* Fall back to default server profile. */ });
     return () => controller.abort();
   }, [item?.type, item?.id]);
 
@@ -63,7 +63,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
     setResultMessage(null);
 
     try {
-      const tmdbId = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined) || (item.seerrId ? Number(item.seerrId) : undefined);
+      const tmdbId = item.tmdbId || (/^tmdb-/.test(item.id) ? Number(item.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
       if (!tmdbId) {
         throw new Error('Missing TMDB ID for this media item.');
       }
@@ -98,7 +98,7 @@ export const RequestDialog: React.FC<RequestDialogProps> = ({
       const data = await res.json();
 
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Failed to submit request to Seerr.');
+        throw new Error(data.error || 'Failed to submit media request.');
       }
 
       setResultMessage(data.message || 'Request submitted successfully!');

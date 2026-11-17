@@ -80,8 +80,8 @@ export default async function TvWatchPage({
   const isHls = playback.transport === 'HLS' || streamSrc.includes('.m3u8') || /mpegurl/i.test(playback.contentType || '');
 
   const series = media?.seriesId ? await fetchTvMedia(media.seriesId) : media;
-  const episodes = series?.seasons?.flatMap((season: { episodes?: Array<{ id: string; jellyfinId?: string }> }) => season.episodes || []) || [];
-  const currentIndex = episodes.findIndex((episode: { id: string; jellyfinId?: string }) => episode.id === id || episode.jellyfinId === id);
+  const episodes = series?.seasons?.flatMap((season: { episodes?: Array<{ id: string }> }) => season.episodes || []) || [];
+  const currentIndex = episodes.findIndex((episode: { id: string }) => episode.id === id);
   const nextEpisode = currentIndex >= 0 ? episodes[currentIndex + 1] : null;
   const resumeSeconds = Math.max(0, Number(media?.playbackPositionTicks || 0) / 10_000_000);
 
@@ -102,7 +102,7 @@ export default async function TvWatchPage({
         trickplayUrl={playback.trickplayUrl}
         selectedVersionId={playback.selectedVersionId}
         durationSeconds={playback.durationSeconds || 0}
-        nextEpUrl={nextEpisode ? `/tv/watch/${encodeURIComponent(nextEpisode.jellyfinId || nextEpisode.id)}` : null}
+        nextEpUrl={nextEpisode ? `/tv/watch/${encodeURIComponent(nextEpisode.id)}` : null}
         resumeSeconds={resumeSeconds}
         isYouTube={isYouTube}
       />

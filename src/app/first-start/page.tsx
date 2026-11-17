@@ -3,9 +3,11 @@
 import React, { useState, useEffect } from 'react';
 import { apiFetch } from '@/api/client';
 import { InitialSetupModal } from '@/components/InitialSetupModal';
+import { useProfile } from '@/context/ProfileContext';
 import { ShieldCheck, UserPlus, CheckCircle2, ArrowRight, Server, Users } from 'lucide-react';
 
 export default function FirstStartPage() {
+  const { refreshProfiles } = useProfile();
   const [step, setStep] = useState<'account' | 'profile' | 'integrations' | 'done'>('account');
   const [username, setUsername] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -68,6 +70,7 @@ export default function FirstStartPage() {
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not create first profile');
+      await refreshProfiles();
       setStep('integrations');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Profile setup failed');
@@ -193,7 +196,7 @@ export default function FirstStartPage() {
         {step === 'integrations' && (
           <div className="space-y-4">
             <p className="text-sm text-neutral-400">
-              Use HomeStream’s native media engine or connect Jellyfin. You can configure library folders and other integrations in Admin.
+              Enable HomeStream&rsquo;s native media engine and optionally configure TMDB, Radarr, Sonarr, qBittorrent, and media folders.
             </p>
             <button
               type="button"

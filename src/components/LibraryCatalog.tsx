@@ -68,7 +68,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
       .catch((err) => {
         if (isCancelled) return;
         console.error('Failed to load library:', err);
-        setError('Failed to load media catalog from Jellyfin.');
+        setError('Failed to load media catalog.');
         setIsLoading(false);
       });
 
@@ -128,21 +128,21 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
       icon: Film,
       singular: 'Movie',
       badgeColor: 'bg-blue-600/20 text-blue-400 border-blue-500/30',
-      description: 'Complete collection of movies stored on your Jellyfin server, listed A–Z.',
+      description: 'Complete collection of movies in your HomeStream library, listed A–Z.',
     },
     tv: {
       name: 'TV Shows',
       icon: Tv,
       singular: 'Series',
       badgeColor: 'bg-purple-600/20 text-purple-400 border-purple-500/30',
-      description: 'All TV series available on your Jellyfin server, listed A–Z.',
+      description: 'All TV series in your HomeStream library, listed A–Z.',
     },
     youtube: {
       name: 'YouTube',
       icon: PlaySquare,
       singular: 'Video',
       badgeColor: 'bg-red-600/20 text-red-400 border-red-500/30',
-      description: 'Downloaded YouTube library on Jellyfin, listed A–Z.',
+      description: 'Downloaded YouTube library in HomeStream, listed A–Z.',
     },
   }[libraryType];
 
@@ -162,7 +162,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
 
         <div className="text-xs text-neutral-400 flex items-center space-x-2">
           <span className="w-2 h-2 rounded-full bg-emerald-500" />
-          <span>Jellyfin Server A–Z Catalog</span>
+          <span>HomeStream A–Z Catalog</span>
         </div>
       </div>
 
@@ -267,7 +267,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
       {isLoading && (
         <div className="py-20 flex flex-col items-center justify-center space-y-4">
           <RefreshCw size={32} className="animate-spin text-red-600" />
-          <p className="text-sm text-neutral-400">Loading {libraryMeta.name} from Jellyfin...</p>
+          <p className="text-sm text-neutral-400">Loading {libraryMeta.name}...</p>
         </div>
       )}
 

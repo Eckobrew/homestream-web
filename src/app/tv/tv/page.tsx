@@ -32,7 +32,7 @@ export default async function TvShowsPage() {
       </div>
       {items.length === 0 && (
         <div style={{ padding: '40px 0', color: '#aaaaaa' }}>
-          No TV shows found in your Jellyfin library.
+          No TV shows found in your library.
         </div>
       )}
     </div>

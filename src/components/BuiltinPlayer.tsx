@@ -40,8 +40,6 @@ interface BuiltinPlayerProps {
   episode?: Episode;
   onClose: () => void;
   onNextEpisode?: () => void;
-  jellyfinServerUrl?: string;
-  jellyfinApiKey?: string;
   isDownloading?: boolean;
   downloadProgress?: number;
   torrentHash?: string;
@@ -52,8 +50,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   episode,
   onClose,
   onNextEpisode,
-  jellyfinServerUrl,
-  jellyfinApiKey,
   isDownloading,
   downloadProgress,
   torrentHash,
@@ -224,18 +220,17 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   // Active episode / target ID
   const [activeEpisode, setActiveEpisode] = useState<Episode | undefined>(episode);
   const [activePlayableId, setActivePlayableId] = useState<string | undefined>(
-    episode?.jellyfinId ||
     episode?.id ||
     item.playableEpisodeId ||
-    (item.type !== 'Series' ? (item.jellyfinId || item.id) : undefined)
+    (item.type !== 'Series' ? item.id : undefined)
   );
 
-  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), selectedVersionId, selectedAudioIndex);
+  const fallbackPlayback = usePlaybackFallback(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined), selectedVersionId, selectedAudioIndex);
   const { subtitles, selectedSubtitleId, setSelectedSubtitleId, isLoadingSubtitles } = useSubtitles(activePlayableId, videoRef, selectedVersionId);
-  const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
+  const reportProgress = useProgress(activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined), videoRef, isPlaying, () => isCasting ? currentTimeRef.current : videoRef.current?.currentTime || 0);
   const state = playbackState({ stopped, error: streamError, loading: isLoadingStream || isLoadingEpisode, buffering: isMidStreamBuffering, playing: isPlaying });
 
-  const isJellyfinItem = Boolean(item.source === 'jellyfin' || item.source === 'native' || item.jellyfinId || String(item.id || '').startsWith('nat-'));
+  const isLibraryItem = Boolean(item.source === 'native' || String(item.id || '').startsWith('nat-'));
 
   // Series playlist episodes
   const [seriesEpisodes, setSeriesEpisodes] = useState<Episode[]>(
@@ -292,15 +287,15 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     if (item.type === 'Series') {
       if (item.seasons && item.seasons.length > 0) {
         const allEps = item.seasons.flatMap((s) => s.episodes || []);
-        const isPlayableEp = (ep: Episode) => Boolean(ep.jellyfinId || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-'));
+        const isPlayableEp = (ep: Episode) => Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (item.source === 'native' && ep.id));
         setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
         if (!activeEpisode) {
           const found = activePlayableId
-            ? allEps.find((ep) => ep.jellyfinId === activePlayableId || ep.id === activePlayableId)
+            ? allEps.find((ep) => ep.id === activePlayableId)
             : allEps.find(isPlayableEp);
           if (found) {
             setActiveEpisode(found);
-            if (!activePlayableId) setActivePlayableId(found.jellyfinId || found.id);
+            if (!activePlayableId) setActivePlayableId(found.id);
           }
         }
         return;
@@ -318,11 +313,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           }
           if (media.seasons) {
             const allEps = media.seasons.flatMap((s: any) => s.episodes || []);
-            const isPlayableEp = (ep: Episode) => Boolean(ep.jellyfinId || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-'));
+            const isPlayableEp = (ep: Episode) => Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (media.source === 'native' && ep.id));
             setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a: Episode, b: Episode) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
             if (!activeEpisode) {
               const found = targetPlayableId
-                ? allEps.find((ep: any) => ep.jellyfinId === targetPlayableId || ep.id === targetPlayableId)
+                ? allEps.find((ep: any) => ep.id === targetPlayableId)
                 : allEps.find(isPlayableEp);
               if (found) {
                 setActiveEpisode(found);
@@ -338,9 +333,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   // Compute next episode in TV series
   const nextEpisode = useMemo(() => {
     if (!seriesEpisodes || seriesEpisodes.length === 0) return null;
-    const currentId = activeEpisode?.jellyfinId || activeEpisode?.id || activePlayableId;
+    const currentId = activeEpisode?.id || activePlayableId;
     const currentIdx = seriesEpisodes.findIndex(
-      (ep) => (currentId && (ep.jellyfinId === currentId || ep.id === currentId)) ||
+      (ep) => (currentId && ep.id === currentId) ||
               (activeEpisode && ep.seasonNumber === activeEpisode.seasonNumber && ep.episodeNumber === activeEpisode.episodeNumber)
     );
     if (currentIdx !== -1 && currentIdx + 1 < seriesEpisodes.length) {
@@ -434,7 +429,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       let rawUrl = localUrl;
       let negotiatedContentType = '';
       let negotiatedDuration = 0;
-      const targetId = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
+      const targetId = activePlayableId || activeEpisode?.id || item.playableEpisodeId || item.id;
       if (targetId) {
         const params = new URLSearchParams({ itemId: targetId, receiver: 'cast', audioCodecs: 'aac,mp3,opus,vorbis', forceTranscode: String(compatible) });
         if (selectedVersionId) params.set('versionId', selectedVersionId);
@@ -648,7 +643,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   // Auto-reload on Chromecast ONLY when media/episode actually changes while casting
   useEffect(() => {
     if (isCasting && streamUrl && lastCastedKeyRef.current) {
-      const currentItemKey = activePlayableId || activeEpisode?.jellyfinId || item.playableEpisodeId || item.jellyfinId || item.id;
+      const currentItemKey = activePlayableId || activeEpisode?.id || item.playableEpisodeId || item.id;
       if (lastCastedKeyRef.current !== currentItemKey) {
         lastCastedKeyRef.current = currentItemKey;
         loadCastMedia();
@@ -684,13 +679,13 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       return;
     }
 
-    if (!isJellyfinItem) {
+    if (!isLibraryItem) {
       setStreamUrl(activeEpisode?.videoStreamUrl || item.downloadStreamUrl || item.videoStreamUrl || '');
       setIsLoadingStream(false);
       return;
     }
 
-    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
+    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined);
     if (!targetId) return;
 
     setIsLoadingStream(true);
@@ -740,7 +735,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => {
       isMounted = false; controller.abort();
     };
-  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode]);
+  }, [activePlayableId, item, isLibraryItem, activeEpisode, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode]);
 
   // Parse Trickplay WebVTT sprite sheet cues when trickplayUrl is available
   useEffect(() => {
@@ -834,10 +829,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   }, [hoverTime, trickplayCues]);
 
   const handlePlaybackError = useCallback(() => {
-    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
+    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined);
 
-    if (isJellyfinItem && targetId && !hasTriedFallbackTranscode) {
-      console.warn('Playback error encountered on direct stream. Attempting automatic Jellyfin transcoding fallback...');
+    if (isLibraryItem && targetId && !hasTriedFallbackTranscode) {
+      console.warn('Playback error encountered on direct stream. Attempting automatic transcoding fallback...');
       setHasTriedFallbackTranscode(true);
       setIsLoadingStream(true);
 
@@ -856,14 +851,14 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setStreamError(true);
     setIsPlaying(false);
     setIsLoadingStream(false);
-  }, [activePlayableId, item, isJellyfinItem, hasTriedFallbackTranscode, fallbackPlayback]);
+  }, [activePlayableId, item, isLibraryItem, hasTriedFallbackTranscode, fallbackPlayback]);
 
   const handleRetryPlayback = () => {
-    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.jellyfinId || item.id : undefined);
+    const targetId = activePlayableId || item.playableEpisodeId || (item.type !== 'Series' ? item.id : undefined);
     setStreamError(false);
     setIsLoadingStream(true);
 
-    if (isJellyfinItem && targetId) {
+    if (isLibraryItem && targetId) {
       setHasTriedFallbackTranscode(true);
       void fallbackPlayback({
         ready: data => {
@@ -1260,7 +1255,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         }
       }
 
-      setActivePlayableId(nextEpisode.jellyfinId || nextEpisode.id);
+      setActivePlayableId(nextEpisode.id);
       setStreamUrl('');
       setStreamDelivery({ url: '', type: '' });
       setSkipSegments([]);

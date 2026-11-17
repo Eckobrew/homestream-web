@@ -72,7 +72,7 @@ export default async function TvRequestedPage() {
         ) : (
           <div className="tv-grid">
             {requested.map((item: any) => {
-              const id = item.id || `seerr-${item.mediaType || 'movie'}-${item.mediaId || item.tmdbId}`;
+              const id = item.id || `tmdb-${item.mediaType || 'movie'}-${item.mediaId || item.tmdbId}`;
               return (
                 <a key={id} href={`/tv/media/${id}`} className="tv-card" tabIndex={0}>
                   <img

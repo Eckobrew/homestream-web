@@ -48,7 +48,6 @@ interface AccountSummary {
   displayName: string;
   isAdmin: boolean;
   hasPassword: boolean;
-  legacyJellyfinAuth: boolean;
 }
 
 interface ActiveSession {
@@ -451,9 +450,7 @@ export function AdminIntegrations({
   }, [tab, loadMediaOverview, loadSystemOverview]);
 
   const CATEGORY_MAP: Record<string, 'media' | 'requests' | 'music_books' | 'downloaders'> = {
-    jellyfin: 'media',
     tmdb: 'media',
-    seerr: 'requests',
     radarr: 'requests',
     sonarr: 'requests',
     slskd: 'music_books',

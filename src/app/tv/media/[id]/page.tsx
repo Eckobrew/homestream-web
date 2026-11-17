@@ -43,8 +43,8 @@ export default async function TvMediaDetailPage({
 
   const isMovie = (item.type as string)?.toLowerCase() === 'movie';
   const episodes: any[] = item.episodes || [];
-  const isAvailable = Boolean(item.isAvailable || item.jellyfinId || item.source === 'native' || String(item.id || '').startsWith('nat-'));
-  const tmdbId = item.tmdbId || (id.startsWith('seerr-') || id.startsWith('tmdb-') ? Number(id.replace(/^seerr-(?:movie-|tv-)?|^tmdb-(?:movie-|tv-)?/, '')) : 0);
+  const isAvailable = Boolean(item.isAvailable || item.source === 'native' || String(item.id || '').startsWith('nat-'));
+  const tmdbId = item.tmdbId || (id.startsWith('tmdb-') ? Number(id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : 0);
 
   const torrentMovieUrl = `/tv/watch/${id}?torrent=1&tmdbId=${tmdbId || ''}&type=movie&title=${encodeURIComponent(item.title || '')}`;
 

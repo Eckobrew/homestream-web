@@ -122,7 +122,7 @@ export async function fetchTvHome(): Promise<{
           year: w.year,
           overview: '',
           genres: [],
-          source: 'jellyfin' as const,
+          source: 'native' as const,
           status: 'available' as const,
         }))
       : [];

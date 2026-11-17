@@ -39,8 +39,6 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [requestSections, setRequestSections] = useState<MediaRowSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDemoMode, setIsDemoMode] = useState(false);
-  const [jellyfinConnected, setJellyfinConnected] = useState(false);
-  const [seerrConnected, setSeerrConnected] = useState(false);
   const [activeTab, setActiveTab] = useState(initialTab === 'requests' ? 'discover' : initialTab || 'home');
   const [music,setMusic]=useState<{tracks:MusicTrack[];index:number}|null>(null);
   const [canManageIntegrations,setCanManageIntegrations]=useState(false);
@@ -87,7 +85,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
               year: w.year,
               overview: '',
               genres: [],
-              source: 'jellyfin' as const,
+              source: 'native' as const,
               status: 'available' as const,
             }))
           );
@@ -129,11 +127,9 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     episode?: Episode;
   } | undefined>(undefined);
 
-  // Server credentials for player
-  const [serverConfig, setServerConfig] = useState<{ appName?: string; jellyfinUrl: string; hasJellyfinKey: boolean }>({
+  // Server metadata for UI
+  const [serverConfig, setServerConfig] = useState<{ appName?: string }>({
     appName: '',
-    jellyfinUrl: '',
-    hasJellyfinKey: false,
   });
 
   useEffect(() => { setServerConfig(previous => ({...previous,appName:configuredAppName})); },[configuredAppName]);
@@ -225,8 +221,6 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         setSections(homeData.sections || []);
         setRequestSections(homeData.requestSections || []);
         setIsDemoMode(Boolean(homeData.isDemoMode));
-        setJellyfinConnected(Boolean(homeData.jellyfinConnected));
-        setSeerrConnected(Boolean(homeData.seerrConnected));
       }
 
       if (configRes.ok) {
@@ -474,7 +468,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
       return next;
     });
 
-    // Refresh home data in background to pull live status from Seerr & qBittorrent
+    // Refresh home data in background to pull live status from qBittorrent & requests
     setTimeout(() => {
       loadHomeData();
     }, 2000);
@@ -494,7 +488,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         }
       }
 
-      // 2. Netflix Category Rows (Jellyfin available first, then Seerr options)
+      // 2. Netflix Category Rows (library available first, then discovery options)
       if (movieCategories.length > 0) {
         res.push(...movieCategories);
       } else {
@@ -502,7 +496,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           .filter((s) => s.id !== 'continue-watching' && s.id !== 'my-requests')
           .map((sec) => ({
             ...sec,
-            title: sec.id === 'trending-seerr' ? 'Trending Movies' : sec.title,
+            title: sec.id === 'trending-tmdb' ? 'Trending Movies' : sec.title,
             items: sec.items.filter((i) => i.type === 'Movie'),
           }))
           .filter((sec) => sec.items.length > 0);
@@ -524,7 +518,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         }
       }
 
-      // 2. Netflix Category Rows (Jellyfin available first, then Seerr options)
+      // 2. Netflix Category Rows (library available first, then discovery options)
       if (tvCategories.length > 0) {
         res.push(...tvCategories);
       } else {
@@ -532,7 +526,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           .filter((s) => s.id !== 'continue-watching' && s.id !== 'my-requests')
           .map((sec) => ({
             ...sec,
-            title: sec.id === 'trending-seerr' ? 'Trending TV Shows' : sec.title,
+            title: sec.id === 'trending-tmdb' ? 'Trending TV Shows' : sec.title,
             items: sec.items.filter((i) => i.type === 'Series' || i.type === 'Episode'),
           }))
           .filter((sec) => sec.items.length > 0);
@@ -553,7 +547,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
 
       // 2. Popular Titles (including both movies and shows)
       const popular = requestSections.find((s) => s.id === 'requests-popular') ||
-        sections.find((s) => s.id === 'trending-seerr');
+        sections.find((s) => s.id === 'trending-tmdb');
       if (popular && popular.items.length > 0) {
         res.push({
           ...popular,
@@ -621,8 +615,6 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
         isDemoMode={isDemoMode}
-        jellyfinConnected={jellyfinConnected}
-        seerrConnected={seerrConnected}
         canManageIntegrations={canManageIntegrations && !activeProfile?.isKids && activeProfile?.isAdministrator !== false}
         activeTab={activeTab}
         currentHub={currentHub}
@@ -751,7 +743,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
               <Sparkles size={16} className="text-amber-400 shrink-0" />
               <div>
                 <span className="font-bold text-white">Running in Demo Mode: </span>
-                <span>Configure JELLYFIN_URL and JELLYFIN_API_KEY in your .env file to connect your media library.</span>
+                <span>Add your media libraries or connect TMDB and qBittorrent in Admin Settings to get started.</span>
               </div>
             </div>
           )}
@@ -883,11 +875,11 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
               <span className="hover:text-neutral-400 cursor-pointer">Audio and Subtitles</span>
               <span className="hover:text-neutral-400 cursor-pointer">Help Center</span>
               <span className="hover:text-neutral-400 cursor-pointer">Proxmox LXC Docs</span>
-              <span className="hover:text-neutral-400 cursor-pointer">Jellyfin API</span>
-              <span className="hover:text-neutral-400 cursor-pointer">Seerr Request Gateway</span>
+              <span className="hover:text-neutral-400 cursor-pointer">Native Media Engine</span>
+              <span className="hover:text-neutral-400 cursor-pointer">TMDB Discovery</span>
             </div>
             <p className="text-[11px]">
-              &copy; {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream'}. Built for Jellyfin &amp; Overseerr/Jellyseerr on Proxmox LXC.
+              &copy; {new Date().getFullYear()} {process.env.NEXT_PUBLIC_APP_NAME || 'HomeStream'}. Built for self-hosted streaming on Proxmox LXC.
             </p>
           </footer>
         </div>
@@ -911,11 +903,10 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           item={playingState.item}
           episode={playingState.episode}
           onClose={handleClosePlayer}
-          jellyfinServerUrl={serverConfig.jellyfinUrl}
         />
       )}
 
-      {/* Seerr Request Dialog */}
+      {/* Request Dialog */}
       {requestItem && (
         <RequestDialog
           item={requestItem}
@@ -937,7 +928,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
         onComplete={() => loadHomeData()}
       />
 
-      {/* External Authentication Modal (Jellyfin Auth Wall) */}
+      {/* External Authentication Modal */}
       {authStatus.requiresAuth && !authStatus.isAuthenticated && (
         <AuthModal
           appName={configuredAppName}

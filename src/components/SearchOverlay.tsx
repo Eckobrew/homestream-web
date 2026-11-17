@@ -95,7 +95,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
 
   // Apply filters
   const filteredResults = results.filter((item) => {
-    if (activeFilter === 'available') return item.status === 'available' || item.source === 'jellyfin' || item.source === 'native';
+    if (activeFilter === 'available') return item.status === 'available' || item.source === 'native';
     if (activeFilter === 'movies') return item.type === 'Movie';
     if (activeFilter === 'tv') return item.type === 'Series';
     return true;
@@ -117,7 +117,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
         )
       );
 
-      const tmdbId = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined) || (item.seerrId ? Number(item.seerrId) : undefined);
+      const tmdbId = item.tmdbId || (/^tmdb-/.test(item.id) ? Number(item.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
       if (tmdbId) {
         apiFetch('/api/request', {
           method: 'POST',
@@ -151,7 +151,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               Search Results for <span className="text-red-500">&quot;{query}&quot;</span>
             </h1>
             <p className="text-xs text-neutral-400">
-              Live index from Seerr &amp; Jellyfin library. Click on any title to play or request automated download.
+              Live index from TMDB &amp; HomeStream library. Click on any title to play or request automated download.
             </p>
           </div>
 
@@ -176,7 +176,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
               }`}
             >
               <CheckCircle2 size={12} />
-              <span>On Jellyfin</span>
+              <span>In Library</span>
             </button>
             <button
               onClick={() => setActiveFilter('movies')}
@@ -208,7 +208,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
       {isLoading && (
         <div className="flex flex-col items-center justify-center py-20 text-neutral-400 space-y-3">
           <Loader2 size={36} className="animate-spin text-red-600" />
-          <span className="text-sm">Searching Seerr &amp; Jellyfin...</span>
+          <span className="text-sm">Searching TMDB &amp; HomeStream...</span>
         </div>
       )}
 
@@ -226,7 +226,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
       {/* Search Results Grid */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-4 md:gap-5">
         {filteredResults.map((item) => {
-          const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'native' || item.source === 'demo';
+          const isAvailable = item.status === 'available' || item.source === 'native' || item.source === 'demo';
           const isRequested = item.status === 'requested' || item.status === 'processing';
 
           return (
@@ -249,7 +249,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
                   {isAvailable ? (
                     <span className="bg-emerald-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
                       <CheckCircle2 size={11} />
-                      <span>ON JELLYFIN</span>
+                      <span>IN LIBRARY</span>
                     </span>
                   ) : item.isDownloading || item.downloadStreamUrl ? (
                     <span className="bg-blue-600/95 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
@@ -264,7 +264,7 @@ export const SearchOverlay: React.FC<SearchOverlayProps> = ({
                   ) : (
                     <span className="bg-blue-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
                       <Download size={11} />
-                      <span>SEERR</span>
+                      <span>TMDB</span>
                     </span>
                   )}
                 </div>

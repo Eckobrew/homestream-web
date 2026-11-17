@@ -76,13 +76,13 @@ export default async function Image() {
             gap: 12,
           }}
         >
-          <span>Jellyfin Library</span>
+          <span>Native Media Library</span>
           <span>•</span>
           <span>Multi-Profile Continue Watching</span>
           <span>•</span>
           <span>Chromecast</span>
           <span>•</span>
-          <span>Overseerr</span>
+          <span>TMDB Discovery</span>
         </div>
       </div>
     ),

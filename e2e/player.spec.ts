@@ -12,12 +12,12 @@ test.beforeAll(() => {
   video=readFileSync(file);
 });
 test.afterAll(() => rmSync(directory,{recursive:true,force:true}));
-const episodes=[1,2].map(number=>({id:`episode${number}`,jellyfinId:`episode${number}`,name:`Episode ${number}`,seasonNumber:1,episodeNumber:number,durationMinutes:1,thumbnailUrl:'/demo-poster.svg',playbackPositionTicks:number===1?100000000:0}));
-const series={id:'series',jellyfinId:'series',title:'Test Series',type:'Series',source:'jellyfin',status:'available',overview:'Player fixture',genres:[],posterUrl:'/demo-poster.svg',backdropUrl:'/demo-backdrop.svg',playableEpisodeId:'episode1',durationMinutes:1,playbackPositionTicks:100000000,seasons:[{id:'season1',seasonNumber:1,name:'Season 1',episodeCount:2,episodes}]};
+const episodes=[1,2].map(number=>({id:`episode${number}`,name:`Episode ${number}`,seasonNumber:1,episodeNumber:number,durationMinutes:1,thumbnailUrl:'/demo-poster.svg',playbackPositionTicks:number===1?100000000:0}));
+const series={id:'series',title:'Test Series',type:'Series',source:'native',status:'available',overview:'Player fixture',genres:[],posterUrl:'/demo-poster.svg',backdropUrl:'/demo-backdrop.svg',playableEpisodeId:'episode1',durationMinutes:1,playbackPositionTicks:100000000,seasons:[{id:'season1',seasonNumber:1,name:'Season 1',episodeCount:2,episodes}]};
 async function fixture(page:import('@playwright/test').Page,fail=false) {
   const progress:Record<string,unknown>[]=[];
   await page.route('**/api/v1/accounts?status=1', route => route.fulfill({ json: { needsFirstStart: false } }));
-  await page.route('**/api/v1/config',route=>route.fulfill({json:{appName:'HomeStream',isConfigured:true,isSetupNeeded:false,isJellyfinConfigured:true}}));
+  await page.route('**/api/v1/config',route=>route.fulfill({json:{appName:'HomeStream',isConfigured:true,isSetupNeeded:false,mediaEngine:'native'}}));
   await page.route('**/api/v1/profiles**',route=>route.fulfill({json:{profiles:[{id:'viewer',name:'Viewer'}],activeProfileId:'viewer',needsSetup:false}}));
   await page.route('**/api/v1/home**',route=>route.fulfill({json:{hero:null,sections:[],heroItems:[],isDemoMode:false}}));
   await page.route('**/api/v1/media/**',route=>route.fulfill({json:{item:series}}));

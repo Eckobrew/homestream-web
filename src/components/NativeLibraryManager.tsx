@@ -30,7 +30,7 @@ interface NativeLibraryConfig {
 }
 
 interface NativeSettings {
-  mediaEngine: 'jellyfin' | 'native';
+  mediaEngine: 'native';
   libraries: NativeLibraryConfig[];
   hwAccel: 'none' | 'auto' | 'vaapi' | 'qsv' | 'nvenc' | 'videotoolbox';
   vaapiDevice: string;

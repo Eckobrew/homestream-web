@@ -71,8 +71,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
         setShowVideo(true);
         return;
       }
-      if (currentItem.source === 'jellyfin' || currentItem.source === 'native') return;
-      const tmdb = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+      if (currentItem.source === 'native') return;
+      const tmdb = currentItem.tmdbId || (currentItem.id.startsWith('tmdb-') ? Number(currentItem.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
       const type = currentItem.type === 'Series' ? 'tv' : 'movie';
       try {
         const res = await apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${currentItem.id}`, { signal: controller.signal });
@@ -174,9 +174,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             HF
           </span>
           <span>{currentItem.type === 'Series' ? 'SERIES' : 'FILM'}</span>
-          {(currentItem.source === 'jellyfin' || currentItem.source === 'native') && (
+          {currentItem.source === 'native' && (
             <span className="text-emerald-400 font-semibold">
-              • {currentItem.source === 'native' ? 'Ready to stream' : 'Ready to stream on Jellyfin'}
+              • Ready to stream
             </span>
           )}
         </div>
@@ -207,7 +207,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             <span className="border border-gray-400/40 text-[10px] px-1 py-0.5 rounded font-mono text-gray-300">
               {currentItem.resolution}
             </span>
-          ) : currentItem.source !== 'seerr' ? (
+          ) : currentItem.source === 'native' || currentItem.source === 'demo' ? (
             <span className="border border-gray-400/40 text-[10px] px-1 py-0.5 rounded font-mono text-gray-400">
               HD
             </span>
@@ -234,7 +234,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
         {/* Action Buttons */}
         <div className="flex items-center space-x-2.5 sm:space-x-3 pt-2 pointer-events-auto">
-          {/* If item is requestable (e.g. from Seerr on requests tab) */}
+          {/* If item is requestable (e.g. from TMDB discovery) */}
           {currentItem.status !== 'available' ? (
             <button
               onClick={() => onRequest && onRequest(currentItem)}
@@ -262,7 +262,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
             <button
               onClick={() => {
                 const restartItem = { ...currentItem, playbackPositionTicks: 0, progressPercent: 0 };
-                const targetId = restartItem.playableEpisodeId || (restartItem.type !== 'Series' ? restartItem.jellyfinId || restartItem.id : undefined);
+                const targetId = restartItem.playableEpisodeId || (restartItem.type !== 'Series' ? restartItem.id : undefined);
                 if (targetId) {
                   apiFetch('/api/playback/progress', {
                     method: 'POST',

@@ -42,7 +42,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
   const libraryPreview = item.videoStreamUrl?.startsWith('/api/preview-stream?')
     ? item.videoStreamUrl : undefined;
-  const isAvailable = item.status === 'available' || item.source === 'jellyfin' || item.source === 'native' || item.source === 'demo';
+  const isAvailable = item.status === 'available' || item.source === 'native' || item.source === 'demo';
   const isRequested = item.status === 'requested' || item.status === 'processing';
 
   // Smooth hover intent delay & preview trigger
@@ -108,9 +108,9 @@ export const MediaCard: React.FC<MediaCardProps> = ({
         previewTimeoutRef.current = setTimeout(() => setIsPlayingPreview(true), 400);
         return;
       }
-      if (item.source === 'jellyfin' || item.source === 'native') return;
+      if (item.source === 'native') return;
 
-      const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+      const tmdb = item.tmdbId || (item.id.startsWith('tmdb-') ? Number(item.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
       const type = item.type === 'Series' ? 'tv' : 'movie';
       const controller = new AbortController();
       trailerRequestRef.current = controller;
@@ -203,7 +203,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
             </div>
           )}
 
-          {/* Status badge in top right corner if from Seerr or Actively Downloading */}
+          {/* Status badge in top right corner for TMDB / Actively Downloading */}
           {item.isDownloading ? (
             <div className="absolute top-2 right-2 z-10">
               <span className="bg-blue-600/90 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow backdrop-blur-sm flex items-center space-x-1 border border-blue-400/40">
@@ -211,11 +211,11 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 <span>DOWNLOADING {item.downloadProgress || 0}%</span>
               </span>
             </div>
-          ) : item.source === 'seerr' && (
+          ) : item.source === 'tmdb' && (
             <div className="absolute top-2 right-2 z-10">
               {isAvailable ? (
                 <span className="bg-emerald-600/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow backdrop-blur-sm">
-                  ON JELLYFIN
+                  IN LIBRARY
                 </span>
               ) : isRequested ? (
                 <span className="bg-amber-600/90 text-white text-[10px] font-bold px-1.5 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
@@ -368,7 +368,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                         ? 'bg-amber-600 cursor-not-allowed opacity-80'
                         : 'bg-red-600 hover:bg-red-500'
                     }`}
-                    title={isRequested ? 'Requested' : 'Request to Download via Seerr'}
+                    title={isRequested ? 'Requested' : 'Request Download'}
                   >
                     {isRequested ? <Clock size={15} /> : <Download size={15} />}
                   </button>
@@ -463,7 +463,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 <span className="border border-gray-400/40 text-[9px] px-1 rounded font-mono text-gray-300">
                   {item.resolution === '4K UHD' ? '4K' : item.resolution === '1080p HD' ? 'HD' : item.resolution}
                 </span>
-              ) : item.source !== 'seerr' ? (
+              ) : item.source === 'native' || item.source === 'demo' ? (
                 <span className="border border-gray-400/40 text-[9px] px-1 rounded font-mono text-gray-400">
                   HD
                 </span>

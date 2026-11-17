@@ -6,19 +6,9 @@ import { resolve, join } from 'node:path';
 const backend = resolve(process.env.HOMESTREAM_BACKEND_DIR || '../homestream-backend');
 const directory = await mkdtemp(join(tmpdir(), 'homestream-browser-'));
 const children = [];
-const env = { HOMESTREAM_DEMO_MODE: 'true', ...process.env, DATA_DIR: directory, JELLYFIN_URL: '', JELLYFIN_API_KEY: '', SEERR_URL: '', SEERR_API_KEY: '', QBITTORRENT_URL: '', NEXT_PUBLIC_JELLYFIN_URL: '', NEXT_PUBLIC_SEERR_URL: '', NEXT_PUBLIC_QBITTORRENT_URL: '', HOMESTREAM_EXTERNAL_URL: 'http://127.0.0.1:3300', HOMESTREAM_SESSION_SECRET: 'browser-test-session-secret-32-characters', HOMESTREAM_MOBILE_TOKEN: 'browser-test-mobile-token-32-characters', HOMESTREAM_TRUSTED_PROXIES: '127.0.0.1,::1', HOST: '127.0.0.1', HOSTNAME: '127.0.0.1', NEXT_TELEMETRY_DISABLED: '1' };
+const env = { HOMESTREAM_DEMO_MODE: 'true', ...process.env, DATA_DIR: directory, TMDB_API_KEY: '', RADARR_URL: '', SONARR_URL: '', QBITTORRENT_URL: '', NEXT_PUBLIC_QBITTORRENT_URL: '', HOMESTREAM_EXTERNAL_URL: 'http://127.0.0.1:3300', HOMESTREAM_SESSION_SECRET: 'browser-test-session-secret-32-characters', HOMESTREAM_MOBILE_TOKEN: 'browser-test-mobile-token-32-characters', HOMESTREAM_TRUSTED_PROXIES: '127.0.0.1,::1', HOST: '127.0.0.1', HOSTNAME: '127.0.0.1', NEXT_TELEMETRY_DISABLED: '1' };
 children.push(spawn(process.execPath, ['dist/server.js'], { cwd: backend, env: { ...env, PORT: '3301' }, stdio: 'inherit' }));
 children.push(spawn(process.execPath, ['.next/standalone/server.js'], { env: { ...env, PORT: '3302', HOMESTREAM_BACKEND_URL: 'http://127.0.0.1:3301' }, stdio: 'inherit' }));
-const jellyfin = createServer((incoming,outgoing) => {
-  const route = new URL(incoming.url,'http://fixture').pathname;
-  outgoing.setHeader('content-type','application/json');
-  if (route === '/System/Info/Public') outgoing.end(JSON.stringify({ServerName:'Test Jellyfin',Version:'10.10.0'}));
-  else if (route === '/Users') outgoing.end(JSON.stringify([{Id:'viewer',Name:'Viewer',Policy:{IsAdministrator:false}}]));
-  else if (route === '/Users/AuthenticateByName') { outgoing.writeHead(503); outgoing.end('{}'); }
-  else if (route.includes('/Items') || route.includes('/Resume')) outgoing.end(JSON.stringify({Items:[]}));
-  else outgoing.end(JSON.stringify({Items:[]}));
-});
-jellyfin.listen(3303,'127.0.0.1');
 const gateway = createServer((incoming, outgoing) => {
   const api = incoming.url.startsWith('/api/');
   const headers = { ...incoming.headers, 'x-forwarded-for': incoming.socket.remoteAddress };
@@ -36,7 +26,6 @@ async function stop() {
   if (stopping) return;
   stopping = true;
   gateway.closeAllConnections(); gateway.close();
-  jellyfin.closeAllConnections(); jellyfin.close();
   for (const child of children) child.kill('SIGTERM');
   await Promise.all(children.map(child => child.exitCode !== null ? undefined : new Promise(resolve => child.once('exit',resolve))));
   await rm(directory, { recursive:true, force:true });

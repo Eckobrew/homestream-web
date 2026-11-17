@@ -46,7 +46,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       return [...staticRoutes, ...mediaRoutes];
     }
   } catch (err) {
-    console.error('Error generating dynamic sitemap from Jellyfin:', err);
+    console.error('Error generating dynamic sitemap:', err);
   }
 
   return staticRoutes;

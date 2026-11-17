@@ -106,7 +106,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
       .catch((err) => console.error('Failed to load item details:', err));
 
     // 2. Fetch trailer for movie or series
-    const tmdb = item.tmdbId || (item.id.startsWith('seerr-') ? Number(item.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+    const tmdb = item.tmdbId || (item.id.startsWith('tmdb-') ? Number(item.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
     apiFetch(`/api/trailer?tmdbId=${tmdb || ''}&type=${type}&itemId=${item.id}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -174,7 +174,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
   if (!item || !currentItem) return null;
 
-  const isAvailable = currentItem.status === 'available' || currentItem.source === 'jellyfin' || currentItem.source === 'native' || currentItem.source === 'demo';
+  const isAvailable = currentItem.status === 'available' || currentItem.source === 'native' || currentItem.source === 'demo';
   const isRequested = currentItem.status === 'requested' || currentItem.status === 'processing';
   const hasResume = Boolean(
     (currentItem.playbackPositionTicks && currentItem.playbackPositionTicks > 0) ||
@@ -192,7 +192,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
     const epKey = `${sNum}-${ep.episodeNumber}`;
     setRequestingEpId(epKey);
     try {
-      const tmdbId = currentItem.tmdbId || (currentItem.seerrId ? Number(currentItem.seerrId) : undefined);
+      const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('tmdb-') ? Number(currentItem.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
       if (!tmdbId) {
         onRequest(currentItem, [sNum], ep);
         return;
@@ -223,7 +223,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const handleRestart = () => {
     if (currentItem.type === 'Series') {
       const allEps = currentItem.seasons?.flatMap((s) => s.episodes || []) || [];
-      const firstEp = allEps.find((ep) => ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-')) || allEps[0];
+      const firstEp = allEps.find((ep) => ep.videoStreamUrl || String(ep.id || '').startsWith('nat-')) || allEps[0];
       const restartItem: MediaItem = {
         ...currentItem,
         playbackPositionTicks: 0,
@@ -234,7 +234,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
         playbackPositionTicks: 0,
       } : undefined;
 
-      const targetId = restartEp?.jellyfinId || restartEp?.id || currentItem.playableEpisodeId || currentItem.jellyfinId || currentItem.id;
+      const targetId = restartEp?.id || currentItem.playableEpisodeId || currentItem.id;
       if (targetId) {
         apiFetch('/api/playback/progress', {
           method: 'POST',
@@ -249,7 +249,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
         playbackPositionTicks: 0,
         progressPercent: 0,
       };
-      const targetId = currentItem.jellyfinId || currentItem.id;
+      const targetId = currentItem.id;
       if (targetId) {
         apiFetch('/api/playback/progress', {
           method: 'POST',
@@ -345,7 +345,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 <>
                   <button
                     onClick={() => {
-                      const firstEp = currentItem.seasons?.flatMap((s) => s.episodes || []).find((ep) => ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-'));
+                      const firstEp = currentItem.seasons?.flatMap((s) => s.episodes || []).find((ep) => ep.videoStreamUrl || String(ep.id || '').startsWith('nat-'));
                       onPlay(currentItem, firstEp);
                     }}
                     className="flex items-center space-x-2 bg-white text-black hover:bg-neutral-200 font-bold px-5 sm:px-6 py-2 rounded transition-transform active:scale-95 shadow"
@@ -396,7 +396,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     return (
                       <button
                         onClick={() => {
-                          const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('seerr-') ? Number(currentItem.id.replace(/^seerr-(?:movie-|tv-)?/, '')) : undefined);
+                          const tmdbId = currentItem.tmdbId || (currentItem.id.startsWith('tmdb-') ? Number(currentItem.id.replace(/^tmdb-(?:movie-|tv-)?/, '')) : undefined);
                           if (tmdbId) {
                             apiFetch('/api/request', {
                               method: 'POST',
@@ -701,7 +701,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     {currentItem.audioQuality}
                   </span>
                 )}
-                {currentItem.source === 'seerr' && !currentItem.resolution && (
+                {currentItem.source === 'tmdb' && !currentItem.resolution && (
                   <span className="border border-neutral-800 text-[10px] px-1.5 py-0.5 rounded font-mono text-neutral-400">
                     HD Available
                   </span>
@@ -734,7 +734,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                   <>
                     <CheckCircle2 size={16} className="text-emerald-500 shrink-0" />
                     <span className="text-emerald-400 font-medium">
-                      Available on your Jellyfin server. Instant playback ready.
+                      Available in your library. Instant playback ready.
                     </span>
                   </>
                 ) : currentItem.isDownloading ? (
@@ -748,14 +748,14 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                   <>
                     <Clock size={16} className="text-amber-500 shrink-0" />
                     <span className="text-amber-400 font-medium">
-                      Requested on Seerr. Sonarr/Radarr is actively fetching this media.
+                      Requested. Sonarr/Radarr is actively fetching this media.
                     </span>
                   </>
                 ) : (
                   <>
                     <AlertCircle size={16} className="text-blue-400 shrink-0" />
                     <span className="text-blue-300 font-medium">
-                      Not currently on Jellyfin. Click &quot;Request via Seerr&quot; to download automatically.
+                      Not yet in your library. Click &quot;Request Only&quot; or &quot;Download &amp; Stream&quot; to fetch it.
                     </span>
                   </>
                 )}
@@ -849,7 +849,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     const isEpRequested = requestedEpIds.has(epKey) || isRequested;
                     const isEpRequesting = requestingEpId === epKey;
                     const isTorrentDownloading = Boolean(currentItem.isDownloading || currentItem.downloadStreamUrl || ep.downloadStreamUrl);
-                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || ep.jellyfinId || String(ep.id || '').startsWith('nat-'))) || isTorrentDownloading;
+                    const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (currentItem.source === 'native' && ep.id))) || isTorrentDownloading;
 
                     return (
                       <div
@@ -972,7 +972,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                                   apiFetch('/api/playback/progress', {
                                     method: 'POST',
                                     headers: { 'Content-Type': 'application/json' },
-                                    body: JSON.stringify({ itemId: ep.jellyfinId || ep.id, positionTicks: 0, isPaused: false }),
+                                    body: JSON.stringify({ itemId: ep.id, positionTicks: 0, isPaused: false }),
                                   }).catch(() => {});
                                   onPlay({ ...currentItem, playbackPositionTicks: 0 }, restartEp);
                                 }}
@@ -1046,7 +1046,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
                 {recommendations.slice(0, 6).map((rec) => {
-                  const recAvailable = rec.status === 'available' || rec.source === 'jellyfin' || rec.source === 'native';
+                  const recAvailable = rec.status === 'available' || rec.source === 'native';
                   const recRequested = rec.status === 'requested' || rec.status === 'processing';
 
                   return (
@@ -1069,7 +1069,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                         <div className="absolute top-2 right-2 z-10">
                           {recAvailable ? (
                             <span className="bg-emerald-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow backdrop-blur-sm">
-                              ON JELLYFIN
+                              IN LIBRARY
                             </span>
                           ) : recRequested ? (
                             <span className="bg-amber-600/90 text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow backdrop-blur-sm flex items-center space-x-1">
@@ -1134,7 +1134,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                               }`}
                             >
                               {recRequested ? <Check size={13} /> : <Download size={13} />}
-                              <span>{recRequested ? 'Requested' : 'Download via Seerr'}</span>
+                              <span>{recRequested ? 'Requested' : 'Request Download'}</span>
                             </button>
                           )}
                         </div>
@@ -1152,7 +1152,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
               <div>
                 <h4 className="font-bold text-white text-base">Want to watch this title?</h4>
                 <p className="text-xs text-neutral-400">
-                  Request it through Seerr to have your automated downloader (Sonarr/Radarr) acquire it.
+                  Request it to have your automated downloader (Sonarr/Radarr) acquire it.
                 </p>
               </div>
               <button
