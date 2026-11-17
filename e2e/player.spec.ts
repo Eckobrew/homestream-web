@@ -122,11 +122,14 @@ test('version changes preserve position and use their own subtitles, trickplay a
   const video = page.locator('video').first();
   const videoTime = () => video.evaluate(el => (el as HTMLVideoElement).currentTime);
   await expect.poll(videoTime).toBeGreaterThan(9);
-  await page.getByRole('combobox', { name: 'Select video version' }).selectOption('alternate');
+  await page.getByRole('button', { name: 'Settings' }).click();
+  await page.getByRole('dialog', { name: 'Player settings' }).getByRole('button', { name: 'Alternate' }).click();
+  await page.getByRole('button', { name: 'Close settings' }).click();
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentSrc)).toContain('version=alternate');
   await expect.poll(videoTime).toBeGreaterThan(9);
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).textTracks[0]?.mode)).toBe('showing');
-  await page.getByRole('combobox', { name: 'Select audio track' }).selectOption('2');
+  await page.getByRole('button', { name: 'Audio' }).click();
+  await page.getByRole('dialog', { name: 'Audio tracks' }).getByRole('button', { name: 'Alternate audio' }).click();
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentSrc)).toContain('audio=2');
   await expect.poll(videoTime).toBeGreaterThan(9);
   const seek = page.getByRole('slider', { name: 'Seek time' });

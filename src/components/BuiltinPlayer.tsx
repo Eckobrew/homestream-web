@@ -25,6 +25,8 @@ import {
   Minimize,
   SkipForward,
   Subtitles,
+  AudioLines,
+  Settings,
   Check,
   X,
   AlertCircle,
@@ -120,7 +122,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [syncRoomCode, setSyncRoomCode] = useState('');
   const [syncJoinCode, setSyncJoinCode] = useState('');
   const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
-  const [showSyncMenu, setShowSyncMenu] = useState(false);
+  const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'settings' | null>(null);
+  const [settingsSubView, setSettingsSubView] = useState<'main' | 'syncplay'>('main');
 
   const isItemDownloading = Boolean(
     isDownloading ||
@@ -192,9 +195,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   }, [isItemDownloading, resolvedTorrentHash, item.title, item.downloadStreamUrl, item.videoStreamUrl]);
   const [hasTriedFallbackTranscode, setHasTriedFallbackTranscode] = useState(false);
   const [playbackDuration, setPlaybackDuration] = useState<number>(0);
-
-  // Subtitles state
-  const [showSubtitleMenu, setShowSubtitleMenu] = useState(false);
 
   // Chromecast / Remote Playback state
   const [isCastAvailable, setIsCastAvailable] = useState(false);
@@ -887,11 +887,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     setShowControls(true);
     if (hideTimeoutRef.current) clearTimeout(hideTimeoutRef.current);
     hideTimeoutRef.current = setTimeout(() => {
-      if (isPlaying && !showSubtitleMenu && !isCasting) {
+      if (isPlaying && !activeMenu && !isCasting) {
         setShowControls(false);
       }
     }, 3500);
-  }, [isPlaying, showSubtitleMenu, isCasting]);
+  }, [isPlaying, activeMenu, isCasting]);
 
   useEffect(() => {
     resetControlsTimer();
@@ -1306,7 +1306,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       if (e.key === 'f') toggleFullscreen();
       if (e.key === 'm') toggleMute();
       if (e.key === 'c' || e.key === 'C') {
-        setShowSubtitleMenu((prev) => !prev);
+        setSettingsSubView('main');
+        setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'));
       }
     };
 
@@ -1679,7 +1680,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             {/* Subtitles & Audio bar */}
             <div className="flex items-center justify-between pt-2 border-t border-neutral-800/80 px-1">
               <button
-                onClick={() => setShowSubtitleMenu(true)}
+                onClick={() => {
+                  setSettingsSubView('main');
+                  setActiveMenu('subtitles');
+                }}
                 className={`flex items-center space-x-1.5 text-xs font-semibold px-3 py-1.5 rounded-full border transition-colors ${
                   selectedSubtitleId
                     ? 'bg-red-950/80 border-red-700 text-red-400'
@@ -1928,132 +1932,64 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               {currentTitle}
             </div>
 
-            {/* Right: Version, SyncPlay, Subtitles, Cast, Restart, Next Episode, Fullscreen */}
-            <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-5 relative shrink-0">
-              {playbackDiag && (
-                <span
-                  className="hidden md:inline-flex items-center px-2 py-0.5 rounded bg-neutral-900/80 border border-neutral-700 text-[11px] text-neutral-300"
-                  title={[
-                    playbackDiag.playMethod,
-                    playbackDiag.resolution,
-                    playbackDiag.sourceVideoCodec,
-                    playbackDiag.sourceAudioCodec,
-                    playbackDiag.transcodeReasons ? `Reason: ${playbackDiag.transcodeReasons}` : undefined,
-                  ].filter(Boolean).join(' · ')}
-                >
-                  {[playbackDiag.playMethod, playbackDiag.resolution].filter(Boolean).join(' · ')}
-                </span>
-              )}
-              <select
-                value={qualityMode}
-                onChange={(e) => {
-                  const cur = currentTimeRef.current;
-                  if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
-                  setHasTriedFallbackTranscode(false);
-                  setQualityMode(e.target.value as QualityMode);
-                }}
-                className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
-                aria-label="Select playback quality"
-              >
-                <option value="auto">Auto</option>
-                <option value="original">Original</option>
-                <option value="1080p">1080p</option>
-                <option value="720p">720p</option>
-              </select>
-              {versions.length > 1 && (
-                <select
-                  value={selectedVersionId || versions[0]?.id || ''}
-                  onChange={(e) => {
-                    const cur = currentTimeRef.current;
-                    if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
-                    setHasTriedFallbackTranscode(false);
-                    setSelectedAudioIndex(undefined);
-                    setSelectedVersionId(e.target.value);
-                  }}
-                  className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
-                  aria-label="Select video version"
-                >
-                  {versions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-              {audioTracks.length > 1 && (
-                <select
-                  value={selectedAudioIndex ?? ''}
-                  onChange={e => {
-                    setVersionResumeSec(currentTimeRef.current);
-                    setHasTriedFallbackTranscode(false);
-                    setSelectedAudioIndex(e.target.value === '' ? undefined : Number(e.target.value));
-                  }}
-                  className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
-                  aria-label="Select audio track"
-                >
-                  <option value="">Auto audio</option>
-                  {audioTracks.map(track => <option key={track.index} value={track.index}>{track.title}</option>)}
-                </select>
-              )}
-
-              {/* SyncPlay Button */}
+            {/* Right: Audio, Subtitles, Settings, Next Episode (Series), Fullscreen */}
+            <div className="flex items-center space-x-2 sm:space-x-3 md:space-x-4 relative shrink-0">
+              {/* Audio Button */}
               <button
-                onClick={() => setShowSyncMenu(!showSyncMenu)}
-                className={`transition-colors p-1 rounded flex items-center gap-1 ${
-                  syncRoomCode ? 'text-emerald-400' : 'text-neutral-300 hover:text-white'
+                onClick={() => {
+                  setSettingsSubView('main');
+                  setActiveMenu((prev) => (prev === 'audio' ? null : 'audio'));
+                }}
+                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
+                  selectedAudioIndex !== undefined ? 'text-red-500' : 'text-neutral-300 hover:text-white'
                 }`}
-                title="SyncPlay (Watch Together)"
+                title="Audio"
+                aria-label="Audio"
               >
-                <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                {syncRoomCode && <span className="text-[11px] font-mono">{syncRoomCode}</span>}
+                <AudioLines className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
               {/* Subtitles Button */}
               <button
-                onClick={() => setShowSubtitleMenu(!showSubtitleMenu)}
-                className={`transition-colors p-1 rounded hover:text-white ${
+                onClick={() => {
+                  setSettingsSubView('main');
+                  setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'));
+                }}
+                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
                   selectedSubtitleId ? 'text-red-500' : 'text-neutral-300 hover:text-white'
                 }`}
                 title="Subtitles (C)"
+                aria-label="Subtitles"
               >
                 <Subtitles className="w-4 h-4 sm:w-5 sm:h-5" />
               </button>
 
-              {/* Cast to Chromecast Button */}
-              <div className="relative flex items-center">
-                <button
-                  onClick={handleCastClick}
-                  className={`p-1 rounded transition-colors relative flex items-center justify-center ${
-                    isCasting
-                      ? 'text-red-500 hover:text-red-400'
-                      : isCastConnecting
-                      ? 'text-amber-400 animate-pulse'
-                      : 'text-neutral-300 hover:text-white'
-                  }`}
-                  title={
-                    isCasting
-                      ? `Casting to ${castDeviceName || 'Chromecast'} (Click to disconnect)`
-                      : isCastConnecting
-                      ? 'Connecting to Chromecast...'
-                      : 'Cast to Chromecast'
-                  }
-                  aria-label="Cast to Chromecast"
-                >
-                  <Cast className="w-4 h-4 sm:w-5 sm:h-5" />
-                  {isCasting && (
-                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-600 rounded-full animate-ping" />
-                  )}
-                </button>
-              </div>
-
-              {/* Restart Episode / Movie Button */}
+              {/* Settings Button (Quality, Video Version, SyncPlay, Cast, Restart, Playback Info) */}
               <button
-                onClick={handleRestart}
-                className="flex items-center space-x-1 sm:space-x-1.5 hover:text-white text-neutral-300 transition-colors text-xs sm:text-sm font-semibold p-1"
-                title={`Restart ${activeEpisode ? 'Episode' : 'Movie'} from beginning (0 / Home)`}
+                onClick={() => {
+                  setSettingsSubView('main');
+                  setActiveMenu((prev) => (prev === 'settings' ? null : 'settings'));
+                }}
+                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 relative ${
+                  activeMenu === 'settings' || syncRoomCode || isCasting
+                    ? 'text-white'
+                    : 'text-neutral-300 hover:text-white'
+                }`}
+                title="Settings"
+                aria-label="Settings"
               >
-                <RotateCcw className="w-4 h-4 sm:w-5 sm:h-5" />
-                <span className="hidden sm:inline">Restart</span>
+                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                {(syncRoomCode || isCasting || isCastConnecting) && (
+                  <span
+                    className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-full ${
+                      isCasting
+                        ? 'bg-red-500'
+                        : isCastConnecting
+                        ? 'bg-amber-400 animate-pulse'
+                        : 'bg-emerald-400'
+                    }`}
+                  />
+                )}
               </button>
 
               {/* Skip Forward / Next Episode on TV shows */}
@@ -2061,22 +1997,24 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 <button
                   onClick={handleNextEpisode}
                   disabled={!nextEpisode && !onNextEpisode}
-                  className={`flex items-center space-x-1 sm:space-x-1.5 transition-colors text-xs sm:text-sm font-semibold p-1 ${
+                  className={`flex items-center space-x-1 sm:space-x-1.5 transition-colors text-xs sm:text-sm font-semibold p-1.5 rounded-lg hover:bg-white/10 ${
                     nextEpisode || onNextEpisode
                       ? 'hover:text-white text-neutral-300 cursor-pointer'
                       : 'text-neutral-600 cursor-not-allowed opacity-50'
                   }`}
                   title={nextEpisode ? `Next Episode: ${nextEpisode.name || `S${nextEpisode.seasonNumber}E${nextEpisode.episodeNumber}`}` : 'Next Episode (N)'}
+                  aria-label="Next Episode"
                 >
                   <SkipForward className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="hidden sm:inline">Next Episode</span>
+                  <span className="hidden lg:inline">Next</span>
                 </button>
               )}
 
               <button
                 onClick={toggleFullscreen}
-                className="hover:text-neutral-300 transition-colors p-1"
+                className="hover:text-neutral-300 transition-colors p-1.5 rounded-lg hover:bg-white/10"
                 title="Fullscreen (F)"
+                aria-label="Fullscreen"
               >
                 {isFullscreen ? <Minimize className="w-4 h-4 sm:w-5 sm:h-5" /> : <Maximize className="w-4 h-4 sm:w-5 sm:h-5" />}
               </button>
@@ -2110,141 +2048,96 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         </button>
       )}
 
-      {showSyncMenu && (
-        <div
-          onClick={(e) => e.stopPropagation()}
-          className="absolute bottom-20 right-6 z-50 w-72 rounded-xl bg-neutral-900/95 border border-neutral-700 p-4 shadow-2xl text-xs space-y-3"
-        >
-          <div className="flex items-center justify-between font-bold text-white">
-            <span>SyncPlay (Watch Together)</span>
-            <button onClick={() => setShowSyncMenu(false)} className="text-neutral-400 hover:text-white">
-              <X size={14} />
-            </button>
-          </div>
-          {syncRoomCode ? (
-            <div className="space-y-2">
-              <div className="bg-black/60 border border-neutral-700 rounded-lg p-2.5 flex items-center justify-between">
-                <span className="text-neutral-400">Room Code</span>
-                <span className="font-mono font-bold text-emerald-400 text-sm">{syncRoomCode}</span>
-              </div>
-              <div className="text-neutral-400">
-                Participants ({syncParticipants.length}): {syncParticipants.map((p) => p.name).join(', ')}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() =>
-                    void apiFetch('/api/syncplay', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        action: 'sync',
-                        code: syncRoomCode,
-                        itemId: activePlayableId || item.id,
-                        isPaused: !isPlaying,
-                        positionTicks: Math.round(currentTime * 10_000_000),
-                      }),
-                    })
-                  }
-                  className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-1.5 rounded"
-                >
-                  Push Sync
-                </button>
-                <button
-                  onClick={() => {
-                    void apiFetch('/api/syncplay', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'leave', code: syncRoomCode }),
-                    });
-                    setSyncRoomCode('');
-                    setSyncParticipants([]);
-                  }}
-                  className="px-3 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 py-1.5 rounded"
-                >
-                  Leave
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2.5">
-              <button
-                onClick={async () => {
-                  const res = await apiFetch('/api/syncplay', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                      action: 'create',
-                      itemId: activePlayableId || item.id,
-                      title: currentTitle,
-                      isPaused: !isPlaying,
-                      positionTicks: Math.round(currentTime * 10_000_000),
-                    }),
-                  });
-                  const d = await res.json().catch(() => ({}));
-                  if (d.room?.code) {
-                    setSyncRoomCode(d.room.code);
-                    setSyncParticipants(d.room.participants || []);
-                  }
-                }}
-                className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2 rounded-lg"
-              >
-                Create SyncPlay Room
-              </button>
-              <div className="flex gap-1.5">
-                <input
-                  type="text"
-                  value={syncJoinCode}
-                  onChange={(e) => setSyncJoinCode(e.target.value.toUpperCase())}
-                  placeholder="Enter room code"
-                  className="flex-1 bg-neutral-950 border border-neutral-700 rounded px-2.5 py-1.5 font-mono text-white"
-                />
-                <button
-                  onClick={async () => {
-                    if (!syncJoinCode.trim()) return;
-                    const res = await apiFetch('/api/syncplay', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({
-                        action: 'join',
-                        code: syncJoinCode.trim(),
-                        itemId: activePlayableId || item.id,
-                      }),
-                    });
-                    const d = await res.json().catch(() => ({}));
-                    if (res.ok && d.room?.code) {
-                      setSyncRoomCode(d.room.code);
-                      setSyncParticipants(d.room.participants || []);
-                      setSyncJoinCode('');
-                    } else if (d?.error) {
-                      alert(d.error);
-                    }
-                  }}
-                  className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-3 py-1.5 rounded"
-                >
-                  Join
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {showSubtitleMenu && (
+      {activeMenu === 'audio' && (
         <div
           className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setShowSubtitleMenu(false)}
+          onClick={() => setActiveMenu(null)}
         >
           <div
             className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[75vh] overflow-y-auto animate-fade-in shadow-2xl"
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Audio tracks"
+          >
+            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+              <div className="flex items-center space-x-2 text-white font-bold text-base">
+                <AudioLines size={18} className="text-red-500" />
+                <span>Audio</span>
+              </div>
+              <button
+                onClick={() => setActiveMenu(null)}
+                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="space-y-1.5">
+              <button
+                onClick={() => {
+                  setVersionResumeSec(currentTimeRef.current);
+                  setHasTriedFallbackTranscode(false);
+                  setSelectedAudioIndex(undefined);
+                  setActiveMenu(null);
+                }}
+                className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                  selectedAudioIndex === undefined
+                    ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
+                    : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
+                }`}
+              >
+                <span>Auto audio</span>
+                {selectedAudioIndex === undefined && <Check size={18} />}
+              </button>
+
+              {audioTracks.map((track) => (
+                <button
+                  key={track.index}
+                  onClick={() => {
+                    setVersionResumeSec(currentTimeRef.current);
+                    setHasTriedFallbackTranscode(false);
+                    setSelectedAudioIndex(track.index);
+                    setActiveMenu(null);
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                    selectedAudioIndex === track.index
+                      ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
+                      : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
+                  }`}
+                >
+                  <span className="truncate pr-2">{track.title}</span>
+                  {selectedAudioIndex === track.index && <Check size={18} />}
+                </button>
+              ))}
+
+              {audioTracks.length === 0 && (
+                <div className="text-sm text-neutral-500 py-3 text-center italic">
+                  Using default audio track
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeMenu === 'subtitles' && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setActiveMenu(null)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[75vh] overflow-y-auto animate-fade-in shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Subtitles"
           >
             <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
               <div className="flex items-center space-x-2 text-white font-bold text-base">
                 <Subtitles size={18} className="text-red-500" />
-                <span>Subtitles & Audio</span>
+                <span>Subtitles</span>
               </div>
               <button
-                onClick={() => setShowSubtitleMenu(false)}
+                onClick={() => setActiveMenu(null)}
                 className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
               >
                 <X size={18} />
@@ -2255,7 +2148,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               <button
                 onClick={() => {
                   changeSubtitleTrack(null);
-                  setShowSubtitleMenu(false);
+                  setActiveMenu(null);
                 }}
                 className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
                   selectedSubtitleId === null
@@ -2272,7 +2165,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                   key={sub.id}
                   onClick={() => {
                     changeSubtitleTrack(sub.id);
-                    setShowSubtitleMenu(false);
+                    setActiveMenu(null);
                   }}
                   className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
                     selectedSubtitleId === sub.id
@@ -2298,6 +2191,309 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      )}
+
+      {activeMenu === 'settings' && (
+        <div
+          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={() => setActiveMenu(null)}
+        >
+          <div
+            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-fade-in shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-label="Player settings"
+          >
+            {settingsSubView === 'syncplay' ? (
+              <>
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                  <div className="flex items-center space-x-2 text-white font-bold text-base">
+                    <button
+                      onClick={() => setSettingsSubView('main')}
+                      className="p-1 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                      aria-label="Back to settings"
+                    >
+                      <ArrowLeft size={16} />
+                    </button>
+                    <Users size={18} className="text-emerald-400" />
+                    <span>SyncPlay (Watch Together)</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveMenu(null)}
+                    className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {syncRoomCode ? (
+                  <div className="space-y-3 text-xs">
+                    <div className="bg-black/60 border border-neutral-700 rounded-lg p-3 flex items-center justify-between">
+                      <span className="text-neutral-400">Room Code</span>
+                      <span className="font-mono font-bold text-emerald-400 text-sm">{syncRoomCode}</span>
+                    </div>
+                    <div className="text-neutral-400">
+                      Participants ({syncParticipants.length}): {syncParticipants.map((p) => p.name).join(', ')}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() =>
+                          void apiFetch('/api/syncplay', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'sync',
+                              code: syncRoomCode,
+                              itemId: activePlayableId || item.id,
+                              isPaused: !isPlaying,
+                              positionTicks: Math.round(currentTime * 10_000_000),
+                            }),
+                          })
+                        }
+                        className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white font-semibold py-2 rounded-lg"
+                      >
+                        Push Sync
+                      </button>
+                      <button
+                        onClick={() => {
+                          void apiFetch('/api/syncplay', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ action: 'leave', code: syncRoomCode }),
+                          });
+                          setSyncRoomCode('');
+                          setSyncParticipants([]);
+                        }}
+                        className="px-4 bg-neutral-800 hover:bg-neutral-700 text-neutral-200 py-2 rounded-lg"
+                      >
+                        Leave
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-3 text-xs">
+                    <button
+                      onClick={async () => {
+                        const res = await apiFetch('/api/syncplay', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            action: 'create',
+                            itemId: activePlayableId || item.id,
+                            title: currentTitle,
+                            isPaused: !isPlaying,
+                            positionTicks: Math.round(currentTime * 10_000_000),
+                          }),
+                        });
+                        const d = await res.json().catch(() => ({}));
+                        if (d.room?.code) {
+                          setSyncRoomCode(d.room.code);
+                          setSyncParticipants(d.room.participants || []);
+                        }
+                      }}
+                      className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-2.5 rounded-lg"
+                    >
+                      Create SyncPlay Room
+                    </button>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={syncJoinCode}
+                        onChange={(e) => setSyncJoinCode(e.target.value.toUpperCase())}
+                        placeholder="Enter room code"
+                        className="flex-1 bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 font-mono text-white"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!syncJoinCode.trim()) return;
+                          const res = await apiFetch('/api/syncplay', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              action: 'join',
+                              code: syncJoinCode.trim(),
+                              itemId: activePlayableId || item.id,
+                            }),
+                          });
+                          const d = await res.json().catch(() => ({}));
+                          if (res.ok && d.room?.code) {
+                            setSyncRoomCode(d.room.code);
+                            setSyncParticipants(d.room.participants || []);
+                            setSyncJoinCode('');
+                          } else if (d?.error) {
+                            alert(d.error);
+                          }
+                        }}
+                        className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-4 py-2 rounded-lg"
+                      >
+                        Join
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            ) : (
+              <>
+                <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
+                  <div className="flex items-center space-x-2 text-white font-bold text-base">
+                    <Settings size={18} className="text-red-500" />
+                    <span>Settings</span>
+                  </div>
+                  <button
+                    onClick={() => setActiveMenu(null)}
+                    className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
+                    aria-label="Close settings"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                {/* Quality */}
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                    Quality
+                  </div>
+                  <div className="grid grid-cols-4 gap-1.5">
+                    {(['auto', 'original', '1080p', '720p'] as QualityMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        onClick={() => {
+                          const cur = currentTimeRef.current;
+                          if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                          setHasTriedFallbackTranscode(false);
+                          setQualityMode(mode);
+                        }}
+                        className={`px-2.5 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
+                          qualityMode === mode
+                            ? 'bg-red-600/20 text-red-400 border-red-600/40'
+                            : 'bg-neutral-800/70 text-neutral-300 hover:bg-neutral-800 border-transparent'
+                        }`}
+                      >
+                        {mode === 'auto' ? 'Auto' : mode === 'original' ? 'Original' : mode}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Video Version */}
+                {versions.length > 1 && (
+                  <div className="space-y-2">
+                    <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                      Video Version
+                    </div>
+                    <div className="space-y-1.5">
+                      {versions.map((v) => {
+                        const isSelected = (selectedVersionId || versions[0]?.id || '') === v.id;
+                        return (
+                          <button
+                            key={v.id}
+                            onClick={() => {
+                              const cur = currentTimeRef.current;
+                              if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                              setHasTriedFallbackTranscode(false);
+                              setSelectedAudioIndex(undefined);
+                              setSelectedVersionId(v.id);
+                            }}
+                            className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors border ${
+                              isSelected
+                                ? 'bg-red-600/20 text-red-400 font-semibold border-red-600/40'
+                                : 'text-neutral-300 hover:bg-neutral-800 border-transparent'
+                            }`}
+                          >
+                            <span className="truncate pr-2">{v.label}</span>
+                            {isSelected && <Check size={16} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Controls: SyncPlay, Cast, Restart */}
+                <div className="space-y-1.5 pt-1 border-t border-neutral-800">
+                  <button
+                    onClick={() => setSettingsSubView('syncplay')}
+                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Users size={16} className={syncRoomCode ? 'text-emerald-400' : 'text-neutral-400'} />
+                      <span>SyncPlay (Watch Together)</span>
+                    </span>
+                    <span className={`text-xs font-mono ${syncRoomCode ? 'text-emerald-400' : 'text-neutral-500'}`}>
+                      {syncRoomCode || 'Off'}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleCastClick();
+                      setActiveMenu(null);
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <Cast
+                        size={16}
+                        className={
+                          isCasting
+                            ? 'text-red-500'
+                            : isCastConnecting
+                            ? 'text-amber-400 animate-pulse'
+                            : 'text-neutral-400'
+                        }
+                      />
+                      <span>
+                        {isCasting
+                          ? `Casting to ${castDeviceName || 'Chromecast'}`
+                          : isCastConnecting
+                          ? 'Connecting to Chromecast...'
+                          : 'Cast to Chromecast'}
+                      </span>
+                    </span>
+                    <span className="text-xs text-neutral-500">
+                      {isCasting ? 'Disconnect' : isCastAvailable ? 'Ready' : ''}
+                    </span>
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      handleRestart();
+                      setActiveMenu(null);
+                    }}
+                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+                  >
+                    <span className="flex items-center gap-2.5">
+                      <RotateCcw size={16} className="text-neutral-400" />
+                      <span>Restart {activeEpisode ? 'Episode' : 'Movie'}</span>
+                    </span>
+                    <span className="text-xs text-neutral-500">0:00</span>
+                  </button>
+                </div>
+
+                {/* Playback Info */}
+                {playbackDiag && (
+                  <div className="pt-2 border-t border-neutral-800 text-[11px] text-neutral-400 space-y-0.5">
+                    <div className="font-semibold text-neutral-300">Playback Info</div>
+                    <div>
+                      {[
+                        playbackDiag.playMethod,
+                        playbackDiag.resolution,
+                        playbackDiag.sourceVideoCodec,
+                        playbackDiag.sourceAudioCodec,
+                      ]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </div>
+                    {playbackDiag.transcodeReasons && (
+                      <div className="text-neutral-500">Reason: {playbackDiag.transcodeReasons}</div>
+                    )}
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
