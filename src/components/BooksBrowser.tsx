@@ -427,7 +427,7 @@ export function BooksBrowser({
                     key={book.id || book.foreignBookId}
                     book={book}
                     busy={busyId === book.id}
-                    onRead={() => void openReader(book)}
+                    onRead={book.readable ? () => void openReader(book) : undefined}
                     onSelect={() => setSelected(book)}
                     onToggleShelf={() => void toggleShelf(book)}
                   />
@@ -477,7 +477,7 @@ export function BooksBrowser({
                   key={book.foreignBookId}
                   book={book}
                   busy={busyId === book.foreignBookId}
-                  onRead={book.inLibrary ? () => void openReader(book) : undefined}
+                  onRead={book.inLibrary && book.readable ? () => void openReader(book) : undefined}
                   onRequest={!book.inLibrary ? () => void handleRequest(book) : undefined}
                   onSelect={() => setSelected(book)}
                   onToggleShelf={book.inLibrary ? () => void toggleShelf(book) : undefined}

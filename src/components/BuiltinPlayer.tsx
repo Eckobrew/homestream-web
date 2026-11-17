@@ -113,6 +113,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [selectedVersionId, setSelectedVersionId] = useState<string | undefined>(undefined);
   const [audioTracks, setAudioTracks] = useState<MediaAudioTrack[]>([]);
   const [selectedAudioIndex, setSelectedAudioIndex] = useState<number | undefined>(undefined);
+  const [burnSubtitleIndex, setBurnSubtitleIndex] = useState<number | undefined>(undefined);
+  const [qualityMode, setQualityMode] = useState<QualityMode>('auto');
+  const [playbackDiag, setPlaybackDiag] = useState<{ playMethod?: string; resolution?: string; sourceVideoCodec?: string; sourceAudioCodec?: string; transcodeReasons?: string } | null>(null);
   const [versionResumeSec, setVersionResumeSec] = useState<number | null>(null);
   const [trickplayUrl, setTrickplayUrl] = useState<string | undefined>(undefined);
   const [trickplayCues, setTrickplayCues] = useState<Array<{ start: number; end: number; src: string; x: number; y: number; w: number; h: number }>>([]);
@@ -353,6 +356,14 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const changeSubtitleTrack = useCallback(
     (subId: string | null) => {
       setSelectedSubtitleId(subId);
+      const target = subId ? subtitles.find((s) => s.id === subId) : undefined;
+      if (target?.burnIn) {
+        setVersionResumeSec(videoRef.current?.currentTime || currentTime);
+        setBurnSubtitleIndex(target.index);
+      } else if (burnSubtitleIndex !== undefined) {
+        setVersionResumeSec(videoRef.current?.currentTime || currentTime);
+        setBurnSubtitleIndex(undefined);
+      }
 
       // If casting via Google Cast SDK, update active tracks on receiver
       if (isCasting && typeof window !== 'undefined' && (window as any).cast?.framework) {
@@ -374,7 +385,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         }
       }
     },
-    [isCasting, subtitles]
+    [burnSubtitleIndex, currentTime, isCasting, setSelectedSubtitleId, subtitles]
   );
 
   const returnFromFailedCast = useCallback((start: { position: number; autoplay: boolean }) => {
@@ -685,15 +696,25 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
     const controller = new AbortController();
     let isMounted = true;
-    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal, false, selectedVersionId, selectedAudioIndex)
+    negotiatePlayback(targetId, mime => videoRef.current?.canPlayType(mime) || '', controller.signal, false, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode)
       .then((data) => {
         if (!isMounted) return;
         if (data.streamUrl) {
           setStreamDelivery({ url: data.streamUrl, type: data.contentType || '' });
           setStreamUrl(data.streamUrl);
           setIsTranscoding(Boolean(data.isTranscoding));
+          setPlaybackDiag({
+            playMethod: data.playMethod || (data.isTranscoding ? 'Transcode' : 'DirectPlay'),
+            resolution: data.resolution,
+            sourceVideoCodec: data.sourceVideoCodec,
+            sourceAudioCodec: data.sourceAudioCodec,
+            transcodeReasons: data.transcodeReasons,
+          });
           setSkipSegments(Array.isArray(data.skipSegments) ? data.skipSegments : []);
           setVersions(Array.isArray(data.versions) ? data.versions : []);
+          if (!selectedVersionId && data.selectedVersionId) {
+            setSelectedVersionId(data.selectedVersionId);
+          }
           setAudioTracks(data.audioTracks || []);
           setTrickplayUrl(data.trickplayUrl);
           if (data.durationSeconds && data.durationSeconds > 0) {
@@ -716,7 +737,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => {
       isMounted = false; controller.abort();
     };
-  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId, selectedAudioIndex]);
+  }, [activePlayableId, item, isJellyfinItem, jellyfinServerUrl, jellyfinApiKey, activeEpisode, selectedVersionId, selectedAudioIndex, burnSubtitleIndex, qualityMode]);
 
   // Parse Trickplay WebVTT sprite sheet cues when trickplayUrl is available
   useEffect(() => {
@@ -1358,7 +1379,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           className={isCasting ? 'hidden' : 'w-full h-full object-contain cursor-pointer'}
           playsInline
         >
-          {subtitles.map((sub) => (
+          {subtitles.filter((sub) => !sub.burnIn && sub.src).map((sub) => (
             <track
               key={sub.id}
               id={`sub-${sub.id}`}
@@ -1836,6 +1857,36 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
             {/* Right: Version, SyncPlay, Subtitles, Cast, Restart, Next Episode, Fullscreen */}
             <div className="flex items-center space-x-2 sm:space-x-4 md:space-x-5 relative shrink-0">
+              {playbackDiag && (
+                <span
+                  className="hidden md:inline-flex items-center px-2 py-0.5 rounded bg-neutral-900/80 border border-neutral-700 text-[11px] text-neutral-300"
+                  title={[
+                    playbackDiag.playMethod,
+                    playbackDiag.resolution,
+                    playbackDiag.sourceVideoCodec,
+                    playbackDiag.sourceAudioCodec,
+                    playbackDiag.transcodeReasons ? `Reason: ${playbackDiag.transcodeReasons}` : undefined,
+                  ].filter(Boolean).join(' · ')}
+                >
+                  {[playbackDiag.playMethod, playbackDiag.resolution].filter(Boolean).join(' · ')}
+                </span>
+              )}
+              <select
+                value={qualityMode}
+                onChange={(e) => {
+                  const cur = currentTimeRef.current;
+                  if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                  setHasTriedFallbackTranscode(false);
+                  setQualityMode(e.target.value as QualityMode);
+                }}
+                className="bg-black/70 border border-neutral-700 text-white text-xs rounded px-2 py-1"
+                aria-label="Select playback quality"
+              >
+                <option value="auto">Auto</option>
+                <option value="original">Original</option>
+                <option value="1080p">1080p</option>
+                <option value="720p">720p</option>
+              </select>
               {versions.length > 1 && (
                 <select
                   value={selectedVersionId || versions[0]?.id || ''}
@@ -1978,7 +2029,11 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           }}
           className="absolute bottom-24 right-6 z-40 bg-white/95 hover:bg-white text-black font-bold text-xs sm:text-sm px-4 py-2 rounded-lg shadow-2xl transition"
         >
-          {activeSkipSegment.type === 'credits' ? 'Skip Credits →' : 'Skip Intro →'}
+          {activeSkipSegment.type === 'credits'
+            ? 'Skip Credits →'
+            : activeSkipSegment.type === 'recap'
+              ? 'Skip Recap →'
+              : 'Skip Intro →'}
         </button>
       )}
 

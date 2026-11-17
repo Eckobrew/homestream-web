@@ -29,8 +29,11 @@ export function BookReader({
     ? 'pdf'
     : book.formats[0] || 'epub';
 
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const isSupportedFormat = format === 'epub' || format === 'pdf';
+  const [loading, setLoading] = useState(isSupportedFormat);
+  const [error, setError] = useState(
+    isSupportedFormat ? '' : `Format "${format.toUpperCase()}" cannot be read in the browser. Use Download instead.`
+  );
   const [percent, setPercent] = useState<number>(initialProgress?.percent || 0);
   const [locationLabel, setLocationLabel] = useState<string>('');
   const [turnAnim, setTurnAnim] = useState<'next' | 'prev' | null>(null);

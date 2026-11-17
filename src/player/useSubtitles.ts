@@ -18,11 +18,17 @@ export function useSubtitles(itemId: string | undefined, video: RefObject<HTMLVi
     if (versionId) query.set('versionId', versionId);
     apiFetch(`/api/subtitles?${query}`, { signal: controller.signal })
       .then(response => { if (!response.ok) throw new Error('Subtitles unavailable'); return response.json(); })
-      .then((data: { subtitles?: SubtitleTrack[] }) => {
+      .then((data: { subtitles?: SubtitleTrack[]; subtitleMode?: string }) => {
         if (controller.signal.aborted) return;
         const tracks = data.subtitles || [];
         setSubtitles(tracks);
-        setSelectedSubtitleId(tracks.find(track => track.isForced)?.id || tracks.find(track => track.isDefault)?.id || null);
+        if (data.subtitleMode === 'none') {
+          setSelectedSubtitleId(null);
+        } else if (data.subtitleMode === 'forced') {
+          setSelectedSubtitleId(tracks.find(track => track.isForced)?.id || null);
+        } else {
+          setSelectedSubtitleId(tracks.find(track => track.isForced)?.id || tracks.find(track => track.isDefault)?.id || null);
+        }
       }).catch(() => {}).finally(() => { if (!controller.signal.aborted) setIsLoadingSubtitles(false); });
     return () => controller.abort();
   }, [itemId, versionId]);

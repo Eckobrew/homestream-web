@@ -1,5 +1,6 @@
 import React from 'react';
 import { fetchTvPlayback, fetchTvMedia, fetchTvSubtitles } from '@/lib/tv-api';
+import { TvWatchPlayer } from '@/components/TvWatchPlayer';
 
 export const revalidate = 0;
 
@@ -81,112 +82,20 @@ export default async function TvWatchPage({
         Press <b>Return / Back</b> on your TV remote to exit
       </div>
 
-      <video
-        id="tv-video"
-        controls
-        autoPlay
-        playsInline
-        preload="auto"
+      <TvWatchPlayer
+        itemId={id}
+        streamSrc={streamSrc}
+        contentType={playback.contentType}
+        isHls={isHls}
         poster={media?.backdropUrl || ''}
-        style={{ width: '100%', height: '100%', backgroundColor: '#000000' }}
-      >
-        <source src={streamSrc} type={isHls ? 'application/x-mpegURL' : playback.contentType || 'video/mp4'} />
-        {subtitles.map((sub, i) => (
-          <track
-            key={sub.id || i}
-            kind="subtitles"
-            src={sub.src}
-            srcLang={sub.language}
-            label={sub.label}
-            default={i === 0}
-          />
-        ))}
-        Your TV browser does not support HTML5 video playback.
-      </video>
-
-      {/* Script for remote control handling, progress beacons, and next episode */}
-      <script
-        dangerouslySetInnerHTML={{
-          __html: `
-            (function() {
-              var video = document.getElementById('tv-video');
-              var itemId = ${JSON.stringify(id)};
-              var nextEpUrl = ${nextEpisode ? JSON.stringify(`/tv/watch/${encodeURIComponent(nextEpisode.jellyfinId || nextEpisode.id)}`) : 'null'};
-              var resumeSeconds = ${JSON.stringify(resumeSeconds)};
-              var isYouTube = ${JSON.stringify(isYouTube)};
-              var lastReport = 0;
-              var stopped = false;
-
-              function reportProgress(ending) {
-                if (!video) return;
-                var now = Date.now();
-                if (stopped || (!ending && now - lastReport < 8000)) return;
-                if (ending) stopped = true;
-                lastReport = now;
-                try {
-                  var dur = isFinite(video.duration) ? video.duration : 0;
-                  var cur = video.currentTime || 0;
-                  var payload = JSON.stringify(isYouTube ? {
-                    videoId: itemId,
-                    positionSeconds: Math.floor(cur),
-                    durationSeconds: Math.floor(dur),
-                    completed: video.ended
-                  } : {
-                    itemId: itemId,
-                    positionTicks: Math.floor(cur * 10000000),
-                    isPaused: video.paused,
-                    isStopped: ending
-                  });
-                  if (navigator.sendBeacon) {
-                    navigator.sendBeacon(isYouTube ? '/api/v1/youtube/progress' : '/api/v1/playback/progress', payload);
-                  }
-                } catch (e) {}
-              }
-
-              function handleKeys(e) {
-                var code = e.keyCode || e.which;
-                // Return / Back (10009 on Tizen, 27 on Esc, 461 on WebOS)
-                if (code === 10009 || code === 27 || code === 461) {
-                  e.preventDefault();
-                  if (video) { video.pause(); reportProgress(true); }
-                  window.history.back();
-                  return;
-                }
-                // Media remote buttons
-                if (code === 415 && video) { video.play(); } // Play
-                if (code === 19 && video) { video.pause(); reportProgress(false); } // Pause
-                if (code === 413 && video) { video.pause(); reportProgress(true); window.history.back(); } // Stop
-              }
-
-              window.addEventListener('keydown', handleKeys);
-              window.addEventListener('pagehide', function() { reportProgress(true); });
-
-              if (video) {
-                video.focus();
-                if (resumeSeconds > 0) {
-                  var restorePosition = function() {
-                    if (!isFinite(video.duration) || resumeSeconds < video.duration) video.currentTime = resumeSeconds;
-                  };
-                  if (video.readyState > 0) restorePosition();
-                  else video.addEventListener('loadedmetadata', restorePosition, { once: true });
-                }
-                video.addEventListener('timeupdate', function() { reportProgress(false); });
-                video.addEventListener('pause', function() { reportProgress(false); });
-                video.addEventListener('ended', function() {
-                  reportProgress(true);
-                  if (nextEpUrl) {
-                    window.location.href = nextEpUrl;
-                  }
-                });
-
-                var playPromise = video.play();
-                if (playPromise && playPromise.catch) {
-                  playPromise.catch(function() {});
-                }
-              }
-            })();
-          `,
-        }}
+        subtitles={subtitles}
+        skipSegments={playback.skipSegments || []}
+        trickplayUrl={playback.trickplayUrl}
+        selectedVersionId={playback.selectedVersionId}
+        durationSeconds={playback.durationSeconds || 0}
+        nextEpUrl={nextEpisode ? `/tv/watch/${encodeURIComponent(nextEpisode.jellyfinId || nextEpisode.id)}` : null}
+        resumeSeconds={resumeSeconds}
+        isYouTube={isYouTube}
       />
     </div>
   );
