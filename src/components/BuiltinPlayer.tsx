@@ -411,7 +411,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         mediaInfo.duration = finalDuration;
       }
 
-      mediaInfo.customData = { itemId: targetId, attempt: generation, playback: { durationSeconds: finalDuration > 0 ? finalDuration : undefined } };
+      mediaInfo.customData = { itemId: targetId, streamItemId: torrentProgressId || targetId, attempt: generation, playback: { durationSeconds: finalDuration > 0 ? finalDuration : undefined } };
       clearCastIdle(session);
 
       if (subtitles && subtitles.length > 0 && (window as any).chrome?.cast?.media?.Track) {
@@ -450,7 +450,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     } catch {
       failed();
     }
-  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isTorrentStream, selectedSubtitleId, selectedVersionId, selectedAudioIndex, cancelCastLoad, returnFromFailedCast]);
+  }, [currentTitle, item, activeEpisode, subtitles, activePlayableId, isTorrentStream, torrentProgressId, selectedSubtitleId, selectedVersionId, selectedAudioIndex, cancelCastLoad, returnFromFailedCast]);
   castLoadRef.current = loadCastMedia;
 
   const inspectCastStartup = useCallback((media: unknown) => {
