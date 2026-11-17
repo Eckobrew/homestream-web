@@ -75,6 +75,11 @@ export function MusicBrowser({
   const [songSort, setSongSort] = useState<'title' | 'artist' | 'album' | 'recent'>('title');
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [selectedPlaylist, setSelectedPlaylist] = useState<PlaylistDetailResponse | null>(null);
+  const [showNewPlaylistForm, setShowNewPlaylistForm] = useState(false);
+  const [newPlaylistName, setNewPlaylistName] = useState('');
+  const [creatingPlaylist, setCreatingPlaylist] = useState(false);
+  const [trackToPlaylist, setTrackToPlaylist] = useState<{ id: string; title: string; artist?: string } | null>(null);
+  const [addingToPlaylistId, setAddingToPlaylistId] = useState('');
   const [showImportModal, setShowImportModal] = useState(false);
   const [importMode, setImportMode] = useState<'spotify' | 'exportify'>('spotify');
   const [selectedFile, setSelectedFile] = useState<{ name: string; isZip: boolean; data: string } | null>(null);
@@ -217,10 +222,108 @@ export function MusicBrowser({
   }, [kids, currentProfileId]);
 
   useEffect(() => {
-    if (category === 'playlists') {
-      fetchPlaylists();
+    fetchPlaylists();
+  }, [fetchPlaylists, reload]);
+
+  function openPlaylistPicker(e: React.MouseEvent, track: { id: string; title: string; artist?: string }) {
+    e.stopPropagation();
+    if (!playlists.length) void fetchPlaylists();
+    setTrackToPlaylist(track);
+  }
+
+  function renderAddToPlaylistButton(track: { id: string; title: string; artist?: string }) {
+    return (
+      <button
+        type="button"
+        onClick={(e) => openPlaylistPicker(e, track)}
+        aria-label="Add to playlist"
+        title="Add to playlist"
+        className="p-3 text-neutral-400 hover:text-[#1DB954] transition"
+      >
+        <Plus size={16} />
+      </button>
+    );
+  }
+
+  async function createCustomPlaylist(name: string): Promise<Playlist | null> {
+    const trimmed = name.trim();
+    if (!trimmed) return null;
+    setCreatingPlaylist(true);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (currentProfileId) params.set('userId', currentProfileId);
+      const r = await apiFetch(`/api/music/playlists${params.size ? `?${params.toString()}` : ''}`, {
+        method: 'POST',
+        body: JSON.stringify({ name: trimmed }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok) throw new Error(data.error || 'Failed to create playlist');
+      await fetchPlaylists();
+      return (data.playlist as Playlist) || null;
+    } catch (e: any) {
+      setError(e.message || 'Failed to create playlist');
+      return null;
+    } finally {
+      setCreatingPlaylist(false);
     }
-  }, [category, fetchPlaylists, reload]);
+  }
+
+  async function handleCreatePlaylist(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    const created = await createCustomPlaylist(newPlaylistName);
+    if (!created) return;
+    setNewPlaylistName('');
+    setShowNewPlaylistForm(false);
+    setNotice(`Created playlist "${created.name}"`);
+    setTimeout(() => setNotice(''), 3000);
+  }
+
+  async function handleAddTrackToPlaylist(playlistId: string, trackId: string) {
+    setAddingToPlaylistId(playlistId);
+    setError('');
+    try {
+      const params = new URLSearchParams();
+      if (currentProfileId) params.set('userId', currentProfileId);
+      const r = await apiFetch(`/api/music/playlist/track${params.size ? `?${params.toString()}` : ''}`, {
+        method: 'POST',
+        body: JSON.stringify({ playlistId, trackId }),
+      });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.success === false) throw new Error(data.error || 'Failed to add track to playlist');
+      setNotice('Added track to playlist');
+      setTimeout(() => setNotice(''), 3000);
+      setTrackToPlaylist(null);
+      void fetchPlaylists();
+      if (selectedPlaylist?.playlist.id === playlistId) {
+        void openPlaylist(playlistId);
+      }
+    } catch (e: any) {
+      setError(e.message || 'Failed to add track to playlist');
+    } finally {
+      setAddingToPlaylistId('');
+    }
+  }
+
+  async function handleRemoveTrackFromPlaylist(playlistId: string, playlistTrackId: string) {
+    setBusy(playlistTrackId);
+    setError('');
+    try {
+      const params = new URLSearchParams({ playlistId, trackId: playlistTrackId });
+      if (currentProfileId) params.set('userId', currentProfileId);
+      const r = await apiFetch(`/api/music/playlist/track?${params.toString()}`, { method: 'DELETE' });
+      const data = await r.json().catch(() => ({}));
+      if (!r.ok || data.success === false) throw new Error(data.error || 'Failed to remove track');
+      setNotice('Track removed from playlist');
+      setTimeout(() => setNotice(''), 3000);
+      await openPlaylist(playlistId);
+      void fetchPlaylists();
+    } catch (e: any) {
+      setError(e.message || 'Failed to remove track');
+    } finally {
+      setBusy('');
+    }
+  }
 
   async function openPlaylist(playlistId: string) {
     setBusy(playlistId);
@@ -644,10 +747,17 @@ export function MusicBrowser({
                     </span>
                   </button>
                   {selected.album.inLibrary && (
-                    <a href={downloadUrl({ trackId: track.id })} download aria-label={`Download ${track.title}`}
-                      title="Download track" className="p-3 text-neutral-400 hover:text-white">
-                      <Download size={16} />
-                    </a>
+                    <>
+                      {renderAddToPlaylistButton({
+                        id: track.id,
+                        title: track.title,
+                        artist: track.artist || selected.album.artist,
+                      })}
+                      <a href={downloadUrl({ trackId: track.id })} download aria-label={`Download ${track.title}`}
+                        title="Download track" className="p-3 text-neutral-400 hover:text-white">
+                        <Download size={16} />
+                      </a>
+                    </>
                   )}
                 </div>
               ))}
@@ -1249,6 +1359,11 @@ export function MusicBrowser({
                             : '--:--'}
                         </span>
                       </button>
+                      {renderAddToPlaylistButton({
+                        id: track.id,
+                        title: track.title,
+                        artist: track.artist,
+                      })}
                       <a
                         href={downloadUrl({ trackId: track.id })}
                         download
@@ -1423,6 +1538,19 @@ export function MusicBrowser({
                           <Download size={16} />
                         </a>
                       )}
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          void handleRemoveTrackFromPlaylist(selectedPlaylist.playlist.id, track.id);
+                        }}
+                        disabled={busy === track.id}
+                        aria-label={`Remove ${track.title} from playlist`}
+                        title="Remove from playlist"
+                        className="p-1 text-neutral-400 hover:text-red-400 transition disabled:opacity-40"
+                      >
+                        <Trash2 size={15} />
+                      </button>
                       {track.status === 'completed' ? (
                         <span className="px-2 py-0.5 rounded-full bg-emerald-950/60 text-[#1DB954] border border-emerald-800/40 font-semibold text-[11px]">
                           ✓ Ready {durStr ? `• ${durStr}` : ''}
@@ -1457,14 +1585,66 @@ export function MusicBrowser({
         {/* Playlists Grid */}
         {category === 'playlists' && !selectedPlaylist && (
           <section className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold text-white">Your Playlists</h3>
                 <p className="text-xs text-neutral-400">
-                  Imported from Spotify • Automatically downloaded via Soulseek (slskd)
+                  Custom &amp; Spotify playlists • Automatically downloaded via Soulseek (slskd)
                 </p>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowNewPlaylistForm((prev) => !prev)}
+                  className="px-4 py-2 rounded-full bg-white text-black hover:bg-neutral-200 text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Plus size={15} />
+                  <span>New Playlist</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowImportModal(true)}
+                  className="px-4 py-2 rounded-full bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center gap-1.5 transition"
+                >
+                  <Upload size={14} />
+                  <span>Import Spotify / CSV</span>
+                </button>
+              </div>
             </div>
+
+            {showNewPlaylistForm && (
+              <form
+                onSubmit={handleCreatePlaylist}
+                className="flex flex-wrap items-center gap-2 p-3 rounded-xl bg-[#242424] border border-neutral-800"
+              >
+                <input
+                  type="text"
+                  value={newPlaylistName}
+                  onChange={(e) => setNewPlaylistName(e.target.value)}
+                  placeholder="Enter new playlist name..."
+                  autoFocus
+                  className="flex-1 min-w-[200px] rounded-lg bg-[#121212] border border-neutral-700 px-3 py-2 text-sm text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+                />
+                <button
+                  type="submit"
+                  disabled={creatingPlaylist || !newPlaylistName.trim()}
+                  className="px-4 py-2 rounded-lg bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center gap-1.5 transition disabled:opacity-50"
+                >
+                  {creatingPlaylist && <Loader2 size={14} className="animate-spin" />}
+                  <span>Create Playlist</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewPlaylistForm(false);
+                    setNewPlaylistName('');
+                  }}
+                  className="px-3 py-2 rounded-lg text-xs font-semibold text-neutral-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+              </form>
+            )}
 
             {playlists.length === 0 ? (
               <div className="p-10 rounded-2xl bg-[#181818] border border-neutral-800 text-center space-y-4">
@@ -1701,6 +1881,86 @@ export function MusicBrowser({
                   <span>{importing ? 'Importing...' : 'Start Import'}</span>
                 </button>
               </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Add Track to Playlist Modal */}
+      {trackToPlaylist && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-[#181818] border border-neutral-800 rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-white">Add to Playlist</h3>
+                <p className="text-xs text-neutral-400 truncate">
+                  {trackToPlaylist.title}{trackToPlaylist.artist ? ` • ${trackToPlaylist.artist}` : ''}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTrackToPlaylist(null)}
+                aria-label="Close Add to Playlist modal"
+                className="text-neutral-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {playlists.length > 0 ? (
+              <div className="max-h-60 overflow-y-auto space-y-1.5 pr-1">
+                {playlists.map((pl) => (
+                  <button
+                    key={pl.id}
+                    type="button"
+                    disabled={addingToPlaylistId === pl.id}
+                    onClick={() => void handleAddTrackToPlaylist(pl.id, trackToPlaylist.id)}
+                    className="w-full flex items-center justify-between gap-3 px-3 py-2.5 rounded-lg bg-[#242424] hover:bg-[#303030] text-left transition disabled:opacity-50"
+                  >
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-white truncate">{pl.name}</div>
+                      <div className="text-xs text-neutral-400">{pl.totalTracks} tracks</div>
+                    </div>
+                    {addingToPlaylistId === pl.id ? (
+                      <Loader2 size={16} className="animate-spin text-[#1DB954] flex-shrink-0" />
+                    ) : (
+                      <Plus size={16} className="text-[#1DB954] flex-shrink-0" />
+                    )}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-neutral-400 py-2">
+                No playlists yet. Create one below and this track will be added right away.
+              </p>
+            )}
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const created = await createCustomPlaylist(newPlaylistName);
+                if (created) {
+                  setNewPlaylistName('');
+                  await handleAddTrackToPlaylist(created.id, trackToPlaylist.id);
+                }
+              }}
+              className="flex items-center gap-2 pt-2 border-t border-neutral-800"
+            >
+              <input
+                type="text"
+                value={newPlaylistName}
+                onChange={(e) => setNewPlaylistName(e.target.value)}
+                placeholder="Or create new playlist..."
+                className="flex-1 rounded-lg bg-[#121212] border border-neutral-700 px-3 py-2 text-xs text-white placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-[#1DB954]"
+              />
+              <button
+                type="submit"
+                disabled={creatingPlaylist || !newPlaylistName.trim()}
+                className="px-3.5 py-2 rounded-lg bg-[#1DB954] hover:bg-[#1ed760] text-black text-xs font-bold flex items-center gap-1 transition disabled:opacity-50"
+              >
+                {creatingPlaylist ? <Loader2 size={13} className="animate-spin" /> : <Plus size={13} />}
+                <span>Create &amp; Add</span>
+              </button>
             </form>
           </div>
         </div>

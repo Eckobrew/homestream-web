@@ -1,7 +1,13 @@
 import React from 'react';
 import { fetchTvMusic, fetchTvMusicAlbum, fetchTvMusicPlaylists } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'Music · TV Mode',
+  'Browse albums and playlists on HomeStream TV.',
+  '/tv/music'
+);
 
 export default async function TvMusicPage({
   searchParams,
@@ -252,7 +258,7 @@ export default async function TvMusicPage({
                   )}
                   <div className="tv-card-meta">
                     <div className="tv-card-title">{pl.name}</div>
-                    <div className="tv-card-sub">{pl.trackCount || 0} tracks</div>
+                    <div className="tv-card-sub">{(pl as any).totalTracks ?? pl.trackCount ?? 0} tracks</div>
                   </div>
                 </a>
               ))}

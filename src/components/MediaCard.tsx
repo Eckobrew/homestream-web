@@ -375,12 +375,33 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                 )}
 
                 <button
-                  onClick={(e) => {
+                  onClick={async (e) => {
                     e.stopPropagation();
-                    setIsFavorite(!isFavorite);
+                    const nextFav = !isFavorite;
+                    setIsFavorite(nextFav);
+                    try {
+                      if (nextFav) {
+                        await apiFetch('/api/watchlist', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            itemId: item.id,
+                            title: item.title,
+                            type: item.type === 'Series' ? 'Series' : 'Movie',
+                            posterUrl: item.posterUrl,
+                            year: item.year,
+                          }),
+                        });
+                      } else {
+                        await apiFetch(`/api/watchlist?itemId=${encodeURIComponent(item.id)}`, { method: 'DELETE' });
+                      }
+                      window.dispatchEvent(new Event('homestream-watchlist-updated'));
+                    } catch {
+                      setIsFavorite(!nextFav);
+                    }
                   }}
                   className="w-8 h-8 rounded-full border border-gray-400 hover:border-white text-gray-300 hover:text-white flex items-center justify-center transition-colors"
-                  title="Add to My List"
+                  title={isFavorite ? 'Remove from My List' : 'Add to My List'}
                 >
                   {isFavorite ? <Check size={16} /> : <Plus size={16} />}
                 </button>

@@ -35,6 +35,8 @@ export function BookReader({
     isSupportedFormat ? '' : `Format "${format.toUpperCase()}" cannot be read in the browser. Use Download instead.`
   );
   const [percent, setPercent] = useState<number>(initialProgress?.percent || 0);
+  const percentRef = useRef(percent);
+  useEffect(() => { percentRef.current = percent; }, [percent]);
   const [locationLabel, setLocationLabel] = useState<string>('');
   const [turnAnim, setTurnAnim] = useState<'next' | 'prev' | null>(null);
   const turnTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -89,7 +91,7 @@ export function BookReader({
   );
 
   const persistProgress = useCallback(
-    (loc: string, pct: number) => {
+    (loc: string, pct: number, spineIndex?: number, spinePct?: number) => {
       const params = profileId ? `?userId=${encodeURIComponent(profileId)}` : '';
       void apiFetch(`/api/books/progress${params}`, {
         method: 'POST',
@@ -98,10 +100,13 @@ export function BookReader({
           bookId: book.id,
           location: loc,
           percent: Math.round(pct * 10) / 10,
+          format,
+          ...(typeof spineIndex === 'number' ? { spineIndex } : {}),
+          ...(typeof spinePct === 'number' ? { spinePct: Math.round(spinePct * 10) / 10 } : {}),
         }),
       }).catch(() => undefined);
     },
-    [book.id, profileId]
+    [book.id, format, profileId]
   );
 
   const turnPage = useCallback(async (forward: boolean) => {
@@ -197,25 +202,58 @@ export function BookReader({
           'a, a:link, a:visited': { color: '#7c2d12 !important', 'text-decoration': 'none !important' },
         });
 
-        const startLoc =
-          initialProgress?.location && initialProgress.location.startsWith('epubcfi(')
-            ? initialProgress.location
-            : undefined;
+        await epubBook.ready;
+        const spineIdx = typeof (initialProgress as any)?.spineIndex === 'number'
+          ? (initialProgress as any).spineIndex
+          : (() => {
+              const m = /^ch:(\d+):/.exec(initialProgress?.location || '');
+              return m ? Number(m[1]) : undefined;
+            })();
+        const restoreSpinePct = typeof (initialProgress as any)?.spinePct === 'number'
+          ? (initialProgress as any).spinePct
+          : undefined;
+        const hasCfi = Boolean(initialProgress?.location && initialProgress.location.startsWith('epubcfi('));
+        const startLoc = hasCfi
+          ? initialProgress!.location
+          : (spineIdx !== undefined ? epubBook.spine?.get?.(spineIdx)?.href : undefined);
+        let restoringIntraChapter = Boolean(!hasCfi && spineIdx !== undefined && restoreSpinePct && restoreSpinePct > 0);
         rendition.on('relocated', (loc: any) => {
           const cfi = loc?.start?.cfi || '';
+          const idx = typeof loc?.start?.index === 'number' ? loc.start.index : undefined;
           const displayed = loc?.start?.displayed;
           if (displayed?.page && displayed?.total) {
             setLocationLabel(`${displayed.page} / ${displayed.total}`);
           }
-          let pct = percent;
+          const localPct = displayed?.total > 1
+            ? Math.round(((Math.max(1, displayed.page || 1) - 1) / (displayed.total - 1)) * 1000) / 10
+            : 0;
+          let pct = percentRef.current;
           if (epubBook.locations?.length?.() > 0 && cfi) {
             pct = Math.max(0, Math.min(100, (epubBook.locations.percentageFromCfi(cfi) || 0) * 100));
             setPercent(pct);
           }
-          if (cfi) persistProgress(cfi, pct);
+          if (cfi && !restoringIntraChapter) persistProgress(cfi, pct, idx, localPct);
         });
 
         await rendition.display(startLoc);
+        if (restoringIntraChapter && !cancelled) {
+          const curDisplayed = rendition.currentLocation?.()?.start?.displayed;
+          const totalInChapter = Number(curDisplayed?.total || 0);
+          const steps = totalInChapter > 1
+            ? Math.round(((restoreSpinePct || 0) / 100) * (totalInChapter - 1))
+            : 0;
+          for (let s = 0; s < steps && !cancelled; s++) {
+            await rendition.next();
+          }
+          restoringIntraChapter = false;
+          const finalLoc = rendition.currentLocation?.()?.start;
+          if (finalLoc?.cfi && !cancelled) {
+            const fp = finalLoc.displayed?.total > 1
+              ? Math.round(((Math.max(1, finalLoc.displayed.page || 1) - 1) / (finalLoc.displayed.total - 1)) * 1000) / 10
+              : 0;
+            persistProgress(finalLoc.cfi, percentRef.current, finalLoc.index, fp);
+          }
+        }
 
         void epubBook.ready
           .then(() => epubBook.locations.generate(1200))

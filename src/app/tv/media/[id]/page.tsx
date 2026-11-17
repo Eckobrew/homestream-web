@@ -1,8 +1,12 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { fetchTvMedia, getBackendUrl } from '@/lib/tv-api';
 import { notFound, redirect } from 'next/navigation';
 
 export const revalidate = 0;
+export const metadata: Metadata = {
+  title: { absolute: 'Media Details · HomeStream TV' },
+};
 
 async function requestMediaAction(formData: FormData) {
   'use server';

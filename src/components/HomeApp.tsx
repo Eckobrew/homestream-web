@@ -69,8 +69,32 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     initialTab === 'downloads' ? 'downloads' : 'modules'
   );
   const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
+  const [watchlistItems, setWatchlistItems] = useState<MediaItem[]>([]);
   const [selectedCollectionId, setSelectedCollectionId] = useState<string | null>(null);
   const [newCollectionName, setNewCollectionName] = useState('');
+
+  const loadWatchlist = useCallback(() => {
+    apiFetch('/api/watchlist')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (Array.isArray(d?.items)) {
+          setWatchlistItems(
+            d.items.map((w: { itemId: string; title: string; type?: string; posterUrl?: string; year?: number }) => ({
+              id: w.itemId,
+              title: w.title,
+              type: w.type === 'Series' ? 'Series' : 'Movie',
+              posterUrl: w.posterUrl || '',
+              year: w.year,
+              overview: '',
+              genres: [],
+              source: 'jellyfin' as const,
+              status: 'available' as const,
+            }))
+          );
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const loadCollections = useCallback(() => {
     apiFetch('/api/collections')
@@ -90,7 +114,14 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [modalItem, setModalItem] = useState<MediaItem | null>(null);
   useEffect(() => {
     loadCollections();
-  }, [activeProfile?.id, modalItem, loadCollections]);
+    loadWatchlist();
+  }, [activeProfile?.id, modalItem, loadCollections, loadWatchlist]);
+
+  useEffect(() => {
+    const handler = () => loadWatchlist();
+    window.addEventListener('homestream-watchlist-updated', handler);
+    return () => window.removeEventListener('homestream-watchlist-updated', handler);
+  }, [loadWatchlist]);
   const [playingState, setPlayingState] = useState<{ item: MediaItem; episode?: Episode } | null>(null);
   const [requestItem, setRequestItem] = useState<MediaItem | null>(null);
   const [requestTarget, setRequestTarget] = useState<{
@@ -368,7 +399,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     else if (currentHub === 'music') setMusicSubTab(subTab as 'albums' | 'artists' | 'songs' | 'playlists');
     else if (currentHub === 'books') setBooksSubTab(subTab as 'shelf' | 'discover' | 'downloads');
     else if (currentHub === 'youtube') setYoutubeSubTab(subTab as 'home' | 'search' | 'subscriptions' | 'queue' | 'archive');
-    else if (currentHub === 'admin') setAdminSubTab(subTab as 'modules' | 'media' | 'downloads' | 'system');
+    else if (currentHub === 'admin') setAdminSubTab(subTab as 'modules' | 'media' | 'playback' | 'maintenance' | 'downloads' | 'system');
   };
 
   const handlePlay = (item: MediaItem, episode?: Episode) => {
@@ -737,6 +768,15 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
 
           {/* Horizontal Scrolling Media Rows */}
           <div className={`relative z-20 ${displayedHeroItems.length > 0 ? '-mt-16 md:-mt-24' : 'pt-20 md:pt-24'} space-y-2 md:space-y-4 pb-20`}>
+            {watchlistItems.length > 0 && (
+              <MediaRow
+                title="My List"
+                items={watchlistItems}
+                onPlay={handlePlay}
+                onOpenModal={handleOpenModal}
+                onRequest={handleRequest}
+              />
+            )}
             {displayedSections.map((section) => (
               <MediaRow
                 key={section.id}

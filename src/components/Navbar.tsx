@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks, Music, Disc, Mic2, ListMusic, BookOpen, Youtube, Layers, Settings2 } from 'lucide-react';
+import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks, Music, Disc, Mic2, ListMusic, BookOpen, Youtube, Layers, Settings2, PlaySquare, RefreshCw } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
 
 export type NavHub = 'home' | 'movies' | 'series' | 'music' | 'books' | 'youtube' | 'admin';
@@ -180,6 +180,8 @@ export const Navbar: React.FC<NavbarProps> = ({
                 : [
                     { id: 'modules', label: 'Modules' },
                     { id: 'media', label: 'Media Management' },
+                    { id: 'playback', label: 'Playback' },
+                    { id: 'maintenance', label: 'Maintenance' },
                     { id: 'downloads', label: 'Downloads' },
                     { id: 'system', label: 'System & Profiles' },
                   ]
@@ -370,18 +372,22 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
 
-                <div className="border-t border-neutral-800/80 my-1" />
+                {onOpenServerSetup && (
+                  <>
+                    <div className="border-t border-neutral-800/80 my-1" />
 
-                <button
-                  onClick={() => {
-                    onOpenServerSetup?.();
-                    setIsProfileMenuOpen(false);
-                  }}
-                  className="w-full px-3 py-2 flex items-center space-x-2 text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors text-xs cursor-pointer"
-                >
-                  <Server size={15} className="text-neutral-400" />
-                  <span>Server Settings</span>
-                </button>
+                    <button
+                      onClick={() => {
+                        onOpenServerSetup();
+                        setIsProfileMenuOpen(false);
+                      }}
+                      className="w-full px-3 py-2 flex items-center space-x-2 text-neutral-300 hover:text-white hover:bg-neutral-800/80 transition-colors text-xs cursor-pointer"
+                    >
+                      <Server size={15} className="text-neutral-400" />
+                      <span>Server Settings</span>
+                    </button>
+                  </>
+                )}
 
                 {isExternal && onLogout && (
                   <>
@@ -519,6 +525,8 @@ export const Navbar: React.FC<NavbarProps> = ({
           [
             { id: 'modules', label: 'Modules', icon: Settings2 },
             { id: 'media', label: 'Media', icon: Server },
+            { id: 'playback', label: 'Playback', icon: PlaySquare },
+            { id: 'maintenance', label: 'Maint', icon: RefreshCw },
             { id: 'downloads', label: 'Downloads', icon: Download },
             { id: 'system', label: 'System', icon: ShieldCheck },
           ].map(({ id, label, icon: Icon }) => (

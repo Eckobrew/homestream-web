@@ -1,10 +1,12 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
 import { fetchTvProfiles, fetchTvAuth, getBackendUrl } from '@/lib/tv-api';
 
-export const metadata = {
-  title: "Who's Watching? - HomeStream TV",
+export const metadata: Metadata = {
+  title: { absolute: "Who's Watching? · HomeStream TV" },
+  robots: { index: false, follow: false },
 };
 
 async function selectProfile(formData: FormData) {

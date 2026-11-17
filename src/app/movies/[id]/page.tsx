@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 import HomeApp from '@/components/HomeApp';
-import { buildMediaMetadata } from '@/lib/seo-metadata';
+import { buildMediaMetadata, fetchMediaSeoJsonLd } from '@/lib/seo-metadata';
 
 interface PageProps {
   params: Promise<{ id: string }>;
@@ -11,5 +11,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function MovieDetailPage({ params }: PageProps) {
-  return <HomeApp initialTab="movies" initialMediaId={(await params).id} />;
+  const { id } = await params;
+  const jsonLd = await fetchMediaSeoJsonLd(id, 'Movies');
+  return (
+    <>
+      {jsonLd && (
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd).replace(/</g, '\\u003c') }}
+        />
+      )}
+      <HomeApp initialTab="movies" initialMediaId={id} />
+    </>
+  );
 }

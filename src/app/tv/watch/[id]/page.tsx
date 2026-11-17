@@ -1,8 +1,13 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { fetchTvPlayback, fetchTvMedia, fetchTvSubtitles } from '@/lib/tv-api';
 import { TvWatchPlayer } from '@/components/TvWatchPlayer';
 
 export const revalidate = 0;
+export const metadata: Metadata = {
+  title: { absolute: 'Watch · HomeStream TV' },
+  robots: { index: false, follow: false },
+};
 
 export default async function TvWatchPage({
   params,
@@ -17,6 +22,7 @@ export default async function TvWatchPage({
     episode?: string;
     title?: string;
     source?: string;
+    streamUrl?: string;
   }>;
 }) {
   const { id } = await params;
@@ -29,8 +35,11 @@ export default async function TvWatchPage({
   let media: any = null;
 
   if (isYouTube) {
+    const localStream = sp.streamUrl && sp.streamUrl.startsWith('/api/')
+      ? (sp.streamUrl.startsWith('/api/v1/') ? sp.streamUrl : sp.streamUrl.replace(/^\/api\//, '/api/v1/'))
+      : null;
     playback = {
-      streamUrl: `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(id)}`,
+      streamUrl: localStream || `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(id)}`,
       contentType: 'video/mp4',
     };
   } else {

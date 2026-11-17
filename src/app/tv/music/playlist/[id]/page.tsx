@@ -35,7 +35,12 @@ export default async function TvMusicPlaylistPage({
             <span className="tv-badge">{tracks.length} Tracks</span>
           </div>
 
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {tracks.some((t) => t.status === 'completed' && t.streamUrl) && (
+              <a href={`/tv/music/play?playlistId=${encodeURIComponent(id)}&index=0`} className="tv-btn tv-btn-play" tabIndex={0}>
+                ▶ Play Playlist
+              </a>
+            )}
             <a href="/tv/music?tab=playlists" className="tv-btn tv-btn-sec" tabIndex={0}>
               ◀ Back to Playlists
             </a>
@@ -46,12 +51,15 @@ export default async function TvMusicPlaylistPage({
       <div className="tv-section">
         <h2 className="tv-section-title">Tracks ({tracks.length})</h2>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          {tracks.map((track, idx) => {
-            const isReady = track.status === 'completed' && track.streamUrl;
+          {(() => {
+            let readyIdx = -1;
+            return tracks.map((track, idx) => {
+            const isReady = Boolean(track.status === 'completed' && track.streamUrl);
+            if (isReady) readyIdx++;
             const durMin = track.durationSeconds ? Math.floor(track.durationSeconds / 60) : 0;
             const durSec = track.durationSeconds ? Math.floor(track.durationSeconds % 60) : 0;
             const durStr = track.durationSeconds ? `${durMin}:${durSec.toString().padStart(2, '0')}` : '--:--';
-            const playUrl = `/tv/music/play?streamUrl=${encodeURIComponent(track.streamUrl || '')}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist)}&cover=${encodeURIComponent(track.coverUrl || '')}&album=${encodeURIComponent(track.album || playlist.name)}`;
+            const playUrl = `/tv/music/play?playlistId=${encodeURIComponent(id)}&index=${Math.max(0, readyIdx)}`;
 
             return (
               <div
@@ -89,7 +97,8 @@ export default async function TvMusicPlaylistPage({
                 </div>
               </div>
             );
-          })}
+          });
+          })()}
         </div>
       </div>
     </div>

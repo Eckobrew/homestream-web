@@ -60,6 +60,8 @@ export function BooksBrowser({
   const [filterQ, setFilterQ] = useState('');
   const [discoverQ, setDiscoverQ] = useState('');
   const [books, setBooks] = useState<BookItem[]>([]);
+  const [totalBooks, setTotalBooks] = useState(0);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [discoverBooks, setDiscoverBooks] = useState<BookItem[]>([]);
   const [requests, setRequests] = useState<BookRequestItem[]>([]);
   const [queue, setQueue] = useState<BookQueueItem[]>([]);
@@ -72,28 +74,34 @@ export function BooksBrowser({
   const [selected, setSelected] = useState<BookItem | null>(null);
   const [reading, setReading] = useState<{ book: BookItem; progress: BookProgress | null } | null>(null);
 
-  const loadLibrary = useCallback(async () => {
+  const loadLibrary = useCallback(async (nextOffset = 0, append = false) => {
     if (kids) {
       setBooks([]);
+      setTotalBooks(0);
       setLoading(false);
       return;
     }
-    setLoading(true);
+    if (append) setLoadingMore(true);
+    else setLoading(true);
     setError('');
     try {
       const params = new URLSearchParams();
       if (filterQ.trim()) params.set('q', filterQ.trim());
       if (currentProfileId) params.set('userId', currentProfileId);
+      if (nextOffset > 0) params.set('offset', String(nextOffset));
       const res = await apiFetch(`/api/books?${params.toString()}`);
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Could not load books');
       setConfigured(Boolean(data.configured));
-      setBooks(data.books || []);
-      setRequests(data.requests || []);
+      const incoming = Array.isArray(data.books) ? data.books : [];
+      setBooks((prev) => (append ? [...prev, ...incoming.filter((b: BookItem) => !prev.some((p) => p.id === b.id))] : incoming));
+      setTotalBooks(Number(data.total ?? incoming.length));
+      if (!append) setRequests(data.requests || []);
     } catch (err: any) {
       setError(err?.message || 'Unable to load bookshelf');
     } finally {
       setLoading(false);
+      setLoadingMore(false);
     }
   }, [currentProfileId, filterQ, kids]);
 
@@ -211,8 +219,9 @@ export function BooksBrowser({
 
   const openReader = async (book: BookItem) => {
     let progress: BookProgress | null = null;
+    const fmt = book.formats?.find((f) => f === 'epub' || f === 'pdf') || 'epub';
     try {
-      const params = new URLSearchParams({ bookId: book.id });
+      const params = new URLSearchParams({ bookId: book.id, format: fmt });
       if (currentProfileId) params.set('userId', currentProfileId);
       const res = await apiFetch(`/api/books/progress?${params.toString()}`);
       if (res.ok) {
@@ -395,7 +404,7 @@ export function BooksBrowser({
               <Loader2 size={32} className="animate-spin text-red-600" />
               <span className="text-xs uppercase tracking-widest">Loading Bookshelf…</span>
             </div>
-          ) : books.length === 0 ? (
+          ) : shelfBooks.length === 0 ? (
             <div className="rounded-2xl border border-neutral-800/80 bg-neutral-900/30 p-12 text-center space-y-4">
               <BookOpen size={40} className="text-red-500 mx-auto opacity-80" />
               <div className="space-y-1">
@@ -419,10 +428,10 @@ export function BooksBrowser({
                 <h2 className="text-lg font-bold">
                   {activeProfile?.name ? `${activeProfile.name}'s Bookshelf` : 'My Bookshelf'}
                 </h2>
-                <span className="text-xs text-neutral-500">({books.length})</span>
+                <span className="text-xs text-neutral-500">({shelfBooks.length})</span>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
-                {books.map((book) => (
+                {shelfBooks.map((book) => (
                   <BookCard
                     key={book.id || book.foreignBookId}
                     book={book}
@@ -433,6 +442,18 @@ export function BooksBrowser({
                   />
                 ))}
               </div>
+              {books.length < totalBooks && (
+                <div className="flex justify-center pt-4">
+                  <button
+                    type="button"
+                    disabled={loadingMore}
+                    onClick={() => void loadLibrary(books.length, true)}
+                    className="px-5 py-2.5 rounded-xl bg-neutral-900 hover:bg-neutral-800 border border-neutral-800 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {loadingMore ? 'Loading…' : `Load More Books (${books.length} / ${totalBooks})`}
+                  </button>
+                </div>
+              )}
             </section>
           )}
         </div>

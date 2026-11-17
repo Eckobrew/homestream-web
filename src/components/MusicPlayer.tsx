@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import type { MusicTrack } from '@/types';
 import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
@@ -39,23 +39,44 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
     if (typeof window === 'undefined') return false;
     return window.localStorage.getItem('homestream.music.muted') === 'true';
   });
-  const [isShuffle, setIsShuffle] = useState(false);
-  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>('off');
+  const [isShuffle, setIsShuffle] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return window.localStorage.getItem('homestream.music.shuffle') === 'true';
+  });
+  const [repeatMode, setRepeatMode] = useState<'off' | 'all' | 'one'>(() => {
+    if (typeof window === 'undefined') return 'off';
+    const saved = window.localStorage.getItem('homestream.music.repeat');
+    return saved === 'all' || saved === 'one' ? saved : 'off';
+  });
   const [error, setError] = useState('');
 
   const audioRef = useRef<HTMLAudioElement>(null);
+  const shuffleHistoryRef = useRef<number[]>([]);
+  const errorSkipTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const consecutiveErrorsRef = useRef(0);
 
   useEffect(() => {
     setIndex(startIndex);
+    shuffleHistoryRef.current = [];
+    consecutiveErrorsRef.current = 0;
     setError('');
     setCurrentTime(0);
   }, [tracks, startIndex]);
 
   useEffect(() => {
     return () => {
+      if (errorSkipTimerRef.current) clearTimeout(errorSkipTimerRef.current);
       audioRef.current?.pause();
     };
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.localStorage.setItem('homestream.music.shuffle', String(isShuffle));
+      window.localStorage.setItem('homestream.music.repeat', repeatMode);
+    } catch {}
+  }, [isShuffle, repeatMode]);
 
   const track = tracks[index];
 
@@ -82,9 +103,20 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
     }
   };
 
+  const pickNextShuffleIndex = useCallback((current: number) => {
+    if (tracks.length <= 1) return current;
+    const candidates = tracks.map((_, i) => i).filter((i) => i !== current);
+    return candidates[Math.floor(Math.random() * candidates.length)];
+  }, [tracks]);
+
   const handleSkipPrev = () => {
+    if (errorSkipTimerRef.current) { clearTimeout(errorSkipTimerRef.current); errorSkipTimerRef.current = null; }
     if (currentTime > 3 && audioRef.current) {
       audioRef.current.currentTime = 0;
+    } else if (isShuffle && shuffleHistoryRef.current.length > 0) {
+      const prevIdx = shuffleHistoryRef.current.pop()!;
+      setIndex(prevIdx);
+      setError('');
     } else if (index > 0) {
       setIndex((i) => i - 1);
       setError('');
@@ -96,9 +128,11 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
     }
   };
 
-  const handleSkipNext = () => {
+  const handleSkipNext = useCallback(() => {
+    if (errorSkipTimerRef.current) { clearTimeout(errorSkipTimerRef.current); errorSkipTimerRef.current = null; }
     if (isShuffle) {
-      const nextIdx = Math.floor(Math.random() * tracks.length);
+      const nextIdx = pickNextShuffleIndex(index);
+      if (nextIdx !== index) shuffleHistoryRef.current.push(index);
       setIndex(nextIdx);
       setError('');
     } else if (index < tracks.length - 1) {
@@ -108,7 +142,7 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
       setIndex(0);
       setError('');
     }
-  };
+  }, [index, isShuffle, pickNextShuffleIndex, repeatMode, tracks.length]);
 
   const handleTimeUpdate = () => {
     if (audioRef.current) {
@@ -191,6 +225,45 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
     canSeek: effectiveDuration > 0,
     canSkipNext: tracks.length > 1,
     canSkipPrev: tracks.length > 1,
+    onCommand: (cmd) => {
+      switch (cmd.type) {
+        case 'play':
+          if (!isPlaying) audioRef.current?.play().then(() => setIsPlaying(true)).catch(() => {});
+          break;
+        case 'pause':
+          audioRef.current?.pause();
+          setIsPlaying(false);
+          break;
+        case 'togglePlayPause':
+          togglePlayPause();
+          break;
+        case 'stop':
+          onClose();
+          break;
+        case 'seekTo':
+          if (typeof cmd.positionMs === 'number') {
+            const t = Math.max(0, cmd.positionMs / 1000);
+            const clamped = effectiveDuration > 0 ? Math.min(t, effectiveDuration) : t;
+            setCurrentTime(clamped);
+            if (audioRef.current) audioRef.current.currentTime = clamped;
+          }
+          break;
+        case 'seekBy':
+          if (typeof cmd.deltaMs === 'number') {
+            const t = Math.max(0, currentTime + cmd.deltaMs / 1000);
+            const clamped = effectiveDuration > 0 ? Math.min(t, effectiveDuration) : t;
+            setCurrentTime(clamped);
+            if (audioRef.current) audioRef.current.currentTime = clamped;
+          }
+          break;
+        case 'next':
+          handleSkipNext();
+          break;
+        case 'previous':
+          handleSkipPrev();
+          break;
+      }
+    },
   });
 
   if (!track) return null;
@@ -201,15 +274,15 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
       aria-label="Music player"
     >
       <audio
-        key={track.id}
+        key={`${index}:${track.id}`}
         ref={audioRef}
         autoPlay
         preload="metadata"
         src={track.streamUrl}
-        onPlay={() => setIsPlaying(true)}
+        onPlay={() => { setIsPlaying(true); consecutiveErrorsRef.current = 0; setError(''); }}
         onPause={() => setIsPlaying(false)}
         onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={handleLoadedMetadata}
+        onLoadedMetadata={() => { consecutiveErrorsRef.current = 0; handleLoadedMetadata(); }}
         onEnded={() => {
           if (repeatMode === 'one') {
             if (audioRef.current) {
@@ -217,7 +290,8 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
               audioRef.current.play().catch(() => {});
             }
           } else if (isShuffle) {
-            const nextIdx = Math.floor(Math.random() * tracks.length);
+            const nextIdx = pickNextShuffleIndex(index);
+            if (nextIdx !== index) shuffleHistoryRef.current.push(index);
             setIndex(nextIdx);
           } else if (index + 1 < tracks.length) {
             setIndex((i) => i + 1);
@@ -227,7 +301,24 @@ export function MusicPlayer({ tracks, startIndex, onClose }: MusicPlayerProps) {
             setIsPlaying(false);
           }
         }}
-        onError={() => setError('Track playback failed. Verify server audio connection.')}
+        onError={() => {
+          consecutiveErrorsRef.current += 1;
+          const canAdvance = tracks.length > 1
+            && consecutiveErrorsRef.current < tracks.length
+            && (isShuffle || repeatMode === 'all' || index + 1 < tracks.length);
+          if (!canAdvance) {
+            setIsPlaying(false);
+            setError(consecutiveErrorsRef.current >= tracks.length && tracks.length > 1
+              ? 'All tracks failed to load. Verify server connection and retry.'
+              : 'Track playback failed. Verify server audio connection.');
+            return;
+          }
+          setError('Track failed to load — skipping to next…');
+          if (errorSkipTimerRef.current) clearTimeout(errorSkipTimerRef.current);
+          errorSkipTimerRef.current = setTimeout(() => {
+            handleSkipNext();
+          }, 2500);
+        }}
       />
 
       <div className="flex items-center justify-between gap-4 max-w-7xl mx-auto">

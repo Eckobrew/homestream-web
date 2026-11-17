@@ -1,7 +1,13 @@
 import React from 'react';
 import { fetchTvYouTube } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'YouTube · TV Mode',
+  'Watch channels and archived videos on HomeStream TV.',
+  '/tv/youtube'
+);
 
 export default async function TvYouTubePage({
   searchParams,
@@ -120,18 +126,19 @@ export default async function TvYouTubePage({
           ) : (
             <div className="tv-grid">
               {items.map((it: any) => {
-                if (tab === 'subscriptions' && (it.name || it.channelId)) {
-                  const subSearchUrl = `/tv/youtube?q=${encodeURIComponent(it.name || it.channelTitle || it.id)}`;
+                if (tab === 'subscriptions' && (it.title || it.handle || it.name || it.channelId)) {
+                  const channelTitle = it.title || it.name || it.channelTitle || it.handle || it.id;
+                  const subSearchUrl = `/tv/youtube?q=${encodeURIComponent(channelTitle)}`;
                   return (
                     <a key={it.id || it.channelId} href={subSearchUrl} className="tv-card" tabIndex={0}>
                       <img
-                        src={it.avatarUrl || '/poster-placeholder.png'}
-                        alt={it.name || it.channelTitle}
+                        src={it.avatarUrl || it.thumbnailUrl || '/poster-placeholder.png'}
+                        alt={channelTitle}
                         loading="lazy"
                         style={{ width: '100%', height: '180px', objectFit: 'cover' }}
                       />
                       <div className="tv-card-meta">
-                        <div className="tv-card-title">{it.name || it.channelTitle}</div>
+                        <div className="tv-card-title">{channelTitle}</div>
                         <div className="tv-card-sub">Channel • Click to Browse</div>
                       </div>
                     </a>
@@ -140,7 +147,11 @@ export default async function TvYouTubePage({
 
                 const vidId = it.id || it.videoId;
                 const thumb = it.thumbnailUrl || it.thumbnail || `https://i.ytimg.com/vi/${vidId}/mqdefault.jpg`;
-                const watchUrl = `/tv/watch/${vidId}?source=youtube`;
+                const watchUrl = `/tv/watch/${encodeURIComponent(vidId)}?source=youtube${
+                  typeof it.streamUrl === 'string' && it.streamUrl.startsWith('/api/')
+                    ? `&streamUrl=${encodeURIComponent(it.streamUrl)}`
+                    : ''
+                }`;
 
                 return (
                   <a key={vidId} href={watchUrl} className="tv-card tv-card-youtube" tabIndex={0}>

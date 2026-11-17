@@ -786,6 +786,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   // SyncPlay polling when inside a room
   useEffect(() => {
     if (!syncRoomCode) return;
+    const localItem = activePlayableId || item.id;
     const timer = setInterval(async () => {
       try {
         const res = await apiFetch(`/api/syncplay?code=${encodeURIComponent(syncRoomCode)}`);
@@ -793,6 +794,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         const d = await res.json();
         const room = d.room;
         if (!room) return;
+        const roomItem = room.episodeId || room.itemId;
+        if (roomItem && localItem && roomItem !== localItem) {
+          setSyncRoomCode('');
+          setSyncParticipants([]);
+          return;
+        }
         setSyncParticipants(Array.isArray(room.participants) ? room.participants : []);
         const video = videoRef.current;
         if (video) {
@@ -811,7 +818,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       } catch {}
     }, 2000);
     return () => clearInterval(timer);
-  }, [syncRoomCode]);
+  }, [syncRoomCode, activePlayableId, item.id]);
 
   const activeSkipSegment = useMemo(
     () => skipSegments.find((s) => currentTime >= s.startSeconds && currentTime < s.endSeconds - 1),
@@ -1099,6 +1106,40 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     canSeek: mediaSessionDuration > 0,
     canSkipNext: Boolean(nextEpisode || onNextEpisode),
     canSkipPrev: false,
+    onCommand: (cmd) => {
+      switch (cmd.type) {
+        case 'play':
+          if (!isPlaying) togglePlay();
+          break;
+        case 'pause':
+          if (isPlaying) togglePlay();
+          break;
+        case 'togglePlayPause':
+          togglePlay();
+          break;
+        case 'stop':
+          onClose();
+          break;
+        case 'seekTo':
+          if (typeof cmd.positionMs === 'number') seek(cmd.positionMs / 1000 - currentTime);
+          break;
+        case 'seekBy':
+          if (typeof cmd.deltaMs === 'number') seek(cmd.deltaMs / 1000);
+          break;
+        case 'next':
+          if (nextEpisode || onNextEpisode) nextEpisodeHandler.current();
+          break;
+        case 'muteToggle':
+          if (videoRef.current) videoRef.current.muted = !videoRef.current.muted;
+          break;
+        case 'volumeUp':
+          if (videoRef.current) videoRef.current.volume = Math.min(1, videoRef.current.volume + 0.1);
+          break;
+        case 'volumeDown':
+          if (videoRef.current) videoRef.current.volume = Math.max(0, videoRef.current.volume - 0.1);
+          break;
+      }
+    },
   });
 
   const handleScrubEnd = () => {
@@ -2066,6 +2107,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                       body: JSON.stringify({
                         action: 'sync',
                         code: syncRoomCode,
+                        itemId: activePlayableId || item.id,
                         isPaused: !isPlaying,
                         positionTicks: Math.round(currentTime * 10_000_000),
                       }),
@@ -2130,12 +2172,19 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                     const res = await apiFetch('/api/syncplay', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'join', code: syncJoinCode.trim() }),
+                      body: JSON.stringify({
+                        action: 'join',
+                        code: syncJoinCode.trim(),
+                        itemId: activePlayableId || item.id,
+                      }),
                     });
                     const d = await res.json().catch(() => ({}));
-                    if (d.room?.code) {
+                    if (res.ok && d.room?.code) {
                       setSyncRoomCode(d.room.code);
                       setSyncParticipants(d.room.participants || []);
+                      setSyncJoinCode('');
+                    } else if (d?.error) {
+                      alert(d.error);
                     }
                   }}
                   className="bg-neutral-800 hover:bg-neutral-700 text-white font-semibold px-3 py-1.5 rounded"

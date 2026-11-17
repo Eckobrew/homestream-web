@@ -1,7 +1,13 @@
 import React from 'react';
+import type { Metadata } from 'next';
 import { fetchTvRequested } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata: Metadata = {
+  ...buildSectionMetadata('Requested · TV Mode', 'Track requested media and downloads on HomeStream TV.', '/tv/requested'),
+  robots: { index: false, follow: false },
+};
 
 export default async function TvRequestedPage() {
   const { requested, downloads } = await fetchTvRequested();

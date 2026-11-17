@@ -1,7 +1,9 @@
 import React from 'react';
+import type { Metadata } from 'next';
 
-export const metadata = {
-  title: 'Sign In - HomeStream TV',
+export const metadata: Metadata = {
+  title: { absolute: 'Sign In · HomeStream TV' },
+  robots: { index: false, follow: false },
 };
 
 export default async function TvLoginPage({

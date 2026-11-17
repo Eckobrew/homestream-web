@@ -54,19 +54,23 @@ interface AccountSummary {
 interface ActiveSession {
   deviceId: string;
   deviceName: string;
-  platform: string;
+  platform?: string;
+  deviceType?: string;
   title?: string;
   state?: string;
+  isPlaying?: boolean;
 }
 
 function IntegrationCard({
   integration,
   downloadsPath,
   booksPath,
+  musicPath,
 }: {
   integration: IntegrationSummary;
   downloadsPath: string;
   booksPath: string;
+  musicPath: string;
 }) {
   const [configured, setConfigured] = useState(integration.configured);
   const [url, setUrl] = useState(integration.url);
@@ -74,6 +78,7 @@ function IntegrationCard({
   const [username, setUsername] = useState(integration.username || '');
   const [path, setPath] = useState(downloadsPath);
   const [bPath, setBPath] = useState(booksPath);
+  const [mPath, setMPath] = useState(musicPath);
   const [qualityProfileId, setQualityProfileId] = useState<number>(integration.qualityProfileId || 1);
   const [qualityPreference, setQualityPreference] = useState<'mp3-320' | 'flac' | 'any-lossless' | 'mp3-any'>(
     integration.qualityPreference || 'mp3-320'
@@ -100,6 +105,7 @@ function IntegrationCard({
           parentPin: pin,
           ...(integration.id === 'qbittorrent' ? { downloadsPath: path } : {}),
           ...((integration.id as string) === 'bookshelf' ? { booksPath: bPath } : {}),
+          ...((integration.id as string) === 'slskd' ? { musicPath: mPath } : {}),
           ...(integration.id === 'radarr' || integration.id === 'sonarr' ? { qualityProfileId } : {}),
           ...(integration.id === 'slskd' ? { qualityPreference } : {}),
         }),
@@ -150,22 +156,26 @@ function IntegrationCard({
           {configured ? 'Configured' : 'Not connected'}
         </span>
       </div>
-      <label className="block text-sm text-neutral-300">
-        Server URL
-        <input
-          type="url"
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-          placeholder={
-            (integration.id as string) === 'slskd'
-              ? 'http://192.168.1.146:5030'
-              : (integration.id as string) === 'bookshelf'
-                ? 'http://192.168.1.146:8787'
-                : 'http://192.168.1.100:8688'
-          }
-          className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
-        />
-      </label>
+      {(integration.id as string) !== 'tmdb' && (
+        <label className="block text-sm text-neutral-300">
+          {(integration.id as string) === 'spotify' ? 'Spotify Client ID' : 'Server URL'}
+          <input
+            type={(integration.id as string) === 'spotify' ? 'text' : 'url'}
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder={
+              (integration.id as string) === 'spotify'
+                ? 'Spotify Client ID'
+                : (integration.id as string) === 'slskd'
+                  ? 'http://192.168.1.146:5030'
+                  : (integration.id as string) === 'bookshelf'
+                    ? 'http://192.168.1.146:8787'
+                    : 'http://192.168.1.100:8688'
+            }
+            className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
+          />
+        </label>
+      )}
       {integration.id === 'qbittorrent' && (
         <label className="block text-sm text-neutral-300">
           Username
@@ -197,6 +207,16 @@ function IntegrationCard({
           <input
             value={bPath}
             onChange={(e) => setBPath(e.target.value)}
+            className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
+          />
+        </label>
+      )}
+      {(integration.id as string) === 'slskd' && (
+        <label className="block text-sm text-neutral-300">
+          Music folder inside backend
+          <input
+            value={mPath}
+            onChange={(e) => setMPath(e.target.value)}
             className="mt-2 block w-full rounded-lg border border-neutral-700 bg-black/40 p-3 text-white"
           />
         </label>
@@ -310,6 +330,10 @@ export function AdminIntegrations({
     onTabChange?.(tab);
   }, [tab, onTabChange]);
   const [moduleFilter, setModuleFilter] = useState<'all' | 'configured' | 'disconnected'>('all');
+  const [moduleCategory, setModuleCategory] = useState<'all' | 'media' | 'requests' | 'music_books' | 'downloaders'>('all');
+  const [moduleSearch, setModuleSearch] = useState('');
+  const [systemSubTab, setSystemSubTab] = useState<'all' | 'storage' | 'accounts' | 'sessions'>('all');
+  const [commandStatus, setCommandStatus] = useState('');
   const [data, setData] = useState<IntegrationsResponse | null>(null);
   const [error, setError] = useState('');
   const [mediaStats, setMediaStats] = useState<MediaOverviewStats | null>(null);
@@ -411,11 +435,45 @@ export function AdminIntegrations({
     if (tab === 'system') void loadSystemOverview();
   }, [tab, loadMediaOverview, loadSystemOverview]);
 
+  const CATEGORY_MAP: Record<string, 'media' | 'requests' | 'music_books' | 'downloaders'> = {
+    jellyfin: 'media',
+    tmdb: 'media',
+    seerr: 'requests',
+    radarr: 'requests',
+    sonarr: 'requests',
+    slskd: 'music_books',
+    spotify: 'music_books',
+    bookshelf: 'music_books',
+    qbittorrent: 'downloaders',
+  };
+
+  async function sendRemoteCommand(targetDeviceId: string, type: string, deltaMs?: number) {
+    setCommandStatus('');
+    try {
+      const r = await apiFetch('/api/v1/sessions/command', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ targetDeviceId, type, ...(deltaMs !== undefined ? { deltaMs } : {}) }),
+      });
+      if (!r.ok) {
+        const d = await r.json().catch(() => ({}));
+        setCommandStatus(d.error || `Remote command failed (${r.status})`);
+        return;
+      }
+      setCommandStatus(`Sent "${type}" command.`);
+    } catch {
+      setCommandStatus('Could not reach device session');
+    }
+  }
+
   const integrations = data?.integrations || [];
   const configuredCount = integrations.filter((i) => i.configured).length;
+  const searchLower = moduleSearch.trim().toLowerCase();
   const filteredIntegrations = integrations.filter((i) => {
-    if (moduleFilter === 'configured') return i.configured;
-    if (moduleFilter === 'disconnected') return !i.configured;
+    if (moduleFilter === 'configured' && !i.configured) return false;
+    if (moduleFilter === 'disconnected' && i.configured) return false;
+    if (moduleCategory !== 'all' && CATEGORY_MAP[i.id] !== moduleCategory) return false;
+    if (searchLower && !i.name.toLowerCase().includes(searchLower) && !i.id.toLowerCase().includes(searchLower)) return false;
     return true;
   });
 
@@ -506,25 +564,59 @@ export function AdminIntegrations({
 
       {tab === 'modules' && data && (
         <div className="space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              {(['all', 'configured', 'disconnected'] as const).map((filter) => (
-                <button
-                  key={filter}
-                  onClick={() => setModuleFilter(filter)}
-                  className={`px-3.5 py-1.5 rounded-full text-xs font-semibold capitalize transition border ${
-                    moduleFilter === filter
-                      ? 'bg-white text-black border-white'
-                      : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:border-neutral-600'
-                  }`}
-                >
-                  {filter}
-                </button>
-              ))}
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-2">
+                {([
+                  ['all', 'All Categories'],
+                  ['media', 'Media & Metadata'],
+                  ['requests', 'Requests & Arr'],
+                  ['music_books', 'Music & Books'],
+                  ['downloaders', 'Download Clients'],
+                ] as const).map(([cat, label]) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setModuleCategory(cat)}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                      moduleCategory === cat
+                        ? 'bg-red-600 text-white border-red-500'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+              <input
+                type="search"
+                value={moduleSearch}
+                onChange={(e) => setModuleSearch(e.target.value)}
+                placeholder="Search modules..."
+                className="w-full sm:w-56 rounded-lg border border-neutral-800 bg-neutral-900/90 px-3 py-1.5 text-xs text-white placeholder:text-neutral-500"
+              />
             </div>
-            <p className="text-xs text-neutral-400">
-              {configuredCount} of {integrations.length} modules connected
-            </p>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {(['all', 'configured', 'disconnected'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setModuleFilter(filter)}
+                    className={`px-3.5 py-1.5 rounded-full text-xs font-semibold capitalize transition border ${
+                      moduleFilter === filter
+                        ? 'bg-white text-black border-white'
+                        : 'bg-neutral-900 text-neutral-300 border-neutral-800 hover:border-neutral-600'
+                    }`}
+                  >
+                    {filter}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-neutral-400">
+                {configuredCount} of {integrations.length} modules connected
+              </p>
+            </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-5">
@@ -534,6 +626,7 @@ export function AdminIntegrations({
                 integration={i}
                 downloadsPath={data.downloadsPath}
                 booksPath={data.booksPath || '/books'}
+                musicPath={(data as any).musicPath || '/music'}
               />
             ))}
           </div>
@@ -601,8 +694,31 @@ export function AdminIntegrations({
 
       {tab === 'system' && (
         <div className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">System Status &amp; Profiles</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <h2 className="text-xl font-bold">System Status &amp; Profiles</h2>
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {([
+                  ['all', 'All'],
+                  ['storage', 'Storage & Modules'],
+                  ['accounts', 'Accounts & Profiles'],
+                  ['sessions', 'Active Sessions & Remote'],
+                ] as const).map(([sub, label]) => (
+                  <button
+                    key={sub}
+                    type="button"
+                    onClick={() => setSystemSubTab(sub)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold border transition ${
+                      systemSubTab === sub
+                        ? 'bg-red-600 text-white border-red-500'
+                        : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
             <button
               onClick={() => void loadSystemOverview()}
               disabled={refreshingSystem}
@@ -613,7 +729,9 @@ export function AdminIntegrations({
             </button>
           </div>
 
+          {(systemSubTab === 'all' || systemSubTab === 'storage' || systemSubTab === 'accounts') && (
           <div className="grid md:grid-cols-2 gap-6">
+            {(systemSubTab === 'all' || systemSubTab === 'storage') && (
             <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
               <h3 className="font-semibold text-base flex items-center gap-2">
                 <HardDrive size={16} className="text-red-400" /> Storage Paths &amp; Integrations
@@ -626,6 +744,10 @@ export function AdminIntegrations({
                 <p>
                   <span className="text-neutral-500">Books Path:</span>{' '}
                   <code className="text-xs bg-black/50 px-2 py-0.5 rounded">{data?.booksPath || '/books'}</code>
+                </p>
+                <p>
+                  <span className="text-neutral-500">Music Path:</span>{' '}
+                  <code className="text-xs bg-black/50 px-2 py-0.5 rounded">{data?.musicPath || '/music'}</code>
                 </p>
               </div>
               <div className="flex flex-wrap gap-2 pt-2">
@@ -643,7 +765,9 @@ export function AdminIntegrations({
                 ))}
               </div>
             </div>
+            )}
 
+            {(systemSubTab === 'all' || systemSubTab === 'accounts') && (
             <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4">
               <h3 className="font-semibold text-base flex items-center gap-2">
                 <Users size={16} className="text-blue-400" /> Accounts ({accounts.length}) &amp; Profiles ({profiles.length})
@@ -751,30 +875,67 @@ export function AdminIntegrations({
                 })}
               </div>
             </div>
+            )}
           </div>
+          )}
 
+          {(systemSubTab === 'all' || systemSubTab === 'sessions') && (
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
-            <h3 className="font-semibold text-base flex items-center gap-2">
-              <Activity size={16} className="text-emerald-400" /> Active Playback Sessions ({sessions.length})
-            </h3>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <h3 className="font-semibold text-base flex items-center gap-2">
+                <Activity size={16} className="text-emerald-400" /> Active Playback Sessions ({sessions.length})
+              </h3>
+              {commandStatus && <span className="text-xs text-neutral-300">{commandStatus}</span>}
+            </div>
             {sessions.length === 0 ? (
               <p className="text-sm text-neutral-500">No active playback sessions.</p>
             ) : (
               <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3">
                 {sessions.map((s) => (
-                  <div key={s.deviceId} className="p-3 rounded-lg bg-black/30 border border-neutral-800 text-sm space-y-1">
+                  <div key={s.deviceId} className="p-3 rounded-lg bg-black/30 border border-neutral-800 text-sm space-y-2">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold truncate">{s.deviceName}</span>
-                      <span className="text-xs text-neutral-400">{s.platform}</span>
+                      <span className="text-xs text-neutral-400">{s.platform || s.deviceType || 'device'}</span>
                     </div>
                     <p className="text-xs text-neutral-400 truncate">
-                      {s.title ? `${s.title} (${s.state || 'playing'})` : s.state || 'idle'}
+                      {s.title ? `${s.title} (${s.state || (s.isPlaying ? 'playing' : 'paused')})` : s.state || (s.isPlaying ? 'playing' : 'idle')}
                     </p>
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      <button
+                        type="button"
+                        onClick={() => void sendRemoteCommand(s.deviceId, 'togglePlayPause')}
+                        className="px-2 py-1 rounded text-[11px] border border-neutral-700 hover:bg-neutral-800"
+                      >
+                        Play/Pause
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sendRemoteCommand(s.deviceId, 'seekBy', -10000)}
+                        className="px-2 py-1 rounded text-[11px] border border-neutral-700 hover:bg-neutral-800"
+                      >
+                        -10s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sendRemoteCommand(s.deviceId, 'seekBy', 10000)}
+                        className="px-2 py-1 rounded text-[11px] border border-neutral-700 hover:bg-neutral-800"
+                      >
+                        +10s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => void sendRemoteCommand(s.deviceId, 'stop')}
+                        className="px-2 py-1 rounded text-[11px] border border-red-800/60 text-red-300 hover:bg-red-950/40"
+                      >
+                        Stop
+                      </button>
+                    </div>
                   </div>
                 ))}
               </div>
             )}
           </div>
+          )}
         </div>
       )}
     </main>

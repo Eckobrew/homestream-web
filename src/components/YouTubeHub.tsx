@@ -168,6 +168,10 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
   const [newSubIgnoreShorts, setNewSubIgnoreShorts] = useState(true);
   const [isSubmittingSub, setIsSubmittingSub] = useState(false);
   const [subModalError, setSubModalError] = useState<string | null>(null);
+  const [checkingChannelId, setCheckingChannelId] = useState<string | null>(null);
+  const [editingSubId, setEditingSubId] = useState<string | null>(null);
+  const [editSubMinDuration, setEditSubMinDuration] = useState(30);
+  const [editSubAutoDownload, setEditSubAutoDownload] = useState(true);
 
   // Queue State
   const [downloadQueue, setDownloadQueue] = useState<YouTubeDownloadItem[]>([]);
@@ -359,7 +363,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
   const handleDismissContinue = async (e: React.MouseEvent, videoId: string) => {
     e.stopPropagation();
     try {
-      await apiFetch(`/api/youtube/progress?videoId=${encodeURIComponent(videoId)}`, { method: 'DELETE' });
+      await apiFetch(`/api/youtube/progress?videoId=${encodeURIComponent(videoId)}&profileId=${encodeURIComponent(profileId)}`, { method: 'DELETE' });
       setContinueWatching((prev) => prev.filter((p) => p.videoId !== videoId));
       showToast('Removed from continue watching');
     } catch {}
@@ -492,6 +496,95 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
       setSubModalError(err.message || 'Error subscribing to channel');
     } finally {
       setIsSubmittingSub(false);
+    }
+  };
+
+  const handleCheckSubscriptions = async (channelId?: string) => {
+    setCheckingChannelId(channelId || 'all');
+    try {
+      const res = await apiFetch('/api/youtube/subscriptions/check', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(channelId ? { channelId } : {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(data.error || 'Failed to check subscriptions');
+      } else {
+        showToast(
+          typeof data.downloadedCount === 'number'
+            ? `Checked channel (${data.downloadedCount} new queued)`
+            : data.message || 'Checked all subscribed channels'
+        );
+        await Promise.all([loadSubscriptions(), loadQueue()]);
+      }
+    } catch {
+      showToast('Failed to check subscriptions');
+    } finally {
+      setCheckingChannelId(null);
+    }
+  };
+
+  const handleUpdateSubscription = async (
+    sub: YouTubeSubscription,
+    patch: { autoDownload?: boolean; minDurationSeconds?: number }
+  ) => {
+    try {
+      const res = await apiFetch('/api/youtube/subscriptions', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: sub.id,
+          autoDownload: patch.autoDownload ?? sub.autoDownload,
+          minDurationSeconds: patch.minDurationSeconds ?? sub.minDurationSeconds,
+          ignoreShorts: sub.ignoreShorts,
+        }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Failed to update subscription');
+        return;
+      }
+      setEditingSubId(null);
+      await loadSubscriptions();
+      showToast('Subscription updated');
+    } catch {
+      showToast('Failed to update subscription');
+    }
+  };
+
+  const handleDeleteSubscription = async (sub: YouTubeSubscription) => {
+    try {
+      const res = await apiFetch(`/api/youtube/subscriptions?id=${encodeURIComponent(sub.id)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Failed to unsubscribe');
+        return;
+      }
+      if (editingSubId === sub.id) setEditingSubId(null);
+      await loadSubscriptions();
+      showToast(`Unsubscribed from ${sub.title}`);
+    } catch {
+      showToast('Failed to unsubscribe');
+    }
+  };
+
+  const handleCancelQueueItem = async (videoId: string) => {
+    try {
+      const res = await apiFetch(`/api/youtube/queue?videoId=${encodeURIComponent(videoId)}`, {
+        method: 'DELETE',
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showToast(data.error || 'Failed to remove item from queue');
+        return;
+      }
+      await loadQueue();
+      showToast('Removed from download queue');
+    } catch {
+      showToast('Failed to remove item from queue');
     }
   };
 
@@ -698,7 +791,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                         </h4>
                         <div className="flex items-center justify-between mt-2 text-[11px] text-neutral-400">
                           <span className="truncate">{item.channelName || 'YouTube'}</span>
-                          <span>{formatDurationSeconds(item.positionSeconds)} left</span>
+                          <span>{formatDurationSeconds(Math.max(0, (item.durationSeconds || 0) - (item.positionSeconds || 0)))} left</span>
                         </div>
                       </div>
                     </div>
@@ -873,20 +966,33 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
         {/* VIEW: SUBSCRIPTIONS */}
         {currentView === 'subscriptions' && (
           <div className="space-y-6">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h3 className="text-xl font-bold tracking-tight">Channel Subscriptions</h3>
                 <p className="text-xs text-neutral-400 mt-1">
                   Channels automatically checked for new podcast episodes.
                 </p>
               </div>
-              <button
-                onClick={() => setIsAddSubModalOpen(true)}
-                className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-full text-xs font-bold transition shadow-lg shadow-red-900/30"
-              >
-                <Plus size={16} />
-                <span>Add Channel</span>
-              </button>
+              <div className="flex items-center gap-2">
+                {subscriptions.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => void handleCheckSubscriptions()}
+                    disabled={checkingChannelId !== null}
+                    className="flex items-center gap-2 bg-neutral-800 hover:bg-neutral-700 text-white px-4 py-2 rounded-full text-xs font-bold transition disabled:opacity-50"
+                  >
+                    <RefreshCw size={14} className={checkingChannelId === 'all' ? 'animate-spin' : ''} />
+                    <span>Check All</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setIsAddSubModalOpen(true)}
+                  className="flex items-center gap-2 bg-red-600 hover:bg-red-500 text-white px-4 py-2 rounded-full text-xs font-bold transition shadow-lg shadow-red-900/30"
+                >
+                  <Plus size={16} />
+                  <span>Add Channel</span>
+                </button>
+              </div>
             </div>
 
             {subscriptions.length === 0 ? (
@@ -896,29 +1002,131 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {subscriptions.map((sub) => (
-                  <div
-                    key={sub.id}
-                    className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 flex items-start gap-4"
-                  >
-                    <div className="w-12 h-12 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0">
-                      {sub.avatarUrl ? (
-                        <img src={sub.avatarUrl} alt={sub.title} className="w-full h-full object-cover" />
+                {subscriptions.map((sub) => {
+                  const isEditing = editingSubId === sub.id;
+                  return (
+                    <div
+                      key={sub.id}
+                      className="p-4 rounded-xl bg-neutral-900 border border-neutral-800 space-y-3"
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="w-12 h-12 rounded-full bg-neutral-800 overflow-hidden flex-shrink-0">
+                          {sub.avatarUrl ? (
+                            <img src={sub.avatarUrl} alt={sub.title} className="w-full h-full object-cover" />
+                          ) : (
+                            <Radio size={24} className="m-3 text-neutral-600" />
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-white truncate">{sub.title}</h4>
+                          <p className="text-xs text-neutral-400 truncate">{sub.handle || sub.id}</p>
+                          <div className="flex items-center gap-2 mt-2 text-[11px] text-neutral-500">
+                            <span>Min {Math.round(sub.minDurationSeconds / 60)}m</span>
+                            <span>•</span>
+                            <span>{sub.autoDownload ? 'Auto-Download' : 'Manual'}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {isEditing ? (
+                        <div className="pt-2 border-t border-neutral-800 space-y-2.5 text-xs">
+                          <div className="flex items-center justify-between gap-2">
+                            <label className="text-neutral-300" htmlFor={`min-dur-${sub.id}`}>
+                              Min duration (min)
+                            </label>
+                            <input
+                              id={`min-dur-${sub.id}`}
+                              type="number"
+                              min={0}
+                              value={editSubMinDuration}
+                              onChange={(e) => setEditSubMinDuration(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                              className="w-20 bg-neutral-950 border border-neutral-700 rounded px-2 py-1 text-xs text-white"
+                            />
+                          </div>
+                          <label className="flex items-center gap-2 text-neutral-300 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={editSubAutoDownload}
+                              onChange={(e) => setEditSubAutoDownload(e.target.checked)}
+                              className="rounded bg-neutral-950 border-neutral-700 text-red-600 focus:ring-0"
+                            />
+                            <span>Auto-Download new episodes</span>
+                          </label>
+                          <div className="flex justify-end gap-2">
+                            <button
+                              type="button"
+                              onClick={() => setEditingSubId(null)}
+                              className="px-2.5 py-1 rounded text-neutral-400 hover:text-white"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleUpdateSubscription(sub, {
+                                  autoDownload: editSubAutoDownload,
+                                  minDurationSeconds: editSubMinDuration * 60,
+                                })
+                              }
+                              className="px-3 py-1 rounded bg-red-600 hover:bg-red-500 text-white font-semibold"
+                            >
+                              Save
+                            </button>
+                          </div>
+                        </div>
                       ) : (
-                        <Radio size={24} className="m-3 text-neutral-600" />
+                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-neutral-800/80 text-xs">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => void handleCheckSubscriptions(sub.id)}
+                              disabled={checkingChannelId !== null}
+                              title="Check for new uploads"
+                              className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition disabled:opacity-50"
+                            >
+                              <RefreshCw size={12} className={checkingChannelId === sub.id ? 'animate-spin' : ''} />
+                              <span>Check</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void handleUpdateSubscription(sub, { autoDownload: !sub.autoDownload })
+                              }
+                              title="Toggle auto-download"
+                              className="px-2.5 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-neutral-200 transition"
+                            >
+                              {sub.autoDownload ? 'Auto' : 'Manual'}
+                            </button>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingSubId(sub.id);
+                                setEditSubMinDuration(Math.round((sub.minDurationSeconds || 0) / 60));
+                                setEditSubAutoDownload(sub.autoDownload);
+                              }}
+                              title="Edit subscription rules"
+                              aria-label={`Edit ${sub.title}`}
+                              className="p-1.5 rounded-lg text-neutral-400 hover:text-white hover:bg-neutral-800 transition"
+                            >
+                              <Sliders size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => void handleDeleteSubscription(sub)}
+                              title="Unsubscribe"
+                              aria-label={`Unsubscribe from ${sub.title}`}
+                              className="p-1.5 rounded-lg text-neutral-400 hover:text-red-400 hover:bg-neutral-800 transition"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-bold text-white truncate">{sub.title}</h4>
-                      <p className="text-xs text-neutral-400 truncate">{sub.handle || sub.id}</p>
-                      <div className="flex items-center gap-2 mt-3 text-[11px] text-neutral-500">
-                        <span>Min {Math.round(sub.minDurationSeconds / 60)}m</span>
-                        <span>•</span>
-                        <span>{sub.autoDownload ? 'Auto-Download' : 'Manual'}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -969,6 +1177,15 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                         )}
                       </div>
                     </div>
+                    <button
+                      type="button"
+                      onClick={() => void handleCancelQueueItem(item.videoId)}
+                      title="Cancel or remove download"
+                      aria-label={`Remove ${item.title} from queue`}
+                      className="p-2 rounded-lg text-neutral-400 hover:text-red-400 hover:bg-neutral-800 transition flex-shrink-0"
+                    >
+                      <Trash2 size={16} />
+                    </button>
                   </div>
                 ))}
               </div>

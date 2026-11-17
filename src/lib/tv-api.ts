@@ -18,7 +18,7 @@ function isLocalOrTailscaleIp(ip: string): boolean {
   return /^(fc|fd)/.test(clean) || /^fe[89ab]/.test(clean);
 }
 
-async function getForwardedHeaders(): Promise<Record<string, string>> {
+export async function getForwardedHeaders(): Promise<Record<string, string>> {
   try {
     const cookieStore = await cookies();
     const cookieHeader = cookieStore.toString();
@@ -100,17 +100,32 @@ export async function fetchTvProfiles(): Promise<{
 export async function fetchTvHome(): Promise<{
   hero?: MediaItem;
   continueWatching: MediaItem[];
+  watchlist: MediaItem[];
   movies: MediaItem[];
   series: MediaItem[];
 }> {
   try {
     const hdrs = await getForwardedHeaders();
-    const res = await fetch(`${getBackendUrl()}/api/v1/home`, {
-      cache: 'no-store',
-      headers: hdrs,
-    });
+    const [res, wlRes] = await Promise.all([
+      fetch(`${getBackendUrl()}/api/v1/home`, { cache: 'no-store', headers: hdrs }),
+      fetch(`${getBackendUrl()}/api/v1/watchlist`, { cache: 'no-store', headers: hdrs }).catch(() => null),
+    ]);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
+    const wlData = wlRes && wlRes.ok ? await wlRes.json().catch(() => ({})) : {};
+    const watchlist: MediaItem[] = Array.isArray(wlData?.items)
+      ? wlData.items.map((w: { itemId: string; title: string; type?: string; posterUrl?: string; year?: number }) => ({
+          id: w.itemId,
+          title: w.title,
+          type: w.type === 'Series' ? 'Series' : 'Movie',
+          posterUrl: w.posterUrl || '',
+          year: w.year,
+          overview: '',
+          genres: [],
+          source: 'jellyfin' as const,
+          status: 'available' as const,
+        }))
+      : [];
     const continueWatching: MediaItem[] =
       data.continueWatching ||
       data.sections?.find((s: any) => s.id === 'continue-watching')?.items ||
@@ -133,8 +148,8 @@ export async function fetchTvHome(): Promise<{
         if (found.length) { series = found.slice(0, 18); break; }
       }
     }
-    const hero: MediaItem | undefined = data.heroItem || movies[0] || series[0];
-    return { hero, continueWatching, movies, series };
+    const hero: MediaItem | undefined = data.hero || data.heroItem || movies[0] || series[0];
+    return { hero, continueWatching, watchlist, movies, series };
   } catch {
     const [movies, series] = await Promise.all([
       fetchTvLibrary('movies'),
@@ -143,6 +158,7 @@ export async function fetchTvHome(): Promise<{
     return {
       hero: movies[0] || series[0],
       continueWatching: [],
+      watchlist: [],
       movies: movies.slice(0, 18),
       series: series.slice(0, 18),
     };
@@ -210,7 +226,7 @@ export async function fetchTvPlayback(
   }
 }
 
-export async function fetchTvSubtitles(itemId: string): Promise<Array<{ id: string; label: string; language: string; src: string }>> {
+export async function fetchTvSubtitles(itemId: string): Promise<Array<{ id: string; label: string; language: string; src: string; burnIn?: boolean }>> {
   try {
     const hdrs = await getForwardedHeaders();
     const res = await fetch(`${getBackendUrl()}/api/v1/subtitles?itemId=${encodeURIComponent(itemId)}`, {
@@ -223,7 +239,8 @@ export async function fetchTvSubtitles(itemId: string): Promise<Array<{ id: stri
       id: sub.id || String(idx),
       label: sub.title || sub.language || `Subtitle ${idx + 1}`,
       language: sub.language || 'und',
-      src: sub.src || `/api/v1/subtitles?itemId=${encodeURIComponent(itemId)}&index=${idx}`,
+      src: sub.burnIn ? '' : (sub.src || `/api/v1/subtitles?itemId=${encodeURIComponent(itemId)}&index=${sub.index ?? idx}`),
+      burnIn: Boolean(sub.burnIn),
     }));
   } catch {
     return [];
@@ -323,10 +340,10 @@ export async function fetchTvRequested(): Promise<{ requested: any[]; downloads:
       fetch(`${getBackendUrl()}/api/v1/requested`, { cache: 'no-store', headers: hdrs }).catch(() => null),
       fetch(`${getBackendUrl()}/api/v1/downloads`, { cache: 'no-store', headers: hdrs }).catch(() => null),
     ]);
-    const reqData = reqRes && reqRes.ok ? await reqRes.json() : { requested: [] };
+    const reqData = reqRes && reqRes.ok ? await reqRes.json() : { items: [] };
     const dlData = dlRes && dlRes.ok ? await dlRes.json() : { items: [] };
     return {
-      requested: reqData.requested || [],
+      requested: reqData.items || reqData.requested || [],
       downloads: dlData.items || [],
     };
   } catch {

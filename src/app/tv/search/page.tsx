@@ -1,8 +1,14 @@
 import React from 'react';
-import { getBackendUrl } from '@/lib/tv-api';
+import { getBackendUrl, getForwardedHeaders } from '@/lib/tv-api';
 import { MediaItem } from '@/types';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'Search · TV Mode',
+  'Search movies, TV shows, and media on HomeStream TV.',
+  '/tv/search'
+);
 
 export default async function TvSearchPage({
   searchParams,
@@ -15,9 +21,10 @@ export default async function TvSearchPage({
 
   if (query) {
     try {
-      const res = await fetch(`${getBackendUrl()}/api/v1/search?query=${encodeURIComponent(query)}`, {
+      const headers = await getForwardedHeaders();
+      const res = await fetch(`${getBackendUrl()}/api/v1/search?q=${encodeURIComponent(query)}`, {
         cache: 'no-store',
-        headers: { Accept: 'application/json' },
+        headers,
       });
       if (res.ok) {
         const data = await res.json();

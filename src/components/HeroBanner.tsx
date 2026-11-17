@@ -36,6 +36,9 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   }, [items.length]);
 
   const currentItem = items[currentIndex] || items[0];
+  useEffect(() => {
+    setInMyList(false);
+  }, [currentItem?.id]);
   const hasResume = Boolean(
     (currentItem?.playbackPositionTicks && currentItem.playbackPositionTicks > 0) ||
     (currentItem?.progressPercent && currentItem.progressPercent > 0)
@@ -288,7 +291,30 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
           {/* Add to list button */}
           <button
-            onClick={() => setInMyList(!inMyList)}
+            onClick={async () => {
+              const nextState = !inMyList;
+              setInMyList(nextState);
+              try {
+                if (nextState) {
+                  await apiFetch('/api/watchlist', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      itemId: currentItem.id,
+                      title: currentItem.title,
+                      type: currentItem.type === 'Series' ? 'Series' : 'Movie',
+                      posterUrl: currentItem.posterUrl,
+                      year: currentItem.year,
+                    }),
+                  });
+                } else {
+                  await apiFetch(`/api/watchlist?itemId=${encodeURIComponent(currentItem.id)}`, { method: 'DELETE' });
+                }
+                window.dispatchEvent(new Event('homestream-watchlist-updated'));
+              } catch {
+                setInMyList(!nextState);
+              }
+            }}
             className="p-2 sm:p-2.5 rounded-full border-2 border-gray-400 hover:border-white text-white hover:bg-white/10 transition-colors"
             title={inMyList ? 'Remove from My List' : 'Add to My List'}
           >

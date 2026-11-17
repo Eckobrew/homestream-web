@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import type { SkipSegment } from '@/player/transport';
+import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
 
 interface TvSubtitleTrack {
   id?: string;
@@ -70,6 +71,39 @@ export function TvWatchPlayer({
   const [trickplayCues, setTrickplayCues] = useState<TrickplayCue[]>([]);
   const [previewTime, setPreviewTime] = useState<number | null>(null);
   const previewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isPlayingState, setIsPlayingState] = useState(true);
+  const [autoplayEpisodes, setAutoplayEpisodes] = useState(true);
+  const autoplayRef = useRef(true);
+  const [activeSubtitleIndex, setActiveSubtitleIndex] = useState<number>(() => (subtitles.some((s) => !s.burnIn && s.src) ? 0 : -1));
+
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' && window.localStorage.getItem('homestream-autoplay') !== 'false';
+    setAutoplayEpisodes(saved);
+    autoplayRef.current = saved;
+  }, []);
+
+  const toggleAutoplay = useCallback(() => {
+    setAutoplayEpisodes((prev) => {
+      const next = !prev;
+      autoplayRef.current = next;
+      try { window.localStorage.setItem('homestream-autoplay', String(next)); } catch {}
+      return next;
+    });
+  }, []);
+
+  const softSubtitles = subtitles.filter((sub) => !sub.burnIn && sub.src);
+
+  const cycleSubtitles = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || softSubtitles.length === 0) return;
+    setActiveSubtitleIndex((prev) => {
+      const next = prev + 1 >= softSubtitles.length ? -1 : prev + 1;
+      for (let i = 0; i < video.textTracks.length; i += 1) {
+        video.textTracks[i].mode = i === next ? 'showing' : 'disabled';
+      }
+      return next;
+    });
+  }, [softSubtitles.length]);
 
   useEffect(() => {
     setActiveStreamSrc(streamSrc);
@@ -275,11 +309,15 @@ export function TvWatchPlayer({
       const seg = skipSegments.find((s) => curLogical >= s.startSeconds && curLogical < s.endSeconds - 1) || null;
       setActiveSkip(seg);
     };
-    const onPause = () => reportProgress(false);
+    const onPause = () => {
+      setIsPlayingState(false);
+      reportProgress(false);
+    };
+    const onPlay = () => setIsPlayingState(true);
     const onPageHide = () => reportProgress(true);
     const onEnded = () => {
       reportProgress(true);
-      if (nextEpUrl) window.location.href = nextEpUrl;
+      if (autoplayRef.current && nextEpUrl) window.location.href = nextEpUrl;
     };
 
     video.focus();
@@ -287,6 +325,7 @@ export function TvWatchPlayer({
     window.addEventListener('pagehide', onPageHide);
     video.addEventListener('timeupdate', onTimeUpdate);
     video.addEventListener('pause', onPause);
+    video.addEventListener('play', onPlay);
     video.addEventListener('ended', onEnded);
 
     return () => {
@@ -294,11 +333,66 @@ export function TvWatchPlayer({
       window.removeEventListener('pagehide', onPageHide);
       video.removeEventListener('timeupdate', onTimeUpdate);
       video.removeEventListener('pause', onPause);
+      video.removeEventListener('play', onPlay);
       video.removeEventListener('ended', onEnded);
       if (previewTimerRef.current) clearTimeout(previewTimerRef.current);
       if (hls) hls.destroy();
     };
   }, [activeIsHls, activeStreamSrc, durationSeconds, isYouTube, itemId, nextEpUrl, resumeSeconds, skipSegments]);
+
+  useSessionHeartbeat({
+    active: true,
+    mediaId: itemId,
+    mediaType: 'video',
+    title: itemId,
+    deviceName: 'HomeStream TV Web',
+    deviceType: 'web',
+    isPlaying: isPlayingState,
+    positionMs: (logicalOffsetRef.current + (videoRef.current?.currentTime || 0)) * 1000,
+    durationMs: durationSeconds * 1000,
+    canSeek: true,
+    canSkipNext: Boolean(nextEpUrl),
+    onCommand: (cmd) => {
+      const video = videoRef.current;
+      if (!video) return;
+      switch (cmd.type) {
+        case 'play':
+          void video.play().catch(() => {});
+          break;
+        case 'pause':
+          video.pause();
+          break;
+        case 'togglePlayPause':
+          if (video.paused) void video.play().catch(() => {});
+          else video.pause();
+          break;
+        case 'stop':
+          window.history.back();
+          break;
+        case 'next':
+          if (nextEpUrl) window.location.href = nextEpUrl;
+          break;
+        case 'seekTo':
+          if (typeof cmd.positionMs === 'number') void seekToLogical(cmd.positionMs / 1000);
+          break;
+        case 'seekBy':
+          if (typeof cmd.deltaMs === 'number') {
+            const cur = logicalOffsetRef.current + (video.currentTime || 0);
+            void seekToLogical(Math.max(0, cur + cmd.deltaMs / 1000));
+          }
+          break;
+        case 'muteToggle':
+          video.muted = !video.muted;
+          break;
+        case 'volumeUp':
+          video.volume = Math.min(1, video.volume + 0.1);
+          break;
+        case 'volumeDown':
+          video.volume = Math.max(0, video.volume - 0.1);
+          break;
+      }
+    },
+  });
 
   const activeCue = previewTime !== null
     ? trickplayCues.find((c) => previewTime >= c.start && previewTime < c.end) || null
@@ -331,6 +425,58 @@ export function TvWatchPlayer({
         ))}
         Your TV browser does not support HTML5 video playback.
       </video>
+
+      {!isYouTube && (
+        <div
+          style={{
+            position: 'absolute',
+            top: '24px',
+            right: '36px',
+            zIndex: 30,
+            display: 'flex',
+            gap: '10px',
+          }}
+        >
+          {softSubtitles.length > 0 && (
+            <button
+              type="button"
+              tabIndex={0}
+              onClick={cycleSubtitles}
+              style={{
+                padding: '10px 16px',
+                borderRadius: '8px',
+                backgroundColor: 'rgba(20,20,20,0.85)',
+                color: '#ffffff',
+                fontWeight: 600,
+                fontSize: '15px',
+                border: '1px solid rgba(255,255,255,0.28)',
+                cursor: 'pointer',
+              }}
+            >
+              {activeSubtitleIndex >= 0
+                ? `Subtitles: ${softSubtitles[activeSubtitleIndex]?.label || softSubtitles[activeSubtitleIndex]?.language || 'On'}`
+                : 'Subtitles: Off'}
+            </button>
+          )}
+          <button
+            type="button"
+            tabIndex={0}
+            onClick={toggleAutoplay}
+            style={{
+              padding: '10px 16px',
+              borderRadius: '8px',
+              backgroundColor: autoplayEpisodes ? 'rgba(229,9,20,0.9)' : 'rgba(20,20,20,0.85)',
+              color: '#ffffff',
+              fontWeight: 600,
+              fontSize: '15px',
+              border: '1px solid rgba(255,255,255,0.28)',
+              cursor: 'pointer',
+            }}
+          >
+            {`Autoplay: ${autoplayEpisodes ? 'On' : 'Off'}`}
+          </button>
+        </div>
+      )}
 
       {activeSkip && (
         <button

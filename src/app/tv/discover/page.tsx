@@ -1,7 +1,13 @@
 import React from 'react';
 import { fetchTvDiscover } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'Discover · TV Mode',
+  'Discover trending movies and shows on HomeStream TV.',
+  '/tv/discover'
+);
 
 export default async function TvDiscoverPage({
   searchParams,

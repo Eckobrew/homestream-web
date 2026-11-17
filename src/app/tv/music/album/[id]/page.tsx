@@ -40,7 +40,12 @@ export default async function TvMusicAlbumPage({
             <span className="tv-badge">{tracks.length} Tracks</span>
           </div>
 
-          <div style={{ marginTop: '24px' }}>
+          <div style={{ marginTop: '24px', display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
+            {tracks.length > 0 && (
+              <a href={`/tv/music/play?albumId=${encodeURIComponent(id)}&index=0`} className="tv-btn tv-btn-play" tabIndex={0}>
+                ▶ Play Album
+              </a>
+            )}
             <a href="/tv/music" className="tv-btn tv-btn-sec" tabIndex={0}>
               ◀ Back to Music
             </a>
@@ -55,8 +60,7 @@ export default async function TvMusicAlbumPage({
             const durMin = track.durationSeconds ? Math.floor(track.durationSeconds / 60) : 0;
             const durSec = track.durationSeconds ? Math.floor(track.durationSeconds % 60) : 0;
             const durStr = track.durationSeconds ? `${durMin}:${durSec.toString().padStart(2, '0')}` : '--:--';
-            const streamUrl = track.streamUrl || `/api/v1/music/stream?trackId=${track.id}`;
-            const playUrl = `/tv/music/play?streamUrl=${encodeURIComponent(streamUrl)}&title=${encodeURIComponent(track.title)}&artist=${encodeURIComponent(track.artist || album.artist)}&cover=${encodeURIComponent(track.coverUrl || album.coverUrl || '')}&album=${encodeURIComponent(album.title)}`;
+            const playUrl = `/tv/music/play?albumId=${encodeURIComponent(id)}&index=${idx}`;
 
             return (
               <a

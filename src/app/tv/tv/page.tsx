@@ -1,7 +1,13 @@
 import React from 'react';
 import { fetchTvLibrary } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'TV Shows · TV Mode',
+  'Browse TV shows and series on HomeStream TV.',
+  '/tv/tv'
+);
 
 export default async function TvShowsPage() {
   const items = await fetchTvLibrary('tv');

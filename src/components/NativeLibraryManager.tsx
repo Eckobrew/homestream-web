@@ -115,6 +115,8 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
   const [importingHistory, setImportingHistory] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [newLibName, setNewLibName] = useState('');
+  const [playbackGroup, setPlaybackGroup] = useState<'all' | 'transcoding' | 'languages' | 'toggles' | 'streams'>('all');
+  const [maintenanceGroup, setMaintenanceGroup] = useState<'all' | 'health' | 'caches' | 'backups'>('all');
   const [newLibType, setNewLibType] = useState<'movie' | 'tv'>('movie');
   const [newLibPath, setNewLibPath] = useState('');
   const [identifyInputs, setIdentifyInputs] = useState<Record<string, string>>({});
@@ -545,6 +547,31 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
       {/* Comprehensive Transcoding, Playback & Feature Settings */}
       {showPlayback && (
       <>
+      {section === 'playback' && (
+        <div className="flex flex-wrap gap-1.5">
+          {([
+            ['all', 'All Playback Settings'],
+            ['transcoding', 'Transcoding & Hardware'],
+            ['languages', 'Languages & Subtitles'],
+            ['toggles', 'Feature Toggles'],
+            ['streams', 'Streams & Intro Previews'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setPlaybackGroup(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                playbackGroup === key
+                  ? 'bg-red-600 text-white border-red-500'
+                  : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+      {(playbackGroup === 'all' || playbackGroup === 'transcoding' || playbackGroup === 'languages' || playbackGroup === 'toggles') && (
       <form
         onSubmit={handleSaveSettings}
         className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4"
@@ -564,6 +591,7 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
           </button>
         </div>
 
+        {(playbackGroup === 'all' || playbackGroup === 'transcoding') && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
           <label className="space-y-1">
             <span className="text-neutral-400">Hardware Acceleration</span>
@@ -617,7 +645,13 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
               className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white"
             />
           </label>
+        </div>
+        )}
 
+        {(playbackGroup === 'all' || playbackGroup === 'languages' || playbackGroup === 'transcoding') && (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 text-xs">
+          {(playbackGroup === 'all' || playbackGroup === 'languages') && (
+          <>
           <label className="space-y-1">
             <span className="text-neutral-400">Default Audio Language</span>
             <input
@@ -656,7 +690,10 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
               </select>
             </div>
           </label>
+          </>
+          )}
 
+          {(playbackGroup === 'all' || playbackGroup === 'transcoding') && (
           <label className="space-y-1">
             <span className="text-neutral-400">HLS Segment (sec) / Idle Timeout (sec)</span>
             <div className="flex gap-2">
@@ -685,9 +722,12 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
               />
             </div>
           </label>
+          )}
         </div>
+        )}
 
         {/* Feature Toggles */}
+        {(playbackGroup === 'all' || playbackGroup === 'toggles') && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 pt-2 text-xs">
           {[
             ['allowDirectPlay', 'Allow Direct Play (HTTP Range)'],
@@ -713,9 +753,13 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
             </label>
           ))}
         </div>
+        )}
       </form>
+      )}
 
       {/* Active Streams & Watch Stats */}
+      {(playbackGroup === 'all' || playbackGroup === 'streams') && (
+      <>
       <div className="grid md:grid-cols-2 gap-6">
         <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
           <h3 className="font-semibold text-base flex items-center gap-2">
@@ -894,10 +938,75 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
       </div>
       </>
       )}
+      </>
+      )}
 
       {/* Maintenance: Trickplay, Intro Detection, Caches, SQLite Backups */}
       {showMaintenance && (
         <div className="space-y-6">
+          {section === 'maintenance' && (
+            <div className="flex flex-wrap gap-1.5">
+              {([
+                ['all', 'All Maintenance'],
+                ['health', 'Health & Repair'],
+                ['caches', 'Caches & Trickplay'],
+                ['backups', 'Database Backups'],
+              ] as const).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setMaintenanceGroup(key)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold border transition ${
+                    maintenanceGroup === key
+                      ? 'bg-red-600 text-white border-red-500'
+                      : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {section === 'maintenance' && health && (maintenanceGroup === 'all' || maintenanceGroup === 'health') && (
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-base font-bold text-white">Library Health</h3>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void postAction({ action: 'repairHealth', repair: 'pruneMissing' }, 'Pruned missing files.')}
+                    className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+                  >
+                    Prune Missing ({health.missingFiles.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void postAction({ action: 'repairHealth', repair: 'refreshMetadata' }, 'Refreshed missing metadata.')}
+                    className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+                  >
+                    Repair Metadata ({health.missingMetadata.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void postAction({ action: 'repairHealth', repair: 'backfillTrickplay' }, 'Queued Trickplay backfill.')}
+                    className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+                  >
+                    Rebuild Trickplay ({health.missingOrStaleTrickplay})
+                  </button>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Items</div><div className="text-lg font-bold text-white">{health.totalItems}</div></div>
+                <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Files</div><div className="text-lg font-bold text-white">{health.totalFiles}</div></div>
+                <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Missing Files</div><div className="text-lg font-bold text-amber-400">{health.missingFiles.length}</div></div>
+                <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Missing Meta</div><div className="text-lg font-bold text-amber-400">{health.missingMetadata.length}</div></div>
+                <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Stale Trickplay</div><div className="text-lg font-bold text-neutral-200">{health.missingOrStaleTrickplay}</div></div>
+              </div>
+            </div>
+          )}
+
+          {(maintenanceGroup === 'all' || maintenanceGroup === 'caches') && (
           <div className="grid md:grid-cols-2 gap-6 text-xs">
             <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -954,7 +1063,9 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
               )}
             </div>
           </div>
+          )}
 
+          {(maintenanceGroup === 'all' || maintenanceGroup === 'backups') && (
           <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3 text-xs">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div>
@@ -1007,6 +1118,7 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 

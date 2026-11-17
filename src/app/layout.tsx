@@ -27,8 +27,7 @@ export const metadata: Metadata = {
   description: `A modern self-hosted streaming web companion integrating Jellyfin and Seerr (Jellyseerr/Overseerr) with multi-profile continue watching and Google Cast.`,
   keywords: [
     appName,
-    "HomeStream",
-    "HomeStream",
+    ...(appName !== "HomeStream" ? ["HomeStream"] : []),
     "Jellyfin",
     "Overseerr",
     "Jellyseerr",
@@ -38,6 +37,11 @@ export const metadata: Metadata = {
     "Movies",
     "TV Shows",
     "Media Server",
+    "Music Streaming",
+    "eBooks",
+    "YouTube Archive",
+    "SyncPlay",
+    "Native Media Server",
   ],
   authors: [{ name: appName }],
   creator: appName,
@@ -131,7 +135,7 @@ export default function RootLayout({
                   window.__castFrameworkReady = true;
                   try {
                     window.cast.framework.CastContext.getInstance().setOptions({
-                      receiverApplicationId: 'CC1AD845',
+                      receiverApplicationId: ${JSON.stringify(process.env.NEXT_PUBLIC_CAST_RECEIVER_APP_ID || 'CC1AD845')},
                       autoJoinPolicy: 'origin_scoped'
                     });
                   } catch (e) {

@@ -3,6 +3,12 @@
 import { useEffect, useRef } from 'react';
 import { apiFetch } from '@/api/client';
 
+export interface SessionCommand {
+  type: string;
+  positionMs?: number;
+  deltaMs?: number;
+}
+
 export interface SessionHeartbeatOptions {
   active: boolean;
   mediaId: string;
@@ -10,12 +16,15 @@ export interface SessionHeartbeatOptions {
   title: string;
   subtitle?: string;
   artworkUrl?: string;
+  deviceName?: string;
+  deviceType?: string;
   isPlaying: boolean;
   positionMs: number;
   durationMs: number;
   canSeek?: boolean;
   canSkipNext?: boolean;
   canSkipPrev?: boolean;
+  onCommand?: (command: SessionCommand) => void;
 }
 
 function getWebDeviceId(): string {
@@ -47,8 +56,8 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           deviceId: getWebDeviceId(),
-          deviceName: 'Web Browser',
-          deviceType: 'web',
+          deviceName: current.deviceName || 'Web Browser',
+          deviceType: current.deviceType || 'web',
           mediaId: current.mediaId,
           mediaType: current.mediaType,
           title: current.title,
@@ -67,8 +76,30 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
 
     sendHeartbeat(false);
     const interval = setInterval(() => sendHeartbeat(false), 5000);
+
+    let es: EventSource | null = null;
+    if (typeof EventSource !== 'undefined') {
+      try {
+        es = new EventSource(`/api/v1/sessions/commands?deviceId=${encodeURIComponent(getWebDeviceId())}`);
+        es.onmessage = (ev) => {
+          try {
+            const parsed = JSON.parse(ev.data);
+            const cmd = parsed?.command || parsed;
+            if (cmd && typeof cmd.type === 'string') {
+              latestRef.current.onCommand?.(cmd);
+            }
+          } catch {
+            // Ignore malformed or heartbeat SSE payloads.
+          }
+        };
+      } catch {
+        // Ignore EventSource errors when remote command stream is unavailable.
+      }
+    }
+
     return () => {
       clearInterval(interval);
+      es?.close();
       sendHeartbeat(true);
     };
   }, [options.active, options.mediaId, options.mediaType, options.title, options.isPlaying]);

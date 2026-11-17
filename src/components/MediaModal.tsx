@@ -54,6 +54,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
   const [creatingCol, setCreatingCol] = useState(false);
   const [newColName, setNewColName] = useState('');
+  const [actionError, setActionError] = useState('');
   const [seriesOverride, setSeriesOverride] = useState<{ audioLang?: string; subtitleLang?: string; subtitleMode?: string }>({});
 
   useEffect(() => {
@@ -484,12 +485,26 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                 <>
                   <button
                     onClick={async () => {
-                      await apiFetch('/api/native/library', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'startOver', itemId: currentItem.id }),
-                      }).catch(() => {});
-                      onPlay({ ...currentItem, playbackPositionTicks: 0 });
+                      setActionError('');
+                      const targetEpisode = currentItem.type === 'Series'
+                        ? (seasons.flatMap((s) => s.episodes || []).find((ep) => ep.id === currentItem.playableEpisodeId) || seasons[0]?.episodes?.[0])
+                        : undefined;
+                      const targetId = targetEpisode?.id || currentItem.playableEpisodeId || currentItem.id;
+                      try {
+                        const res = await apiFetch('/api/playback/progress', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'startOver', itemId: targetId }),
+                        });
+                        if (!res.ok) {
+                          const d = await res.json().catch(() => ({}));
+                          setActionError(d?.error || 'Could not reset playback progress.');
+                          return;
+                        }
+                        onPlay({ ...currentItem, playbackPositionTicks: 0 }, targetEpisode ? { ...targetEpisode, playbackPositionTicks: 0 } : undefined);
+                      } catch {
+                        setActionError('Network error while resetting progress.');
+                      }
                     }}
                     className="px-3 py-1.5 rounded bg-neutral-800/90 hover:bg-neutral-700 text-xs font-semibold text-white border border-neutral-700"
                     title="Reset progress and play from beginning"
@@ -498,12 +513,23 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                   </button>
                   <button
                     onClick={async () => {
-                      await apiFetch('/api/native/library', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ action: 'hideContinueWatching', itemId: currentItem.id }),
-                      }).catch(() => {});
-                      onClose();
+                      setActionError('');
+                      const targetId = currentItem.playableEpisodeId || currentItem.id;
+                      try {
+                        const res = await apiFetch('/api/playback/progress', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'hideContinueWatching', itemId: targetId }),
+                        });
+                        if (!res.ok) {
+                          const d = await res.json().catch(() => ({}));
+                          setActionError(d?.error || 'Could not hide from Continue Watching.');
+                          return;
+                        }
+                        onClose();
+                      } catch {
+                        setActionError('Network error while hiding item.');
+                      }
                     }}
                     className="px-3 py-1.5 rounded bg-neutral-800/90 hover:bg-neutral-700 text-xs font-semibold text-neutral-300 border border-neutral-700"
                     title="Hide from Continue Watching"
@@ -511,6 +537,11 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     Hide
                   </button>
                 </>
+              )}
+              {actionError && (
+                <span role="alert" className="text-xs text-red-400 font-medium">
+                  {actionError}
+                </span>
               )}
 
               {creatingCol ? (

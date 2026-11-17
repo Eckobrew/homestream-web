@@ -1,10 +1,16 @@
 import React from 'react';
 import { fetchTvHome } from '@/lib/tv-api';
+import { buildSectionMetadata } from '@/lib/seo-metadata';
 
 export const revalidate = 0;
+export const metadata = buildSectionMetadata(
+  'Home · TV Mode',
+  'Stream movies, series, music, and podcasts on HomeStream TV.',
+  '/tv'
+);
 
 export default async function TvHomePage() {
-  const { hero, continueWatching, movies, series } = await fetchTvHome();
+  const { hero, continueWatching, watchlist, movies, series } = await fetchTvHome();
 
   return (
     <div>
@@ -21,10 +27,16 @@ export default async function TvHomePage() {
             <h1 className="tv-hero-title">{hero.title}</h1>
             <p className="tv-hero-desc">{hero.overview || 'Stream your favorite movies and shows.'}</p>
             <div>
-              <a href={`/tv/watch/${hero.id}`} className="tv-btn tv-btn-play" tabIndex={0}>
+              <a
+                href={hero.type === 'Series' && !(hero as any).playableEpisodeId
+                  ? `/tv/media/${encodeURIComponent(hero.id)}`
+                  : `/tv/watch/${encodeURIComponent((hero as any).playableEpisodeId || hero.id)}`}
+                className="tv-btn tv-btn-play"
+                tabIndex={0}
+              >
                 ▶ Play
               </a>
-              <a href={`/tv/media/${hero.id}`} className="tv-btn tv-btn-sec" tabIndex={0}>
+              <a href={`/tv/media/${encodeURIComponent(hero.id)}`} className="tv-btn tv-btn-sec" tabIndex={0}>
                 ℹ Details
               </a>
             </div>
@@ -38,7 +50,14 @@ export default async function TvHomePage() {
           <h2 className="tv-section-title">Continue Watching</h2>
           <div className="tv-row">
             {continueWatching.map((item) => (
-              <a key={item.id} href={`/tv/watch/${item.id}`} className="tv-card" tabIndex={0}>
+              <a
+                key={item.id}
+                href={item.type === 'Series' && !(item as any).playableEpisodeId
+                  ? `/tv/media/${encodeURIComponent(item.id)}`
+                  : `/tv/watch/${encodeURIComponent((item as any).playableEpisodeId || item.id)}`}
+                className="tv-card"
+                tabIndex={0}
+              >
                 <img
                   src={item.posterUrl || item.backdropUrl || '/poster-placeholder.png'}
                   alt={item.title}
@@ -47,6 +66,28 @@ export default async function TvHomePage() {
                 <div className="tv-card-meta">
                   <div className="tv-card-title">{item.title}</div>
                   <div className="tv-card-sub">{(item.type as string)?.toLowerCase() === 'series' || (item.type as string) === 'tv' ? 'Series' : 'Movie'}</div>
+                </div>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* My List Row */}
+      {watchlist.length > 0 && (
+        <section className="tv-section">
+          <h2 className="tv-section-title">My List</h2>
+          <div className="tv-row">
+            {watchlist.map((item) => (
+              <a key={item.id} href={`/tv/media/${encodeURIComponent(item.id)}`} className="tv-card" tabIndex={0}>
+                <img
+                  src={item.posterUrl || '/poster-placeholder.png'}
+                  alt={item.title}
+                  loading="lazy"
+                />
+                <div className="tv-card-meta">
+                  <div className="tv-card-title">{item.title}</div>
+                  <div className="tv-card-sub">{item.year || (item.type === 'Series' ? 'TV Series' : 'Movie')}</div>
                 </div>
               </a>
             ))}

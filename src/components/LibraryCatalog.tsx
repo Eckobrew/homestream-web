@@ -4,6 +4,7 @@ import { apiFetch } from '@/api/client';
 import React, { useState, useEffect, useMemo } from 'react';
 import { MediaItem } from '@/types';
 import { MediaCard } from '@/components/MediaCard';
+import { useProfile } from '@/context/ProfileContext';
 import {
   Film,
   Tv,
@@ -34,6 +35,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
   onBackToHome,
   onRequest,
 }) => {
+  const { activeProfile } = useProfile();
   const [items, setItems] = useState<MediaItem[]>([]);
   const [totalCount, setTotalCount] = useState<number>(0);
   const [availableLetters, setAvailableLetters] = useState<string[]>([]);
@@ -73,7 +75,7 @@ export const LibraryCatalog: React.FC<LibraryCatalogProps> = ({
     return () => {
       isCancelled = true;
     };
-  }, [libraryType]);
+  }, [libraryType, activeProfile?.id]);
 
   const availableGenres = useMemo(() => {
     const counts = new Map<string, number>();
