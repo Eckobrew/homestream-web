@@ -474,33 +474,60 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     }, 2000);
   };
 
-  // Filter sections and items strictly corresponding to active tab
+  // Filter sections and items strictly corresponding to active tab in Netflix-style order
   const displayedSections = useMemo(() => {
+    const pushUnique = (list: MediaRowSection[], seen: Set<string>, sec?: MediaRowSection | null) => {
+      if (!sec || sec.items.length === 0 || seen.has(sec.id)) return;
+      seen.add(sec.id);
+      list.push(sec);
+    };
+
     if (activeTab === 'movies') {
       const res: MediaRowSection[] = [];
+      const seen = new Set<string>();
 
       // 1. Continue Watching (Movies only)
       const cw = sections.find((s) => s.id === 'continue-watching');
       if (cw) {
-        const movieCw = cw.items.filter((i) => i.type === 'Movie');
-        if (movieCw.length > 0) {
-          res.push({ ...cw, items: movieCw });
-        }
+        pushUnique(res, seen, { ...cw, items: cw.items.filter((i) => i.type === 'Movie') });
       }
 
-      // 2. Netflix Category Rows (library available first, then discovery options)
+      // 2. My List (Movies only)
+      const movieWatchlist = watchlistItems.filter((i) => i.type === 'Movie');
+      if (movieWatchlist.length > 0) {
+        pushUnique(res, seen, { id: 'my-list-movies', title: 'My List', items: movieWatchlist });
+      }
+
+      // 3. Top 10 Movies Today
+      const top10Movies = sections.find((s) => s.id === 'top-10')?.items.filter((i) => i.type === 'Movie') || [];
+      const fallbackTopMovies = requestSections.find((s) => s.id === 'requests-top-movies')?.items || [];
+      const topMovieItems = (top10Movies.length >= 3 ? top10Movies : fallbackTopMovies).slice(0, 10);
+      if (topMovieItems.length > 0) {
+        pushUnique(res, seen, { id: 'top-10-movies', title: 'Top 10 Movies Today', items: topMovieItems, isTop10: true });
+      }
+
+      // 4. Recommended Movies
+      const recMovies =
+        movieCategories.find((s) => s.id === 'recommended-movies') ||
+        sections.find((s) => s.id === 'recommended-movies');
+      pushUnique(res, seen, recMovies);
+
+      // 5. Trending Movies
+      const trendingMovies = sections
+        .find((s) => s.id === 'trending-tmdb')
+        ?.items.filter((i) => i.type === 'Movie') || [];
+      if (trendingMovies.length > 0) {
+        pushUnique(res, seen, { id: 'trending-movies', title: 'Trending Movies', items: trendingMovies });
+      }
+
+      // 6. Recently Added Movies
+      pushUnique(res, seen, sections.find((s) => s.id === 'recent-movies'));
+
+      // 7. Genre & Curated Movie Rows (25 per row from TMDB)
       if (movieCategories.length > 0) {
-        res.push(...movieCategories);
-      } else {
-        const fallback = sections
-          .filter((s) => s.id !== 'continue-watching' && s.id !== 'my-requests')
-          .map((sec) => ({
-            ...sec,
-            title: sec.id === 'trending-tmdb' ? 'Trending Movies' : sec.title,
-            items: sec.items.filter((i) => i.type === 'Movie'),
-          }))
-          .filter((sec) => sec.items.length > 0);
-        res.push(...fallback);
+        for (const cat of movieCategories) {
+          pushUnique(res, seen, cat);
+        }
       }
 
       return res;
@@ -508,29 +535,50 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
 
     if (activeTab === 'series') {
       const res: MediaRowSection[] = [];
+      const seen = new Set<string>();
 
       // 1. Continue Watching (Series and Episodes only)
       const cw = sections.find((s) => s.id === 'continue-watching');
       if (cw) {
-        const seriesCw = cw.items.filter((i) => i.type === 'Series' || i.type === 'Episode');
-        if (seriesCw.length > 0) {
-          res.push({ ...cw, items: seriesCw });
-        }
+        pushUnique(res, seen, { ...cw, items: cw.items.filter((i) => i.type === 'Series' || i.type === 'Episode') });
       }
 
-      // 2. Netflix Category Rows (library available first, then discovery options)
+      // 2. My List (Series and Episodes only)
+      const tvWatchlist = watchlistItems.filter((i) => i.type === 'Series' || i.type === 'Episode');
+      if (tvWatchlist.length > 0) {
+        pushUnique(res, seen, { id: 'my-list-series', title: 'My List', items: tvWatchlist });
+      }
+
+      // 3. Top 10 TV Shows Today
+      const top10Tv = sections.find((s) => s.id === 'top-10')?.items.filter((i) => i.type === 'Series') || [];
+      const fallbackTopTv = requestSections.find((s) => s.id === 'requests-top-tv')?.items || [];
+      const topTvItems = (top10Tv.length >= 3 ? top10Tv : fallbackTopTv).slice(0, 10);
+      if (topTvItems.length > 0) {
+        pushUnique(res, seen, { id: 'top-10-series', title: 'Top 10 TV Shows Today', items: topTvItems, isTop10: true });
+      }
+
+      // 4. Recommended TV Shows
+      const recTv =
+        tvCategories.find((s) => s.id === 'recommended-tv-shows') ||
+        sections.find((s) => s.id === 'recommended-tv-shows');
+      pushUnique(res, seen, recTv);
+
+      // 5. Trending TV Shows
+      const trendingTv = sections
+        .find((s) => s.id === 'trending-tmdb')
+        ?.items.filter((i) => i.type === 'Series') || [];
+      if (trendingTv.length > 0) {
+        pushUnique(res, seen, { id: 'trending-series', title: 'Trending TV Shows', items: trendingTv });
+      }
+
+      // 6. Recently Added TV Shows
+      pushUnique(res, seen, sections.find((s) => s.id === 'recent-series'));
+
+      // 7. Genre & Curated TV Rows (25 per row from TMDB)
       if (tvCategories.length > 0) {
-        res.push(...tvCategories);
-      } else {
-        const fallback = sections
-          .filter((s) => s.id !== 'continue-watching' && s.id !== 'my-requests')
-          .map((sec) => ({
-            ...sec,
-            title: sec.id === 'trending-tmdb' ? 'Trending TV Shows' : sec.title,
-            items: sec.items.filter((i) => i.type === 'Series' || i.type === 'Episode'),
-          }))
-          .filter((sec) => sec.items.length > 0);
-        res.push(...fallback);
+        for (const cat of tvCategories) {
+          pushUnique(res, seen, cat);
+        }
       }
 
       return res;
@@ -576,9 +624,33 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
       return res;
     }
 
-    // Default 'home' tab: all sections, EXCLUDING my-requests (only on Requests tab at the bottom)
-    return sections.filter((s) => s.id !== 'my-requests');
-  }, [sections, requestSections, activeTab, movieCategories, tvCategories, requestCategories]);
+    // Default 'home' tab: Netflix-style order + TMDB categories (25 per row)
+    const res: MediaRowSection[] = [];
+    const seen = new Set<string>();
+    const homeSections = sections.filter((s) => s.id !== 'my-requests');
+
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'currently-downloading'));
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'continue-watching'));
+    if (watchlistItems.length > 0) {
+      pushUnique(res, seen, { id: 'my-list-home', title: 'My List', items: watchlistItems });
+    }
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'top-10'));
+    for (const sec of homeSections) {
+      if (sec.id.startsWith('recommended')) {
+        pushUnique(res, seen, sec);
+      }
+    }
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'trending-tmdb'));
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'recent-movies'));
+    pushUnique(res, seen, homeSections.find((s) => s.id === 'recent-series'));
+    for (const sec of homeSections) {
+      pushUnique(res, seen, sec);
+    }
+    for (const cat of requestCategories) {
+      pushUnique(res, seen, cat);
+    }
+    return res;
+  }, [sections, requestSections, watchlistItems, activeTab, movieCategories, tvCategories, requestCategories]);
 
   // Dynamic 5 rotating Hero Items for the active tab (random load + cycle)
   const displayedHeroItems = useMemo(() => {
@@ -760,15 +832,6 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
 
           {/* Horizontal Scrolling Media Rows */}
           <div className={`relative z-20 ${displayedHeroItems.length > 0 ? '-mt-16 md:-mt-24' : 'pt-20 md:pt-24'} space-y-2 md:space-y-4 pb-20`}>
-            {watchlistItems.length > 0 && (
-              <MediaRow
-                title="My List"
-                items={watchlistItems}
-                onPlay={handlePlay}
-                onOpenModal={handleOpenModal}
-                onRequest={handleRequest}
-              />
-            )}
             {displayedSections.map((section) => (
               <MediaRow
                 key={section.id}
