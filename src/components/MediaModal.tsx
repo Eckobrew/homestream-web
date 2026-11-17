@@ -51,6 +51,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
   const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
   const [isLoadingRecs, setIsLoadingRecs] = useState(false);
+  const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
+  const [seriesOverride, setSeriesOverride] = useState<{ audioLang?: string; subtitleLang?: string; subtitleMode?: string }>({});
 
   useEffect(() => {
     setDetails(item);
@@ -58,6 +60,33 @@ export const MediaModal: React.FC<MediaModalProps> = ({
     setSelectedSeasonIndex(0);
     setTrailerKey(item?.trailerKey || null);
     if (!item) return;
+
+    // 0. Sync My List, Collections, and Series Prefs
+    apiFetch('/api/watchlist')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.items)) {
+          setIsFavorite(data.items.some((w: { itemId: string }) => w.itemId === item.id));
+        }
+      })
+      .catch(() => {});
+    apiFetch('/api/collections')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (Array.isArray(data?.collections)) setCollections(data.collections);
+      })
+      .catch(() => {});
+    if (item.type === 'Series') {
+      apiFetch(`/api/profile-prefs?seriesId=${encodeURIComponent(item.id)}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.seriesOverride) setSeriesOverride(data.seriesOverride);
+          else setSeriesOverride({});
+        })
+        .catch(() => {});
+    } else {
+      setSeriesOverride({});
+    }
 
     // 1. Fetch full details & seasons
     const type = item.type === 'Series' ? 'tv' : 'movie';
@@ -419,12 +448,122 @@ export const MediaModal: React.FC<MediaModalProps> = ({
               )}
 
               <button
-                onClick={() => setIsFavorite(!isFavorite)}
+                onClick={async () => {
+                  if (!currentItem) return;
+                  const nextFav = !isFavorite;
+                  setIsFavorite(nextFav);
+                  try {
+                    if (nextFav) {
+                      await apiFetch('/api/watchlist', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          itemId: currentItem.id,
+                          title: currentItem.title,
+                          type: currentItem.type,
+                          posterUrl: currentItem.posterUrl,
+                          year: currentItem.year,
+                        }),
+                      });
+                    } else {
+                      await apiFetch(`/api/watchlist?itemId=${encodeURIComponent(currentItem.id)}`, { method: 'DELETE' });
+                    }
+                  } catch {
+                    setIsFavorite(!nextFav);
+                  }
+                }}
                 className="w-10 h-10 rounded-full border-2 border-gray-400 hover:border-white text-white flex items-center justify-center transition-colors"
                 title={isFavorite ? 'Remove from My List' : 'Add to My List'}
               >
                 {isFavorite ? <Check size={18} /> : <Plus size={18} />}
               </button>
+
+              {(currentItem.playbackPositionTicks || 0) > 0 && currentItem.source === 'native' && (
+                <>
+                  <button
+                    onClick={async () => {
+                      await apiFetch('/api/native/library', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'startOver', itemId: currentItem.id }),
+                      }).catch(() => {});
+                      onPlay({ ...currentItem, playbackPositionTicks: 0 });
+                    }}
+                    className="px-3 py-1.5 rounded bg-neutral-800/90 hover:bg-neutral-700 text-xs font-semibold text-white border border-neutral-700"
+                    title="Reset progress and play from beginning"
+                  >
+                    Start Over
+                  </button>
+                  <button
+                    onClick={async () => {
+                      await apiFetch('/api/native/library', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ action: 'hideContinueWatching', itemId: currentItem.id }),
+                      }).catch(() => {});
+                      onClose();
+                    }}
+                    className="px-3 py-1.5 rounded bg-neutral-800/90 hover:bg-neutral-700 text-xs font-semibold text-neutral-300 border border-neutral-700"
+                    title="Hide from Continue Watching"
+                  >
+                    Hide
+                  </button>
+                </>
+              )}
+
+              {collections.length > 0 && (
+                <select
+                  aria-label="Add to Collection"
+                  defaultValue=""
+                  onChange={async (e) => {
+                    const colId = e.target.value;
+                    if (!colId) return;
+                    await apiFetch('/api/collections', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'addItem', collectionId: colId, itemId: currentItem.id }),
+                    }).catch(() => {});
+                    e.target.value = '';
+                  }}
+                  className="bg-neutral-900/90 border border-neutral-700 text-xs text-neutral-200 rounded px-2.5 py-1.5"
+                >
+                  <option value="">+ Collection</option>
+                  {collections.map((c) => (
+                    <option key={c.id} value={c.id}>
+                      {c.itemIds.includes(currentItem.id) ? `✓ ${c.name}` : c.name}
+                    </option>
+                  ))}
+                </select>
+              )}
+
+              {currentItem.type === 'Series' && (
+                <select
+                  aria-label="Series Subtitle Mode"
+                  value={seriesOverride.subtitleMode || ''}
+                  onChange={async (e) => {
+                    const mode = e.target.value;
+                    if (!mode) {
+                      await apiFetch(`/api/profile-prefs?seriesId=${encodeURIComponent(currentItem.id)}`, { method: 'DELETE' }).catch(() => {});
+                      setSeriesOverride({});
+                    } else {
+                      await apiFetch('/api/profile-prefs', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ seriesId: currentItem.id, subtitleMode: mode }),
+                      }).catch(() => {});
+                      setSeriesOverride((prev) => ({ ...prev, subtitleMode: mode }));
+                    }
+                  }}
+                  className="bg-neutral-900/90 border border-neutral-700 text-xs text-neutral-200 rounded px-2.5 py-1.5"
+                  title="Series Subtitle Override"
+                >
+                  <option value="">Subtitles: Profile Default</option>
+                  <option value="auto">Subtitles: Auto</option>
+                  <option value="always">Subtitles: Always</option>
+                  <option value="forced">Subtitles: Forced Only</option>
+                  <option value="none">Subtitles: Off</option>
+                </select>
+              )}
 
               <button
                 className="w-10 h-10 rounded-full border-2 border-gray-400 hover:border-white text-white flex items-center justify-center transition-colors"

@@ -100,7 +100,10 @@ interface WatchStats {
   }>;
 }
 
-export function NativeLibraryManager() {
+export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'libraries' | 'playback' | 'maintenance' } = {}) {
+  const showLibraries = section === 'all' || section === 'libraries';
+  const showPlayback = section === 'all' || section === 'playback';
+  const showMaintenance = section === 'all' || section === 'maintenance';
   const [settings, setSettings] = useState<NativeSettings | null>(null);
   const [hardwareAcceleration, setHardwareAcceleration] = useState<HardwareMode[]>([]);
   const [items, setItems] = useState<NativeItemSummary[]>([]);
@@ -115,6 +118,47 @@ export function NativeLibraryManager() {
   const [newLibType, setNewLibType] = useState<'movie' | 'tv'>('movie');
   const [newLibPath, setNewLibPath] = useState('');
   const [identifyInputs, setIdentifyInputs] = useState<Record<string, string>>({});
+  const [health, setHealth] = useState<{
+    totalFiles: number;
+    totalItems: number;
+    missingFiles: Array<{ fileId: string; itemId: string; filePath: string }>;
+    missingMetadata: Array<{ itemId: string; title: string; type: string }>;
+    missingOrStaleTrickplay: number;
+    unmatchedItems: number;
+  } | null>(null);
+  const [trickplayBackfill, setTrickplayBackfill] = useState<{ running: boolean; total: number; completed: number; currentFile?: string } | null>(null);
+  const [cacheStats, setCacheStats] = useState<{ artworkBytes: number; trickplayBytes: number; transcodeBytes: number; subtitleCacheBytes: number } | null>(null);
+  const [introDetection, setIntroDetection] = useState<{ running: boolean; total: number; completed: number; detected: number; currentSeries?: string } | null>(null);
+  const [introPreviews, setIntroPreviews] = useState<Array<{ fileId: string; itemId: string; title: string; seriesTitle?: string; seasonNumber?: number; episodeNumber?: number; confidence: number; startSeconds: number; endSeconds: number }>>([]);
+  const [backups, setBackups] = useState<Array<{ filename: string; sizeBytes: number; createdAt: string }>>([]);
+  const [backupSchedule, setBackupSchedule] = useState<{ enabled: boolean; intervalHours: number; retentionCount: number; lastRunAt?: string; lastStatus?: string } | null>(null);
+  const [backupVerifyMsg, setBackupVerifyMsg] = useState('');
+  const [migrationPreview, setMigrationPreview] = useState<{
+    imported: number;
+    unmatched: number;
+    alreadyPresent: number;
+    unmatchedItems: Array<{ jellyfinId: string; profileName: string; type: string; title: string; seriesTitle?: string; seasonNumber?: number; episodeNumber?: number; year?: number; candidates: Array<{ id: string; label: string }> }>;
+  } | null>(null);
+  const [migrationOverrides, setMigrationOverrides] = useState<Record<string, string>>({});
+  const [skipFileId, setSkipFileId] = useState('');
+  const [skipRecapStart, setSkipRecapStart] = useState('');
+  const [skipRecapEnd, setSkipRecapEnd] = useState('');
+  const [skipIntroStart, setSkipIntroStart] = useState('');
+  const [skipIntroEnd, setSkipIntroEnd] = useState('');
+  const [skipCreditsStart, setSkipCreditsStart] = useState('');
+  const [skipCreditsEnd, setSkipCreditsEnd] = useState('');
+  const [adminFiles, setAdminFiles] = useState<Array<{
+    fileId: string;
+    itemId: string;
+    title: string;
+    seriesTitle?: string;
+    seasonNumber?: number;
+    episodeNumber?: number;
+    resolution?: string;
+    versionLabel?: string;
+    skipSegments: Array<{ type: 'recap' | 'intro' | 'credits'; startSeconds: number; endSeconds: number }>;
+    hasManualOverride: boolean;
+  }>>([]);
 
   const load = useCallback(async () => {
     try {
@@ -125,8 +169,16 @@ export function NativeLibraryManager() {
       const available: string[] = Array.isArray(d.hardwareAcceleration) ? d.hardwareAcceleration : [];
       setHardwareAcceleration((Object.keys(hardwareLabels) as HardwareMode[]).filter(mode => available.includes(mode)));
       setItems(d.items || []);
+      setAdminFiles(Array.isArray(d.adminFiles) ? d.adminFiles : []);
       setStreams(d.activeStreams || []);
       setStats(d.stats || null);
+      setHealth(d.health || null);
+      setTrickplayBackfill(d.trickplayBackfill || null);
+      setCacheStats(d.cacheStats || null);
+      setIntroDetection(d.introDetection || null);
+      setIntroPreviews(Array.isArray(d.introPreviews) ? d.introPreviews : []);
+      setBackups(Array.isArray(d.backups) ? d.backups : []);
+      setBackupSchedule(d.backupSchedule || null);
       setScanning(Boolean(d.scanStatus?.running));
       if (d.scanStatus) {
         setScanProgress({
@@ -225,7 +277,15 @@ export function NativeLibraryManager() {
 
   return (
     <div className="space-y-6">
+      {statusMsg && (
+        <div className="text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-lg px-3 py-2">
+          {statusMsg}
+        </div>
+      )}
+
       {/* Header + Engine Switch + Scan */}
+      {showLibraries && (
+      <>
       <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
@@ -258,17 +318,105 @@ export function NativeLibraryManager() {
               <RefreshCw size={14} className={scanning ? 'animate-spin' : ''} />
               <span>{scanning ? 'Scanning...' : 'Scan All Libraries'}</span>
             </button>
+            <button
+              type="button"
+              onClick={() => void postAction({ action: 'refreshMetadata' }, 'Metadata refresh complete.')}
+              className="flex items-center gap-1.5 border border-neutral-700 hover:bg-neutral-800 text-neutral-200 text-xs font-semibold px-3 py-2 rounded-lg transition"
+            >
+              <Sparkles size={14} />
+              <span>Refresh Metadata</span>
+            </button>
           </div>
         </div>
 
-        <button
-          type="button"
-          onClick={() => void handleImportHistory()}
-          disabled={importingHistory || scanning}
-          className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
-        >
-          {importingHistory ? 'Importing watch history…' : 'Import Jellyfin watch history'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            disabled={importingHistory || scanning}
+            onClick={async () => {
+              setImportingHistory(true);
+              try {
+                const res = await apiFetch('/api/native/library', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ action: 'importJellyfinHistory', dryRun: true }),
+                });
+                const d = await res.json();
+                if (!res.ok) throw new Error(d.error || 'Preview failed');
+                setMigrationPreview(d);
+                setStatusMsg(`Dry run: ${d.imported} ready, ${d.alreadyPresent} already present, ${d.unmatched} unmatched.`);
+              } catch (e) {
+                setStatusMsg(e instanceof Error ? e.message : 'Preview failed');
+              } finally {
+                setImportingHistory(false);
+              }
+            }}
+            className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
+          >
+            {importingHistory ? 'Checking Jellyfin…' : 'Preview Jellyfin Migration'}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleImportHistory()}
+            disabled={importingHistory || scanning}
+            className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
+          >
+            {importingHistory ? 'Importing watch history…' : 'Import Jellyfin watch history'}
+          </button>
+        </div>
+
+        {migrationPreview && (
+          <div className="rounded-lg border border-neutral-800 bg-neutral-950/70 p-4 space-y-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="font-semibold text-white">
+                Migration Preview: {migrationPreview.imported} new • {migrationPreview.alreadyPresent} existing • {migrationPreview.unmatched} unmatched
+              </div>
+              <button
+                type="button"
+                disabled={importingHistory}
+                onClick={async () => {
+                  setImportingHistory(true);
+                  try {
+                    const res = await apiFetch('/api/native/library', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ action: 'importJellyfinHistory', dryRun: false, overrides: migrationOverrides }),
+                    });
+                    const d = await res.json();
+                    if (!res.ok) throw new Error(d.error || 'Import failed');
+                    setMigrationPreview(null);
+                    setStatusMsg(`Imported ${d.imported} items (${d.unmatched} unmatched, ${d.alreadyPresent} already present).`);
+                  } catch (e) {
+                    setStatusMsg(e instanceof Error ? e.message : 'Import failed');
+                  } finally {
+                    setImportingHistory(false);
+                  }
+                }}
+                className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
+              >
+                Confirm &amp; Import
+              </button>
+            </div>
+            {migrationPreview.unmatchedItems.slice(0, 20).map((u) => (
+              <div key={`${u.profileName}-${u.jellyfinId}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-800 pt-2">
+                <div>
+                  <span className="text-neutral-200 font-medium">{u.seriesTitle ? `${u.seriesTitle} S${u.seasonNumber}E${u.episodeNumber} — ` : ''}{u.title}</span>
+                  <span className="ml-2 text-neutral-500">({u.profileName}{u.year ? ` • ${u.year}` : ''})</span>
+                </div>
+                <select
+                  value={migrationOverrides[u.jellyfinId] || ''}
+                  onChange={(e) => setMigrationOverrides({ ...migrationOverrides, [u.jellyfinId]: e.target.value })}
+                  className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-200 max-w-xs"
+                >
+                  <option value="">Skip unmatched</option>
+                  {u.candidates.map((c) => (
+                    <option key={c.id} value={c.id}>{c.label}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        )}
 
         {(statusMsg || scanning) && (
           <div className="text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-lg px-3 py-2">
@@ -353,7 +501,50 @@ export function NativeLibraryManager() {
         </form>
       </div>
 
+      {/* Library Health & Repair */}
+      {health && (
+        <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3 text-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h3 className="text-base font-bold text-white">Library Health</h3>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void postAction({ action: 'repairHealth', repair: 'pruneMissing' }, 'Pruned missing files.')}
+                className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+              >
+                Prune Missing ({health.missingFiles.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => void postAction({ action: 'repairHealth', repair: 'refreshMetadata' }, 'Refreshed missing metadata.')}
+                className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+              >
+                Repair Metadata ({health.missingMetadata.length})
+              </button>
+              <button
+                type="button"
+                onClick={() => void postAction({ action: 'repairHealth', repair: 'backfillTrickplay' }, 'Queued Trickplay backfill.')}
+                className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+              >
+                Rebuild Trickplay ({health.missingOrStaleTrickplay})
+              </button>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Items</div><div className="text-lg font-bold text-white">{health.totalItems}</div></div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Files</div><div className="text-lg font-bold text-white">{health.totalFiles}</div></div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Missing Files</div><div className="text-lg font-bold text-amber-400">{health.missingFiles.length}</div></div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Missing Meta</div><div className="text-lg font-bold text-amber-400">{health.missingMetadata.length}</div></div>
+            <div className="rounded-lg border border-neutral-800 bg-neutral-950/60 p-3"><div className="text-neutral-400">Stale Trickplay</div><div className="text-lg font-bold text-neutral-200">{health.missingOrStaleTrickplay}</div></div>
+          </div>
+        </div>
+      )}
+      </>
+      )}
+
       {/* Comprehensive Transcoding, Playback & Feature Settings */}
+      {showPlayback && (
+      <>
       <form
         onSubmit={handleSaveSettings}
         className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4"
@@ -581,8 +772,246 @@ export function NativeLibraryManager() {
         </div>
       </div>
 
+      {/* Per-Version Skip Marker Editor & Auto-Intro Previews */}
+      <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-4 text-xs">
+        <h3 className="text-base font-bold text-white">Skip Recap / Intro / Credits Per-Version Overrides</h3>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <label className="space-y-1 sm:col-span-2 lg:col-span-1">
+            <span className="text-neutral-400">File / Version ID</span>
+            <select
+              value={skipFileId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setSkipFileId(nextId);
+                const found = adminFiles.find((f) => f.fileId === nextId);
+                const recap = found?.skipSegments.find((s) => s.type === 'recap');
+                const intro = found?.skipSegments.find((s) => s.type === 'intro');
+                const credits = found?.skipSegments.find((s) => s.type === 'credits');
+                setSkipRecapStart(recap ? String(recap.startSeconds) : '');
+                setSkipRecapEnd(recap ? String(recap.endSeconds) : '');
+                setSkipIntroStart(intro ? String(intro.startSeconds) : '');
+                setSkipIntroEnd(intro ? String(intro.endSeconds) : '');
+                setSkipCreditsStart(credits ? String(credits.startSeconds) : '');
+                setSkipCreditsEnd(credits ? String(credits.endSeconds) : '');
+              }}
+              className="w-full bg-neutral-950 border border-neutral-800 rounded-lg px-3 py-2 text-white"
+            >
+              <option value="">Select file / version…</option>
+              {adminFiles.map((f) => {
+                const epTag = f.seasonNumber !== undefined && f.episodeNumber !== undefined
+                  ? `S${String(f.seasonNumber).padStart(2, '0')}E${String(f.episodeNumber).padStart(2, '0')} `
+                  : '';
+                const verTag = f.versionLabel || f.resolution || 'Default';
+                return (
+                  <option key={f.fileId} value={f.fileId}>
+                    {f.seriesTitle ? `${f.seriesTitle} ${epTag}— ` : ''}{f.title} [{verTag}]{f.hasManualOverride ? ' ★' : ''}
+                  </option>
+                );
+              })}
+            </select>
+          </label>
+          <div className="space-y-1">
+            <span className="text-neutral-400">Recap (sec)</span>
+            <div className="flex gap-1.5">
+              <input type="number" min={0} placeholder="Start" value={skipRecapStart} onChange={(e) => setSkipRecapStart(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+              <input type="number" min={0} placeholder="End" value={skipRecapEnd} onChange={(e) => setSkipRecapEnd(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <span className="text-neutral-400">Intro (sec)</span>
+            <div className="flex gap-1.5">
+              <input type="number" min={0} placeholder="Start" value={skipIntroStart} onChange={(e) => setSkipIntroStart(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+              <input type="number" min={0} placeholder="End" value={skipIntroEnd} onChange={(e) => setSkipIntroEnd(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <span className="text-neutral-400">Credits (sec)</span>
+            <div className="flex gap-1.5">
+              <input type="number" min={0} placeholder="Start" value={skipCreditsStart} onChange={(e) => setSkipCreditsStart(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+              <input type="number" min={0} placeholder="End" value={skipCreditsEnd} onChange={(e) => setSkipCreditsEnd(e.target.value)} className="w-1/2 bg-neutral-950 border border-neutral-800 rounded px-2 py-2 text-white" />
+            </div>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={!skipFileId}
+            onClick={() => {
+              const segments: Array<{ type: 'recap' | 'intro' | 'credits'; startSeconds: number; endSeconds: number }> = [];
+              if (skipRecapStart !== '' && skipRecapEnd !== '') segments.push({ type: 'recap', startSeconds: Number(skipRecapStart), endSeconds: Number(skipRecapEnd) });
+              if (skipIntroStart !== '' && skipIntroEnd !== '') segments.push({ type: 'intro', startSeconds: Number(skipIntroStart), endSeconds: Number(skipIntroEnd) });
+              if (skipCreditsStart !== '' && skipCreditsEnd !== '') segments.push({ type: 'credits', startSeconds: Number(skipCreditsStart), endSeconds: Number(skipCreditsEnd) });
+              void postAction({ action: 'setSkipSegments', fileId: skipFileId, segments }, `Saved ${segments.length} skip segment(s) for ${skipFileId}.`);
+            }}
+            className="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
+          >
+            Save Skip Overrides
+          </button>
+          <button
+            type="button"
+            disabled={!skipFileId}
+            onClick={() => {
+              setSkipRecapStart(''); setSkipRecapEnd('');
+              setSkipIntroStart(''); setSkipIntroEnd('');
+              setSkipCreditsStart(''); setSkipCreditsEnd('');
+              void postAction({ action: 'setSkipSegments', fileId: skipFileId, reset: true }, `Reset ${skipFileId} to chapter defaults.`);
+            }}
+            className="px-3.5 py-2 rounded-lg border border-neutral-700 hover:bg-neutral-800 disabled:opacity-50 text-neutral-200 font-semibold"
+          >
+            Reset to Chapter Defaults
+          </button>
+        </div>
+
+        {introPreviews.length > 0 && (
+          <div className="border-t border-neutral-800 pt-3 space-y-2">
+            <div className="font-semibold text-neutral-200">Unpublished Auto-Detected Intros ({introPreviews.length})</div>
+            {introPreviews.map((p) => (
+              <div key={p.fileId} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-neutral-800 bg-neutral-950/60 px-3 py-2">
+                <div>
+                  <span className="font-semibold text-white">{p.seriesTitle ? `${p.seriesTitle} S${p.seasonNumber}E${p.episodeNumber} — ` : ''}{p.title}</span>
+                  <span className="ml-2 text-neutral-400">{p.startSeconds}s–{p.endSeconds}s • {Math.round(p.confidence * 100)}% confidence</span>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void postAction({ action: 'introPreviewApprove', fileId: p.fileId, startSeconds: p.startSeconds, endSeconds: p.endSeconds }, `Published intro for ${p.title}.`)}
+                    className="px-2.5 py-1 rounded bg-emerald-600/20 text-emerald-300 hover:bg-emerald-600/30"
+                  >
+                    Approve &amp; Publish
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void postAction({ action: 'introPreviewDismiss', fileId: p.fileId }, `Dismissed preview for ${p.title}.`)}
+                    className="px-2.5 py-1 rounded bg-neutral-800 text-neutral-300 hover:bg-neutral-700"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      </>
+      )}
+
+      {/* Maintenance: Trickplay, Intro Detection, Caches, SQLite Backups */}
+      {showMaintenance && (
+        <div className="space-y-6">
+          <div className="grid md:grid-cols-2 gap-6 text-xs">
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-white">Trickplay &amp; Intro Jobs</h3>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    disabled={Boolean(trickplayBackfill?.running)}
+                    onClick={() => void postAction({ action: 'backfillTrickplay' }, 'Started Trickplay backfill.')}
+                    className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white font-semibold"
+                  >
+                    {trickplayBackfill?.running ? `Backfilling (${trickplayBackfill.completed}/${trickplayBackfill.total})` : 'Backfill Trickplay'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={Boolean(introDetection?.running)}
+                    onClick={() => void postAction({ action: 'introDetectionStart' }, 'Started background intro detection.')}
+                    className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-semibold"
+                  >
+                    {introDetection?.running ? `Detecting (${introDetection.completed}/${introDetection.total})` : 'Detect Intros'}
+                  </button>
+                </div>
+              </div>
+              {trickplayBackfill && (
+                <p className="text-neutral-400">
+                  Trickplay: {trickplayBackfill.running ? `Running ${trickplayBackfill.completed}/${trickplayBackfill.total}` : 'Idle'}
+                </p>
+              )}
+              {introDetection && (
+                <p className="text-neutral-400">
+                  Intro Detection: {introDetection.running ? `Scanning ${introDetection.currentSeries || ''} (${introDetection.completed}/${introDetection.total})` : `Idle • ${introPreviews.length} pending review`}
+                </p>
+              )}
+            </div>
+
+            <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
+              <div className="flex items-center justify-between">
+                <h3 className="text-base font-bold text-white">Media Caches</h3>
+                <button
+                  type="button"
+                  onClick={() => void postAction({ action: 'pruneCaches' }, 'Pruned stale transcode, subtitle, and orphan Trickplay caches.')}
+                  className="px-3 py-1.5 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200 font-semibold"
+                >
+                  Prune Stale Caches
+                </button>
+              </div>
+              {cacheStats && (
+                <div className="grid grid-cols-2 gap-2 text-neutral-300">
+                  <div>Artwork: {(cacheStats.artworkBytes / 1048576).toFixed(1)} MB</div>
+                  <div>Trickplay: {(cacheStats.trickplayBytes / 1048576).toFixed(1)} MB</div>
+                  <div>Transcode: {(cacheStats.transcodeBytes / 1048576).toFixed(1)} MB</div>
+                  <div>Subtitles: {(cacheStats.subtitleCacheBytes / 1048576).toFixed(1)} MB</div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3 text-xs">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div>
+                <h3 className="text-base font-bold text-white">Scheduled SQLite Backups &amp; Verification</h3>
+                {backupSchedule && (
+                  <p className="text-neutral-400 mt-0.5">
+                    Schedule: {backupSchedule.enabled ? `Every ${backupSchedule.intervalHours}h • Keep ${backupSchedule.retentionCount}` : 'Disabled'}
+                    {backupSchedule.lastRunAt ? ` • Last: ${new Date(backupSchedule.lastRunAt).toLocaleString()} (${backupSchedule.lastStatus || 'ok'})` : ''}
+                  </p>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => void postAction({ action: 'backupCreate' }, 'Created and verified SQLite backup.')}
+                className="px-3.5 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold"
+              >
+                Create &amp; Verify Backup
+              </button>
+            </div>
+            {backupVerifyMsg && <p className="text-emerald-300">{backupVerifyMsg}</p>}
+            {backups.length === 0 ? (
+              <p className="text-neutral-500">No backups recorded yet.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {backups.map((b) => (
+                  <div key={b.filename} className="flex items-center justify-between rounded-lg border border-neutral-800 bg-neutral-950/60 px-3 py-2">
+                    <div>
+                      <span className="font-mono text-white">{b.filename}</span>
+                      <span className="ml-2 text-neutral-400">{(b.sizeBytes / 1048576).toFixed(2)} MB • {new Date(b.createdAt).toLocaleString()}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const res = await apiFetch('/api/native/library', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ action: 'backupVerify', filename: b.filename }),
+                        });
+                        const d = await res.json();
+                        setBackupVerifyMsg(d?.verification?.ok
+                          ? `${b.filename}: integrity=${d.verification.integrity}, tables=${d.verification.tableCount}`
+                          : `Verification failed: ${d?.error || d?.verification?.integrity || 'error'}`);
+                      }}
+                      className="px-2.5 py-1 rounded border border-neutral-700 hover:bg-neutral-800 text-neutral-200"
+                    >
+                      Verify Read-Only
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Indexed Items / Identify TMDB */}
-      {items.length > 0 && (
+      {showLibraries && items.length > 0 && (
         <div className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-5 space-y-3">
           <h3 className="font-semibold text-base flex items-center gap-2">
             <Sparkles size={16} className="text-amber-400" />
@@ -617,18 +1046,13 @@ export function NativeLibraryManager() {
                     }
                     className="w-24 bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-xs"
                   />
-                  <button
-                    type="button"
-                    onClick={() =>
-                      void postAction(
-                        { action: 'identify', itemId: item.id, tmdbId: Number(identifyInputs[item.id] || 0) },
-                        `Identified "${item.title}".`
-                      )
-                    }
-                    className="flex items-center gap-1 px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200"
-                  >
-                    <Search size={12} /> Match
-                  </button>
+            <button
+              type="button"
+              onClick={() => void postAction({ action: 'identify', itemId: item.id, tmdbId: Number(identifyInputs[item.id] || 0) }, `Identified "${item.title}".`)}
+              className="flex items-center gap-1 px-2 py-1 rounded bg-neutral-800 hover:bg-neutral-700 text-neutral-200"
+            >
+              <Search size={12} /> Match
+            </button>
                   <button
                     type="button"
                     onClick={() =>

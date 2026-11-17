@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import { apiFetch } from '@/api/client';
 import { useProfile } from '@/context/ProfileContext';
 import { PROFILE_PALETTES, getInitials } from '@/lib/profile-constants';
 import {
@@ -42,6 +43,24 @@ export const ProfileSelectorModal: React.FC = () => {
   const [selectedPaletteIndex, setSelectedPaletteIndex] = useState(2);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [audioLangPref, setAudioLangPref] = useState('');
+  const [subtitleLangPref, setSubtitleLangPref] = useState('');
+  const [subtitleModePref, setSubtitleModePref] = useState<'auto' | 'always' | 'forced' | 'none'>('auto');
+  const [prefsSaved, setPrefsSaved] = useState(false);
+
+  useEffect(() => {
+    if (!isSelectorOpen || !activeProfile) return;
+    apiFetch('/api/profile-prefs')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (d?.defaults) {
+          setAudioLangPref(d.defaults.audioLang || '');
+          setSubtitleLangPref(d.defaults.subtitleLang || '');
+          setSubtitleModePref(d.defaults.subtitleMode || 'auto');
+        }
+      })
+      .catch(() => {});
+  }, [isSelectorOpen, activeProfile]);
 
   // Automatically open First Profile creation screen when an account has 0 profiles
   useEffect(() => {
@@ -538,6 +557,63 @@ export const ProfileSelectorModal: React.FC = () => {
               </span>
             </button>
           </div>
+
+          {/* Active Profile Audio & Subtitle Defaults */}
+          {activeProfile && (
+            <div className="max-w-xl mx-auto rounded-xl border border-neutral-800 bg-neutral-900/70 p-4 text-left space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-semibold text-neutral-300">
+                  {activeProfile.name} — Audio &amp; Subtitle Defaults
+                </span>
+                {prefsSaved && <span className="text-xs text-emerald-400">Saved</span>}
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+                <input
+                  type="text"
+                  placeholder="Audio lang (e.g. en, ja)"
+                  value={audioLangPref}
+                  onChange={(e) => setAudioLangPref(e.target.value)}
+                  className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white"
+                />
+                <input
+                  type="text"
+                  placeholder="Subtitle lang (e.g. en)"
+                  value={subtitleLangPref}
+                  onChange={(e) => setSubtitleLangPref(e.target.value)}
+                  className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white"
+                />
+                <select
+                  value={subtitleModePref}
+                  onChange={(e) => setSubtitleModePref(e.target.value as 'auto' | 'always' | 'forced' | 'none')}
+                  className="bg-neutral-950 border border-neutral-800 rounded-lg px-2.5 py-2 text-white"
+                >
+                  <option value="auto">Subtitles: Auto</option>
+                  <option value="always">Subtitles: Always</option>
+                  <option value="forced">Subtitles: Forced Only</option>
+                  <option value="none">Subtitles: Off</option>
+                </select>
+              </div>
+              <button
+                type="button"
+                onClick={async () => {
+                  setPrefsSaved(false);
+                  const res = await apiFetch('/api/profile-prefs', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      audioLang: audioLangPref,
+                      subtitleLang: subtitleLangPref,
+                      subtitleMode: subtitleModePref,
+                    }),
+                  });
+                  if (res.ok) setPrefsSaved(true);
+                }}
+                className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white text-xs font-semibold"
+              >
+                Save Playback Defaults
+              </button>
+            </div>
+          )}
 
           {/* Action Footer Buttons */}
           <div className="flex flex-wrap items-center justify-center gap-3 pt-4">

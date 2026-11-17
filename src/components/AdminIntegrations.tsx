@@ -22,7 +22,7 @@ import {
   Download,
 } from 'lucide-react';
 
-type AdminTab = 'modules' | 'media' | 'downloads' | 'system';
+type AdminTab = 'modules' | 'media' | 'playback' | 'maintenance' | 'downloads' | 'system';
 
 interface MediaOverviewStats {
   moviesCount: number;
@@ -434,10 +434,37 @@ export function AdminIntegrations({
         </div>
 
         {/* Admin Navigation Tabs */}
-        <div className="flex items-center gap-2 bg-neutral-900/90 border border-neutral-800 p-1.5 rounded-xl">
+        <div className="flex flex-wrap items-center gap-1.5 bg-neutral-900/90 border border-neutral-800 p-1.5 rounded-xl">
+          <button
+            onClick={() => setTab('media')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
+              tab === 'media' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <HardDrive size={16} />
+            <span>Libraries</span>
+          </button>
+          <button
+            onClick={() => setTab('playback')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
+              tab === 'playback' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <Film size={16} />
+            <span>Playback</span>
+          </button>
+          <button
+            onClick={() => setTab('maintenance')}
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
+              tab === 'maintenance' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
+            }`}
+          >
+            <RefreshCw size={16} />
+            <span>Maintenance</span>
+          </button>
           <button
             onClick={() => setTab('modules')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
               tab === 'modules' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
             }`}
           >
@@ -445,17 +472,8 @@ export function AdminIntegrations({
             <span>Modules ({configuredCount}/{integrations.length})</span>
           </button>
           <button
-            onClick={() => setTab('media')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-              tab === 'media' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
-            }`}
-          >
-            <HardDrive size={16} />
-            <span>Media Management</span>
-          </button>
-          <button
             onClick={() => setTab('downloads')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
               tab === 'downloads' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
             }`}
           >
@@ -464,7 +482,7 @@ export function AdminIntegrations({
           </button>
           <button
             onClick={() => setTab('system')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
+            className={`flex items-center gap-2 px-3.5 py-2 rounded-lg text-sm font-semibold transition ${
               tab === 'system' ? 'bg-red-600 text-white shadow' : 'text-neutral-400 hover:text-white'
             }`}
           >
@@ -565,8 +583,16 @@ export function AdminIntegrations({
             </div>
           </div>
 
-          <NativeLibraryManager />
+          <NativeLibraryManager section="libraries" />
         </div>
+      )}
+
+      {tab === 'playback' && (
+        <NativeLibraryManager section="playback" />
+      )}
+
+      {tab === 'maintenance' && (
+        <NativeLibraryManager section="maintenance" />
       )}
 
       {tab === 'downloads' && (

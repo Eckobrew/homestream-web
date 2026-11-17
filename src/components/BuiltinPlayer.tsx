@@ -8,7 +8,7 @@ import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { useMediaSession } from '@/player/useMediaSession';
 import { useSessionHeartbeat } from '@/player/useSessionHeartbeat';
-import { negotiatePlayback, MediaAudioTrack, MediaVersion, SkipSegment } from '@/player/transport';
+import { negotiatePlayback, MediaAudioTrack, MediaVersion, SkipSegment, type QualityMode } from '@/player/transport';
 import { playbackState } from '@/player/state';
 import { castReceiverId, castStartupState, clearCastIdle, DEFAULT_RECEIVER_ID, requestCastCapabilities, selectCastSubtitles } from '@/player/cast';
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';

@@ -63,6 +63,7 @@ export function TvWatchPlayer({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const hlsRef = useRef<Hls | null>(null);
   const logicalOffsetRef = useRef(0);
+  const pendingSeekRef = useRef<number | null>(null);
   const [activeStreamSrc, setActiveStreamSrc] = useState(streamSrc);
   const [activeIsHls, setActiveIsHls] = useState(isHls);
   const [activeSkip, setActiveSkip] = useState<SkipSegment | null>(null);
@@ -74,6 +75,7 @@ export function TvWatchPlayer({
     setActiveStreamSrc(streamSrc);
     setActiveIsHls(isHls);
     logicalOffsetRef.current = 0;
+    pendingSeekRef.current = null;
   }, [streamSrc, isHls]);
 
   useEffect(() => {
@@ -135,11 +137,12 @@ export function TvWatchPlayer({
       }
     }
 
-    // Out-of-range HLS seek (e.g. jumping to credits end): renegotiate at startTimeTicks
+    // Out-of-range HLS seek (e.g. jumping to credits end): renegotiate at startTimeTicks with native-tv receiver
     try {
       const q = new URLSearchParams({
         itemId,
-        receiver: 'browser',
+        receiver: 'native-tv',
+        forceTranscode: 'true',
         startTimeTicks: String(Math.floor(clamped * 10_000_000)),
       });
       if (selectedVersionId) q.set('versionId', selectedVersionId);
@@ -147,11 +150,21 @@ export function TvWatchPlayer({
       if (!res.ok) return;
       const data = await res.json();
       if (data?.streamUrl) {
-        logicalOffsetRef.current = clamped;
         const nextUrl = String(data.streamUrl).startsWith('/api/native/')
           ? String(data.streamUrl).replace('/api/', '/api/v1/')
           : String(data.streamUrl);
-        setActiveIsHls(Boolean(data.isTranscoding || nextUrl.includes('.m3u8')));
+        const nextIsHls = Boolean(data.isTranscoding || nextUrl.includes('.m3u8'));
+        const serverStartSec = typeof data.startTimeTicks === 'number'
+          ? data.startTimeTicks / 10_000_000
+          : (nextIsHls ? clamped : 0);
+        if (nextIsHls && serverStartSec > 0) {
+          logicalOffsetRef.current = serverStartSec;
+          pendingSeekRef.current = Math.max(0, clamped - serverStartSec);
+        } else {
+          logicalOffsetRef.current = 0;
+          pendingSeekRef.current = clamped;
+        }
+        setActiveIsHls(nextIsHls);
         setActiveStreamSrc(nextUrl);
       }
     } catch {}
@@ -201,7 +214,10 @@ export function TvWatchPlayer({
       video.play().catch(() => {});
     };
 
-    const effectiveResume = logicalOffsetRef.current > 0 ? 0 : resumeSeconds;
+    const effectiveResume = pendingSeekRef.current !== null
+      ? pendingSeekRef.current
+      : (logicalOffsetRef.current > 0 ? 0 : resumeSeconds);
+    pendingSeekRef.current = null;
     if (activeIsHls && Hls.isSupported()) {
       hls = new Hls({
         enableWorker: true,

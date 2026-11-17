@@ -65,7 +65,7 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   const [musicSubTab, setMusicSubTab] = useState<'albums' | 'artists' | 'songs' | 'playlists'>('albums');
   const [booksSubTab, setBooksSubTab] = useState<'shelf' | 'discover' | 'downloads'>('shelf');
   const [youtubeSubTab, setYoutubeSubTab] = useState<'home' | 'search' | 'subscriptions' | 'queue' | 'archive'>('home');
-  const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'downloads' | 'system'>(
+  const [adminSubTab, setAdminSubTab] = useState<'modules' | 'media' | 'playback' | 'maintenance' | 'downloads' | 'system'>(
     initialTab === 'downloads' ? 'downloads' : 'modules'
   );
 
