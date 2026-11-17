@@ -77,6 +77,9 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const hlsRef = useRef<Hls | null>(null);
 
   const [stopped, setStopped] = useState(false);
+  const [showEndOverlay, setShowEndOverlay] = useState(false);
+  const [endRecommendations, setEndRecommendations] = useState<MediaItem[]>([]);
+  const [endTrailerKey, setEndTrailerKey] = useState<string | null>(null);
   const [isPlaying, setIsPlaying] = useState(true);
   const [autoplayEpisodes, setAutoplayEpisodes] = useState(true);
   const nextEpisodeHandler = useRef<() => void>(() => {});
@@ -1416,7 +1419,39 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           onCanPlay={() => setIsMidStreamBuffering(false)}
           onLoadedMetadata={handleLoadedMetadata}
           onError={handlePlaybackError}
-          onEnded={() => { reportProgress(true); if (autoplayEpisodes) handleNextEpisode(); }}
+          onEnded={() => {
+            reportProgress(true);
+            if (nextEpisode || onNextEpisode) {
+              if (autoplayEpisodes) handleNextEpisode();
+              return;
+            }
+            setShowEndOverlay(true);
+            setEndTrailerKey(null);
+            void (async () => {
+              try {
+                const res = await apiFetch(`/api/media/${encodeURIComponent(item.id)}/recommendations`);
+                if (!res.ok) return;
+                const data = (await res.json()) as { items?: MediaItem[] };
+                const recs = (data.items || []).slice(0, 8);
+                setEndRecommendations(recs);
+                const lead = recs[0];
+                if (lead) {
+                  const params = new URLSearchParams({
+                    title: lead.title,
+                    type: lead.type === 'Series' ? 'tv' : 'movie',
+                  });
+                  if (lead.tmdbId) params.set('tmdbId', String(lead.tmdbId));
+                  const tr = await apiFetch(`/api/trailer?${params.toString()}`);
+                  if (tr.ok) {
+                    const trData = (await tr.json()) as { trailerKey?: string; key?: string };
+                    setEndTrailerKey(trData.trailerKey || trData.key || null);
+                  }
+                }
+              } catch {
+                // Ignore recommendation fetch errors on end screen.
+              }
+            })();
+          }}
           className={isCasting ? 'hidden' : 'w-full h-full object-contain cursor-pointer'}
           playsInline
         >
@@ -2267,6 +2302,85 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               )}
             </div>
           </div>
+        </div>
+      )}
+
+      {showEndOverlay && (
+        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-6 md:p-10 overflow-y-auto">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs uppercase tracking-widest text-neutral-400">Up Next</p>
+              <h2 className="text-xl md:text-2xl font-bold text-white">
+                {endRecommendations[0]?.title ? `Trailer: ${endRecommendations[0].title}` : `More Like ${item.title}`}
+              </h2>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEndOverlay(false);
+                  if (videoRef.current) {
+                    videoRef.current.currentTime = 0;
+                    void videoRef.current.play();
+                  }
+                }}
+                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-semibold transition"
+              >
+                Replay
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowEndOverlay(false);
+                  onClose();
+                }}
+                className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-white text-sm font-semibold transition"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+
+          {endTrailerKey && (
+            <div className="my-5 w-full max-w-4xl mx-auto aspect-video rounded-xl overflow-hidden border border-neutral-800 bg-black shadow-2xl">
+              <iframe
+                src={`https://www.youtube.com/embed/${encodeURIComponent(endTrailerKey)}?autoplay=1&mute=1&rel=0`}
+                title={`Trailer for ${endRecommendations[0]?.title || item.title}`}
+                className="w-full h-full"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                allowFullScreen
+              />
+            </div>
+          )}
+
+          {endRecommendations.length > 0 && (
+            <div className="space-y-2.5">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">More Like This</h3>
+              <div className="flex gap-3 overflow-x-auto pb-2">
+                {endRecommendations.map((rec) => (
+                  <a
+                    key={rec.id}
+                    href={`/${rec.type === 'Series' ? 'tvshows' : 'movies'}/play/${encodeURIComponent(rec.id)}`}
+                    className="group relative flex-shrink-0 w-36 sm:w-44 aspect-square rounded-lg overflow-hidden bg-neutral-900 border border-neutral-800 hover:border-white transition"
+                  >
+                    {(rec.backdropUrl || rec.posterUrl) && (
+                      <img
+                        src={rec.backdropUrl || rec.posterUrl}
+                        alt={rec.title}
+                        className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                      />
+                    )}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/30 to-transparent flex flex-col justify-end p-2.5">
+                      <p className="text-xs font-bold text-white truncate">{rec.title}</p>
+                      <p className="text-[11px] text-neutral-300">
+                        {rec.year ? `${rec.year} • ` : ''}Play now
+                      </p>
+                    </div>
+                  </a>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
