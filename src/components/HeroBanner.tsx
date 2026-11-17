@@ -25,7 +25,7 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   const [showVideo, setShowVideo] = useState(false);
   const [isHovering, setIsHovering] = useState(false);
   const [heroTrailerKey, setHeroTrailerKey] = useState<string | null>(null);
-  const heroIframeRef = useRef<HTMLIFrameElement>(null);
+  const heroVideoRef = useRef<HTMLVideoElement>(null);
 
   // Set random starting index on initial mount
   useEffect(() => {
@@ -99,11 +99,8 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
   const toggleMute = () => {
     const nextMute = !isMuted;
     setIsMuted(nextMute);
-    if (heroIframeRef.current?.contentWindow) {
-      heroIframeRef.current.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: nextMute ? 'mute' : 'unMute', args: [] }),
-        '*'
-      );
+    if (heroVideoRef.current) {
+      heroVideoRef.current.muted = nextMute;
     }
   };
 
@@ -132,12 +129,16 @@ export const HeroBanner: React.FC<HeroBannerProps> = ({
 
       {showVideo && heroTrailerKey && (
         <div className="absolute inset-0 w-full h-full overflow-hidden bg-black pointer-events-none">
-          <iframe
-            ref={heroIframeRef}
-            src={`https://www.youtube-nocookie.com/embed/${heroTrailerKey}?autoplay=1&mute=${isMuted ? 1 : 0}&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&loop=1&playlist=${heroTrailerKey}&playsinline=1&enablejsapi=1`}
-            title={currentItem.title}
-            className="w-full h-full object-cover scale-125 pointer-events-none"
-            allow="autoplay; encrypted-media"
+          <video
+            key={heroTrailerKey}
+            ref={heroVideoRef}
+            src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(heroTrailerKey)}`}
+            autoPlay
+            muted={isMuted}
+            loop
+            playsInline
+            onError={() => setShowVideo(false)}
+            className="w-full h-full object-cover scale-110 pointer-events-none"
           />
         </div>
       )}

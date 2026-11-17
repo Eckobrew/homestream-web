@@ -283,12 +283,15 @@ export const MediaModal: React.FC<MediaModalProps> = ({
         <div className="relative aspect-[16/9] max-h-[420px] w-full bg-neutral-900 overflow-hidden">
           {isPlayingTrailer && trailerKey ? (
             <div className="relative w-full h-full bg-black">
-              <iframe
-                src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&controls=1&modestbranding=1&rel=0`}
-                title={`${currentItem.title} Trailer`}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; fullscreen"
-                allowFullScreen
+              <video
+                key={trailerKey}
+                src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(trailerKey)}`}
+                controls
+                autoPlay
+                playsInline
+                onEnded={() => setIsPlayingTrailer(false)}
+                onError={() => setIsPlayingTrailer(false)}
+                className="w-full h-full object-contain bg-black"
               />
               <button
                 onClick={() => setIsPlayingTrailer(false)}

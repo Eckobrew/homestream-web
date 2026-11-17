@@ -38,7 +38,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const trailerRequestRef = useRef<AbortController | null>(null);
   const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const previewVideoRef = useRef<HTMLVideoElement>(null);
 
   const libraryPreview = item.videoStreamUrl?.startsWith('/api/preview-stream?')
     ? item.videoStreamUrl : undefined;
@@ -279,12 +279,16 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
             {isPlayingPreview && !libraryPreview && trailerKey && (
               <div className="absolute inset-0 w-full h-full overflow-hidden bg-black pointer-events-none">
-                <iframe
-                  ref={iframeRef}
-                  src={`https://www.youtube-nocookie.com/embed/${trailerKey}?autoplay=1&mute=${isPreviewMuted ? 1 : 0}&controls=0&modestbranding=1&rel=0&showinfo=0&iv_load_policy=3&loop=1&playlist=${trailerKey}&playsinline=1&enablejsapi=1`}
-                  title={item.title}
-                  className="w-full h-full object-cover scale-135 pointer-events-none"
-                  allow="autoplay; encrypted-media"
+                <video
+                  key={trailerKey}
+                  ref={previewVideoRef}
+                  src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(trailerKey)}`}
+                  autoPlay
+                  muted={isPreviewMuted}
+                  loop
+                  playsInline
+                  onError={() => setIsPlayingPreview(false)}
+                  className="w-full h-full object-cover scale-125 pointer-events-none"
                 />
               </div>
             )}
@@ -296,11 +300,8 @@ export const MediaCard: React.FC<MediaCardProps> = ({
                   e.stopPropagation();
                   const nextMute = !isPreviewMuted;
                   setIsPreviewMuted(nextMute);
-                  if (iframeRef.current?.contentWindow) {
-                    iframeRef.current.contentWindow.postMessage(
-                      JSON.stringify({ event: 'command', func: nextMute ? 'mute' : 'unMute', args: [] }),
-                      '*'
-                    );
+                  if (previewVideoRef.current) {
+                    previewVideoRef.current.muted = nextMute;
                   }
                 }}
                 className="absolute bottom-2 right-2 z-20 p-1.5 rounded-full bg-black/70 hover:bg-black/90 text-white backdrop-blur-sm transition-colors border border-white/30"

@@ -1438,8 +1438,8 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                   if (lead.tmdbId) params.set('tmdbId', String(lead.tmdbId));
                   const tr = await apiFetch(`/api/trailer?${params.toString()}`);
                   if (tr.ok) {
-                    const trData = (await tr.json()) as { trailerKey?: string; key?: string };
-                    setEndTrailerKey(trData.trailerKey || trData.key || null);
+                    const trData = (await tr.json()) as { trailer?: { key?: string }; trailerKey?: string; key?: string };
+                    setEndTrailerKey(trData.trailer?.key || trData.trailerKey || trData.key || null);
                   }
                 }
               } catch {
@@ -2338,12 +2338,14 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
           {endTrailerKey && (
             <div className="my-5 w-full max-w-4xl mx-auto aspect-video rounded-xl overflow-hidden border border-neutral-800 bg-black shadow-2xl">
-              <iframe
-                src={`https://www.youtube.com/embed/${encodeURIComponent(endTrailerKey)}?autoplay=1&mute=1&rel=0`}
-                title={`Trailer for ${endRecommendations[0]?.title || item.title}`}
-                className="w-full h-full"
-                allow="autoplay; encrypted-media; picture-in-picture"
-                allowFullScreen
+              <video
+                key={endTrailerKey}
+                src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(endTrailerKey)}`}
+                controls
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-contain bg-black"
               />
             </div>
           )}

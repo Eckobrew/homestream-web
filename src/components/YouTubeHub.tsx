@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { apiFetch } from '@/api/client';
 import {
   Play,
@@ -26,6 +26,8 @@ import {
   Flame,
   Film,
   History,
+  Volume2,
+  VolumeX,
 } from 'lucide-react';
 import { MediaItem } from '@/types';
 import { useProfile } from '@/context/ProfileContext';
@@ -161,9 +163,40 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Home / Discovery State
   const [heroVideo, setHeroVideo] = useState<YouTubeSearchResult | null>(null);
+  const [showHeroPreview, setShowHeroPreview] = useState(false);
+  const [isHeroMuted, setIsHeroMuted] = useState(true);
+  const [hoveredVideoId, setHoveredVideoId] = useState<string | null>(null);
+  const heroPreviewVideoRef = useRef<HTMLVideoElement>(null);
+  const hoverPreviewTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [sections, setSections] = useState<Array<{ id: string; title: string; items: YouTubeSearchResult[] }>>([]);
   const [continueWatching, setContinueWatching] = useState<YouTubeContinueItem[]>([]);
   const [isLoadingHome, setIsLoadingHome] = useState(false);
+
+  useEffect(() => {
+    setShowHeroPreview(false);
+    if (!heroVideo?.id) return;
+    const timer = setTimeout(() => {
+      if (!document.hidden) setShowHeroPreview(true);
+    }, 1500);
+    return () => clearTimeout(timer);
+  }, [heroVideo?.id]);
+
+  const scheduleCardPreview = (videoId: string) => {
+    if (hoverPreviewTimerRef.current) clearTimeout(hoverPreviewTimerRef.current);
+    hoverPreviewTimerRef.current = setTimeout(() => setHoveredVideoId(videoId), 650);
+  };
+
+  const clearCardPreview = () => {
+    if (hoverPreviewTimerRef.current) clearTimeout(hoverPreviewTimerRef.current);
+    hoverPreviewTimerRef.current = null;
+    setHoveredVideoId(null);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (hoverPreviewTimerRef.current) clearTimeout(hoverPreviewTimerRef.current);
+    };
+  }, []);
 
   // Search State
   const [searchQuery, setSearchQuery] = useState('');
@@ -333,9 +366,9 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
     }
   };
 
-  // Stream Resolution & Play (Direct via proxy-stream for 100% reliable playback)
+  // Stream Resolution & Play (Direct via yt-dlp proxy stream)
   const handlePlayVideo = (video: { id: string; title: string; thumbnailUrl?: string; durationSeconds?: number; channelTitle?: string; description?: string }) => {
-    const videoStreamUrl = `/api/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`;
+    const videoStreamUrl = `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`;
 
     const mediaItem: MediaItem = {
       id: `yt-${video.id}`,
@@ -356,6 +389,9 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Resume Continue Watching
   const handleResumeContinueWatching = (item: YouTubeContinueItem) => {
+    const normalizedStreamUrl = item.streamUrl
+      ? (item.streamUrl.startsWith('/api/v1/') ? item.streamUrl : item.streamUrl.replace(/^\/api\//, '/api/v1/'))
+      : `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(item.videoId)}`;
     const mediaItem: MediaItem = {
       id: `yt-${item.videoId}`,
       title: item.title,
@@ -368,7 +404,7 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
       genres: ['YouTube', item.channelName || 'YouTube'],
       source: 'youtube' as any,
       status: 'available',
-      videoStreamUrl: item.streamUrl || `/api/youtube/stream-video?videoId=${encodeURIComponent(item.videoId)}`,
+      videoStreamUrl: normalizedStreamUrl,
     };
 
     onPlay(mediaItem);
@@ -710,6 +746,19 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                 className="absolute inset-0 bg-cover bg-center transition-all duration-1000 scale-105"
                 style={{ backgroundImage: `url(${heroVideo.thumbnailUrl})` }}
               />
+              {showHeroPreview && heroVideo.id && (
+                <video
+                  key={heroVideo.id}
+                  ref={heroPreviewVideoRef}
+                  src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(heroVideo.id)}`}
+                  autoPlay
+                  muted={isHeroMuted}
+                  loop
+                  playsInline
+                  onError={() => setShowHeroPreview(false)}
+                  className="absolute inset-0 w-full h-full object-cover scale-105 transition-opacity duration-700 pointer-events-none"
+                />
+              )}
               {/* Cinematic Scrims matching HeroBanner */}
               <div className="absolute inset-0 bg-gradient-to-t from-black via-[#141414]/50 to-transparent pointer-events-none" />
               <div className="absolute inset-0 bg-gradient-to-r from-black via-black/80 to-transparent w-full md:w-3/4 pointer-events-none" />
@@ -751,6 +800,20 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                     <Download size={16} />
                     <span>Save to NAS</span>
                   </button>
+                  {showHeroPreview && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = !isHeroMuted;
+                        setIsHeroMuted(next);
+                        if (heroPreviewVideoRef.current) heroPreviewVideoRef.current.muted = next;
+                      }}
+                      className="p-2.5 rounded-full bg-neutral-800/80 hover:bg-neutral-700 text-white transition border border-neutral-700 backdrop-blur-md"
+                      title={isHeroMuted ? 'Unmute preview' : 'Mute preview'}
+                    >
+                      {isHeroMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+                    </button>
+                  )}
                 </div>
               </div>
             </div>
@@ -847,6 +910,8 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                       <div
                         key={video.id}
                         onClick={() => handlePlayVideo(video)}
+                        onMouseEnter={() => scheduleCardPreview(video.id)}
+                        onMouseLeave={clearCardPreview}
                         className="group relative flex-none w-60 md:w-68 bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800/80 hover:border-neutral-600 cursor-pointer transition duration-200"
                       >
                         <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
@@ -855,6 +920,18 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                             alt={video.title}
                             className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                           />
+                          {hoveredVideoId === video.id && (
+                            <video
+                              key={`preview-${video.id}`}
+                              src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`}
+                              autoPlay
+                              muted
+                              loop
+                              playsInline
+                              onError={() => setHoveredVideoId(null)}
+                              className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                            />
+                          )}
                           {video.durationFormatted && (
                             <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono font-bold text-white">
                               {video.durationFormatted}
@@ -941,6 +1018,8 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                     <div
                       key={video.id}
                       onClick={() => handlePlayVideo(video)}
+                      onMouseEnter={() => scheduleCardPreview(video.id)}
+                      onMouseLeave={clearCardPreview}
                       className="group bg-neutral-900 rounded-xl overflow-hidden border border-neutral-800 hover:border-neutral-600 cursor-pointer transition flex flex-col justify-between"
                     >
                       <div className="relative aspect-video w-full bg-neutral-950 overflow-hidden">
@@ -949,6 +1028,18 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
                           alt={video.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
                         />
+                        {hoveredVideoId === video.id && (
+                          <video
+                            key={`search-preview-${video.id}`}
+                            src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`}
+                            autoPlay
+                            muted
+                            loop
+                            playsInline
+                            onError={() => setHoveredVideoId(null)}
+                            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+                          />
+                        )}
                         {video.durationFormatted && (
                           <span className="absolute bottom-2 right-2 px-1.5 py-0.5 rounded bg-black/80 text-[11px] font-mono font-bold text-white">
                             {video.durationFormatted}
