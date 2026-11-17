@@ -243,9 +243,9 @@ export const ProfileProvider: React.FC<{ children: React.ReactNode }> = ({ child
   }, []);
 
   const openSelector = useCallback(() => {
-    if (!canSwitchProfile || isExternal) return;
+    if (!canSwitchProfile) return;
     setIsSelectorOpen(true);
-  }, [canSwitchProfile, isExternal]);
+  }, [canSwitchProfile]);
 
   const closeSelector = useCallback(() => {
     // Only allow closing if setup is already complete (at least 1 profile exists)

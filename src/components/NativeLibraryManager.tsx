@@ -112,7 +112,6 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
   const [scanning, setScanning] = useState(false);
   const [scanProgress, setScanProgress] = useState<{ scannedFiles: number; addedItems: number } | null>(null);
   const [saving, setSaving] = useState(false);
-  const [importingHistory, setImportingHistory] = useState(false);
   const [statusMsg, setStatusMsg] = useState('');
   const [newLibName, setNewLibName] = useState('');
   const [playbackGroup, setPlaybackGroup] = useState<'all' | 'transcoding' | 'languages' | 'toggles' | 'streams'>('all');
@@ -135,13 +134,6 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
   const [backups, setBackups] = useState<Array<{ filename: string; sizeBytes: number; createdAt: string }>>([]);
   const [backupSchedule, setBackupSchedule] = useState<{ enabled: boolean; intervalHours: number; retentionCount: number; lastRunAt?: string; lastStatus?: string } | null>(null);
   const [backupVerifyMsg, setBackupVerifyMsg] = useState('');
-  const [migrationPreview, setMigrationPreview] = useState<{
-    imported: number;
-    unmatched: number;
-    alreadyPresent: number;
-    unmatchedItems: Array<{ jellyfinId: string; profileName: string; type: string; title: string; seriesTitle?: string; seasonNumber?: number; episodeNumber?: number; year?: number; candidates: Array<{ id: string; label: string }> }>;
-  } | null>(null);
-  const [migrationOverrides, setMigrationOverrides] = useState<Record<string, string>>({});
   const [skipFileId, setSkipFileId] = useState('');
   const [skipRecapStart, setSkipRecapStart] = useState('');
   const [skipRecapEnd, setSkipRecapEnd] = useState('');
@@ -233,20 +225,6 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
     }
   };
 
-  const handleImportHistory = async () => {
-    setImportingHistory(true);
-    try {
-      const result = await postAction({ action: 'importJellyfinHistory' }, 'Watch history imported.');
-      if (result) {
-        setStatusMsg(`Imported ${result.imported} entries. ${result.alreadyPresent} already present and ${result.unmatched} unmatched.`);
-      }
-    } catch {
-      setStatusMsg('Watch history import failed.');
-    } finally {
-      setImportingHistory(false);
-    }
-  };
-
   const handleAddLibrary = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newLibName.trim() || !newLibPath.trim()) return;
@@ -293,24 +271,13 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
           <div>
             <h3 className="text-lg font-bold flex items-center gap-2">
               <HardDrive size={18} className="text-red-500" />
-              <span>Library Manager &amp; Native Media Engine</span>
+              <span>Library Manager</span>
             </h3>
             <p className="text-xs text-neutral-400 mt-0.5">
-              In-house Jellyfin replacement: directory scanner, TMDB indexer, FFmpeg HLS transcoder, Skip Intro/Credits, Multi-Version grouping, opt-in Trickplay, SyncPlay, and Watch Stats.
+              Native directory scanner, TMDB indexer, FFmpeg HLS transcoder, Skip Intro/Credits, Multi-Version grouping, Trickplay, SyncPlay, and Watch Stats.
             </p>
           </div>
           <div className="flex items-center gap-2">
-            <select
-              value={settings.mediaEngine}
-              onChange={(e) =>
-                setSettings({ ...settings, mediaEngine: e.target.value as 'jellyfin' | 'native' })
-              }
-              className="bg-neutral-950 border border-neutral-700 rounded-lg px-3 py-2 text-xs font-semibold"
-              aria-label="Active Media Engine"
-            >
-              <option value="jellyfin">Engine: Jellyfin (Legacy)</option>
-              <option value="native">Engine: Native HomeStream</option>
-            </select>
             <button
               type="button"
               onClick={() => void handleScan()}
@@ -330,95 +297,6 @@ export function NativeLibraryManager({ section = 'all' }: { section?: 'all' | 'l
             </button>
           </div>
         </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            type="button"
-            disabled={importingHistory || scanning}
-            onClick={async () => {
-              setImportingHistory(true);
-              try {
-                const res = await apiFetch('/api/native/library', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ action: 'importJellyfinHistory', dryRun: true }),
-                });
-                const d = await res.json();
-                if (!res.ok) throw new Error(d.error || 'Preview failed');
-                setMigrationPreview(d);
-                setStatusMsg(`Dry run: ${d.imported} ready, ${d.alreadyPresent} already present, ${d.unmatched} unmatched.`);
-              } catch (e) {
-                setStatusMsg(e instanceof Error ? e.message : 'Preview failed');
-              } finally {
-                setImportingHistory(false);
-              }
-            }}
-            className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
-          >
-            {importingHistory ? 'Checking Jellyfin…' : 'Preview Jellyfin Migration'}
-          </button>
-          <button
-            type="button"
-            onClick={() => void handleImportHistory()}
-            disabled={importingHistory || scanning}
-            className="rounded-lg border border-neutral-700 px-3.5 py-2 text-xs font-semibold hover:bg-neutral-800 disabled:opacity-50"
-          >
-            {importingHistory ? 'Importing watch history…' : 'Import Jellyfin watch history'}
-          </button>
-        </div>
-
-        {migrationPreview && (
-          <div className="rounded-lg border border-neutral-800 bg-neutral-950/70 p-4 space-y-3 text-xs">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="font-semibold text-white">
-                Migration Preview: {migrationPreview.imported} new • {migrationPreview.alreadyPresent} existing • {migrationPreview.unmatched} unmatched
-              </div>
-              <button
-                type="button"
-                disabled={importingHistory}
-                onClick={async () => {
-                  setImportingHistory(true);
-                  try {
-                    const res = await apiFetch('/api/native/library', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ action: 'importJellyfinHistory', dryRun: false, overrides: migrationOverrides }),
-                    });
-                    const d = await res.json();
-                    if (!res.ok) throw new Error(d.error || 'Import failed');
-                    setMigrationPreview(null);
-                    setStatusMsg(`Imported ${d.imported} items (${d.unmatched} unmatched, ${d.alreadyPresent} already present).`);
-                  } catch (e) {
-                    setStatusMsg(e instanceof Error ? e.message : 'Import failed');
-                  } finally {
-                    setImportingHistory(false);
-                  }
-                }}
-                className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white font-semibold"
-              >
-                Confirm &amp; Import
-              </button>
-            </div>
-            {migrationPreview.unmatchedItems.slice(0, 20).map((u) => (
-              <div key={`${u.profileName}-${u.jellyfinId}`} className="flex flex-wrap items-center justify-between gap-2 border-t border-neutral-800 pt-2">
-                <div>
-                  <span className="text-neutral-200 font-medium">{u.seriesTitle ? `${u.seriesTitle} S${u.seasonNumber}E${u.episodeNumber} — ` : ''}{u.title}</span>
-                  <span className="ml-2 text-neutral-500">({u.profileName}{u.year ? ` • ${u.year}` : ''})</span>
-                </div>
-                <select
-                  value={migrationOverrides[u.jellyfinId] || ''}
-                  onChange={(e) => setMigrationOverrides({ ...migrationOverrides, [u.jellyfinId]: e.target.value })}
-                  className="bg-neutral-900 border border-neutral-700 rounded px-2 py-1 text-neutral-200 max-w-xs"
-                >
-                  <option value="">Skip unmatched</option>
-                  {u.candidates.map((c) => (
-                    <option key={c.id} value={c.id}>{c.label}</option>
-                  ))}
-                </select>
-              </div>
-            ))}
-          </div>
-        )}
 
         {(statusMsg || scanning) && (
           <div className="text-xs bg-neutral-950 border border-neutral-800 text-neutral-200 rounded-lg px-3 py-2">

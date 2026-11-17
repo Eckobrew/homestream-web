@@ -296,14 +296,14 @@ export const Navbar: React.FC<NavbarProps> = ({
                         {activeProfile?.name || `${appName || 'HomeStream'} User`}
                       </p>
                       <p className="text-[11px] text-emerald-400 flex items-center space-x-1">
-                        <span>{isExternal || !canSwitchProfile ? 'External Session' : 'Active Profile'}</span>
+                        <span>{canSwitchProfile ? 'Active Profile' : 'Profile Locked'}</span>
                       </p>
                     </div>
                   </div>
                 </div>
 
-                {/* Only internal / switch-enabled sessions can switch or manage profiles */}
-                {!isExternal && canSwitchProfile && (
+                {/* Switch or manage profiles across LAN and external sessions */}
+                {canSwitchProfile && (
                   <>
                     {/* Switch to other profiles */}
                     {profiles.filter((p) => p.id !== activeProfile?.id).length > 0 && (
@@ -389,7 +389,7 @@ export const Navbar: React.FC<NavbarProps> = ({
                   </>
                 )}
 
-                {isExternal && onLogout && (
+                {onLogout && (
                   <>
                     <div className="border-t border-neutral-800/80 my-1" />
                     <button

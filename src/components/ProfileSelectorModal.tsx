@@ -88,7 +88,7 @@ export const ProfileSelectorModal: React.FC = () => {
     }
   }, [needsSetup, availableJellyfinUsers, selectedImportIds.length]);
 
-  if (needsSetup || !isSelectorOpen || !canSwitchProfile || isExternal) return null;
+  if (needsSetup || !isSelectorOpen || !canSwitchProfile) return null;
 
   const toggleImportSelection = (id: string) => {
     setSelectedImportIds((prev) =>
