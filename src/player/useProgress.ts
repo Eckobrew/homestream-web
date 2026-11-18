@@ -11,8 +11,9 @@ export function useProgress(itemId: string | undefined, video: RefObject<HTMLVid
     const element = video.current;
     const current = progressSession(itemId, () => positionRef.current ? positionRef.current() : element?.currentTime || 0, () => !playingRef.current, value => {
       const body = JSON.stringify(value);
-      if (value.isStopped && navigator.sendBeacon?.('/api/v1/playback/progress', new Blob([body], { type: 'application/json' }))) return;
-      void apiFetch('/api/playback/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: value.isStopped }).catch(() => {});
+      void apiFetch('/api/playback/progress', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body, keepalive: value.isStopped })
+        .then(response => { if (value.isStopped && response.ok) window.dispatchEvent(new Event('homestream-progress-saved')); })
+        .catch(() => { if (value.isStopped) navigator.sendBeacon?.('/api/v1/playback/progress', new Blob([body], { type: 'application/json' })); });
     });
     session.current = current;
     const timer = setInterval(() => { if (playingRef.current) current.report(); }, 10000);

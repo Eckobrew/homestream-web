@@ -238,6 +238,12 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
   }, [activeProfile?.id]);
 
   useEffect(() => {
+    const saved = () => { void loadHomeData(activeProfile?.id); };
+    window.addEventListener('homestream-progress-saved', saved);
+    return () => window.removeEventListener('homestream-progress-saved', saved);
+  }, [loadHomeData, activeProfile?.id]);
+
+  useEffect(() => {
     checkAuth();
     loadHomeData(activeProfile?.id);
   }, [checkAuth, loadHomeData, activeProfile?.id]);
