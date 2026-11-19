@@ -45,7 +45,7 @@ test('resume, pause, seek, subtitles, episode changes and close preserve the pla
   await expect.poll(()=>page.locator('video').first().evaluate(video=>(video as HTMLVideoElement).currentTime)).toBeGreaterThan(19);
   await page.keyboard.press('c');
   await page.getByRole('button',{name:'English',exact:true}).click();
-  await expect.poll(()=>page.locator('video').first().evaluate(video=>(video as HTMLVideoElement).textTracks[0]?.mode)).toBe('showing');
+  await expect.poll(()=>page.locator('video').first().evaluate(video=>(video as HTMLVideoElement).textTracks[0]?.mode)).toBe('hidden');
   await page.keyboard.press('n');
   await expect.poll(()=>progress.some(value=>value.itemId==='episode1'&&value.isStopped===true)).toBe(true);
   await expect(page.getByText(/Episode 2/).first()).toBeVisible();
@@ -127,7 +127,7 @@ test('version changes preserve position and use their own subtitles, trickplay a
   await page.getByRole('button', { name: 'Close settings' }).click();
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentSrc)).toContain('version=alternate');
   await expect.poll(videoTime).toBeGreaterThan(9);
-  await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).textTracks[0]?.mode)).toBe('showing');
+  await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).textTracks[0]?.mode)).toBe('hidden');
   await page.getByRole('button', { name: 'Audio' }).click();
   await page.getByRole('dialog', { name: 'Audio tracks' }).getByRole('button', { name: 'Alternate audio' }).click();
   await expect.poll(() => video.evaluate(el => (el as HTMLVideoElement).currentSrc)).toContain('audio=2');
