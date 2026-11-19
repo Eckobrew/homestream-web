@@ -207,12 +207,12 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     return () => controller.abort();
   }, [isTorrentStream, streamUrl]);
 
-  // If item is a series, ensure series seasons/episodes are loaded for navigation & next episode
+  // If item is a series or episode, ensure series seasons/episodes are loaded for navigation & episode selector
   useEffect(() => {
-    if (item.type === 'Series') {
-      if (item.seasons && item.seasons.length > 0) {
+    const isPlayableEp = (ep: Episode) => Boolean(ep.id && (ep as any).isAvailableForPlayback !== false);
+    if (item.type === 'Series' || (item.type === 'Episode' && (item as any).seriesId)) {
+      if (item.type === 'Series' && item.seasons && item.seasons.length > 0) {
         const allEps = item.seasons.flatMap((s) => s.episodes || []);
-        const isPlayableEp = (ep: Episode) => Boolean(isTorrentStream || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (item.source === 'native' && ep.id));
         setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a, b) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
         if (!activeEpisode) {
           const found = activePlayableId
@@ -226,8 +226,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         return;
       }
 
+      const seriesLookupId = item.type === 'Episode' ? (item as any).seriesId : item.id;
+      if (!seriesLookupId) return;
       setIsLoadingEpisode(true);
-      apiFetch(`/api/media/${item.id}`)
+      apiFetch(`/api/media/${seriesLookupId}`)
         .then((res) => res.json())
         .then((data) => {
           const media = data.item;
@@ -238,7 +240,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           }
           if (media.seasons) {
             const allEps = media.seasons.flatMap((s: any) => s.episodes || []);
-            const isPlayableEp = (ep: Episode) => Boolean(isTorrentStream || ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (media.source === 'native' && ep.id));
             setSeriesEpisodes(allEps.filter(isPlayableEp).sort((a: Episode, b: Episode) => a.seasonNumber - b.seasonNumber || a.episodeNumber - b.episodeNumber));
             if (!activeEpisode) {
               const found = targetPlayableId
