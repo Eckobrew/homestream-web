@@ -79,6 +79,17 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const nextEpisodeHandler = useRef<() => void>(() => {});
   const castFinishedItem = useRef('');
   useEffect(() => { setAutoplayEpisodes(localStorage.getItem('homestream-autoplay') !== 'false'); }, []);
+
+  useEffect(() => {
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, []);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -1925,14 +1936,13 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               {seriesEpisodes.length > 0 && (
                 <button
                   onClick={() => setActiveMenu((prev) => (prev === 'episodes' ? null : 'episodes'))}
-                  className={`flex items-center space-x-1 sm:space-x-1.5 transition-colors text-xs sm:text-sm font-semibold p-1.5 rounded-lg hover:bg-white/10 ${
+                  className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
                     activeMenu === 'episodes' ? 'text-white bg-white/15' : 'text-neutral-300 hover:text-white'
                   }`}
                   title={item.id?.startsWith('yt-') ? 'Mix Playlist' : 'Episodes'}
                   aria-label={item.id?.startsWith('yt-') ? 'Mix Playlist' : 'Episodes'}
                 >
                   <ListVideo className="w-4 h-4 sm:w-5 sm:h-5" />
-                  <span className="hidden lg:inline">{item.id?.startsWith('yt-') ? 'Mix' : 'Episodes'}</span>
                 </button>
               )}
 
@@ -1992,18 +2002,27 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             {seriesEpisodes.map((ep, idx) => {
               const isCurrent = ep.id === activePlayableId || ep.id === activeEpisode?.id;
               const isYouTube = item.id?.startsWith('yt-');
+              const thumb = (ep as any).stillUrl || (ep as any).thumbnailUrl || (ep as any).posterUrl || (ep as any).backdropUrl || item.backdropUrl || item.posterUrl;
               return (
                 <button
                   key={ep.id}
                   onClick={() => handleSelectEpisode(ep)}
-                  className={`w-full text-left flex items-center gap-3 p-2.5 rounded-lg transition ${
+                  className={`w-full text-left flex items-center gap-3 p-2 rounded-lg transition ${
                     isCurrent ? 'bg-[#E50914]/20 border border-[#E50914]/50' : 'hover:bg-white/10 border border-transparent'
                   }`}
                 >
-                  <span className={`text-xs font-bold w-8 shrink-0 ${isCurrent ? 'text-[#E50914]' : 'text-neutral-400'}`}>
-                    {isYouTube ? `${idx + 1}.` : `S${ep.seasonNumber}E${ep.episodeNumber}`}
-                  </span>
+                  <div className="relative w-24 aspect-video rounded overflow-hidden bg-neutral-800 shrink-0">
+                    {thumb && (
+                      <img src={thumb} alt={ep.name} className="w-full h-full object-cover" />
+                    )}
+                    <div className="absolute inset-0 bg-black/25 flex items-center justify-center">
+                      <Play className={`w-4 h-4 ${isCurrent ? 'text-[#E50914]' : 'text-white/80'} fill-current`} />
+                    </div>
+                  </div>
                   <div className="min-w-0 flex-1">
+                    <p className={`text-xs font-bold ${isCurrent ? 'text-[#E50914]' : 'text-neutral-400'}`}>
+                      {isYouTube ? `#${idx + 1}` : `S${ep.seasonNumber} E${ep.episodeNumber}`}
+                    </p>
                     <p className={`text-sm font-semibold truncate ${isCurrent ? 'text-white' : 'text-neutral-200'}`}>
                       {ep.name}
                     </p>
@@ -2011,7 +2030,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                       <p className="text-xs text-neutral-400 truncate mt-0.5">{ep.overview}</p>
                     )}
                   </div>
-                  {isCurrent && <Play className="w-3.5 h-3.5 text-[#E50914] shrink-0 fill-current" />}
                 </button>
               );
             })}
