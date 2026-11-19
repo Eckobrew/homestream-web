@@ -685,6 +685,19 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
     return heroItems.length > 0 ? heroItems : (hero ? [hero] : []);
   }, [heroItems, hero, displayedSections, requestSections, activeTab]);
 
+  if (playingState) {
+    return (
+      <main className="min-h-screen bg-black text-white overflow-hidden">
+        <BuiltinPlayer
+          key={playingState.item.id}
+          item={playingState.item}
+          episode={playingState.episode}
+          onClose={handleClosePlayer}
+        />
+      </main>
+    );
+  }
+
   return (
     <main className="min-h-screen bg-[#141414] text-white selection:bg-red-600 selection:text-white">
       {/* Navigation Header */}
@@ -962,16 +975,6 @@ export default function HomeApp({ initialTab, initialMediaId, initialWatchId }: 
           onClose={handleCloseModal}
           onPlay={handlePlay}
           onRequest={handleRequest}
-        />
-      )}
-
-      {/* Built-in Web Player Overlay */}
-      {playingState && (
-        <BuiltinPlayer
-          key={playingState.item.id}
-          item={playingState.item}
-          episode={playingState.episode}
-          onClose={handleClosePlayer}
         />
       )}
 

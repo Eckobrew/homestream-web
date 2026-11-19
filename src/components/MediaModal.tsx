@@ -782,7 +782,8 @@ export const MediaModal: React.FC<MediaModalProps> = ({
                     const epKey = `${currentSeason?.seasonNumber || 1}-${ep.episodeNumber}`;
                     const isEpRequested = requestedEpIds.has(epKey) || isRequested;
                     const isEpRequesting = requestingEpId === epKey;
-                    const canStreamEp = !isAvailable && Boolean(tmdbIdFor(currentItem));
+                    const epFutureLabel = formatFutureReleaseLabel((ep as any).airDate || currentItem.releaseDate);
+                    const canStreamEp = !isAvailable && !epFutureLabel && Boolean(tmdbIdFor(currentItem));
                     const canPlayEp = (isAvailable && Boolean(ep.videoStreamUrl || String(ep.id || '').startsWith('nat-') || (currentItem.source === 'native' && ep.id))) || canStreamEp;
 
                     return (

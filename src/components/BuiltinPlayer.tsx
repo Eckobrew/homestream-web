@@ -129,6 +129,28 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [syncJoinCode, setSyncJoinCode] = useState('');
   const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
   const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'syncplay' | 'settings' | 'episodes' | null>(null);
+  const [subtitleStyle, setSubtitleStyle] = useState<{
+    size: 'sm' | 'md' | 'lg' | 'xl';
+    color: string;
+    bg: 'pill' | 'black' | 'shadow';
+    bottomPct: number;
+  }>({ size: 'md', color: '#ffffff', bg: 'pill', bottomPct: 12 });
+  const [activeCueLines, setActiveCueLines] = useState<string[]>([]);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('homestream-subtitle-style');
+      if (saved) setSubtitleStyle((prev) => ({ ...prev, ...JSON.parse(saved) }));
+    } catch {}
+  }, []);
+
+  const updateSubtitleStyle = useCallback((patch: Partial<typeof subtitleStyle>) => {
+    setSubtitleStyle((prev) => {
+      const next = { ...prev, ...patch };
+      try { localStorage.setItem('homestream-subtitle-style', JSON.stringify(next)); } catch {}
+      return next;
+    });
+  }, []);
 
   // Titles that are not in the library stream straight from the swarm via the in-process torrent engine.
   const isTorrentStream = [item.videoStreamUrl, item.downloadStreamUrl, episode?.videoStreamUrl].some(isTorrentStreamUrl);
@@ -334,6 +356,37 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       if (start.autoplay) void videoRef.current.play().catch(() => {});
     }
   }, [cancelCastLoad]);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+    const syncCues = () => {
+      const list = video.textTracks;
+      const lines: string[] = [];
+      for (let i = 0; i < list.length; i++) {
+        const track = list[i];
+        if (track.mode === 'showing') track.mode = 'hidden';
+        if (track.mode === 'hidden' && track.activeCues) {
+          for (let j = 0; j < track.activeCues.length; j++) {
+            const cue = track.activeCues[j] as VTTCue;
+            if (cue?.text) lines.push(cue.text.replace(/<[^>]+>/g, ''));
+          }
+        }
+      }
+      setActiveCueLines(lines);
+    };
+    const textTracks = video.textTracks;
+    const onAdd = () => syncCues();
+    textTracks.addEventListener('change', syncCues);
+    textTracks.addEventListener('addtrack', onAdd);
+    const interval = window.setInterval(syncCues, 250);
+    syncCues();
+    return () => {
+      textTracks.removeEventListener('change', syncCues);
+      textTracks.removeEventListener('addtrack', onAdd);
+      window.clearInterval(interval);
+    };
+  }, [selectedSubtitleId, subtitles, streamUrl]);
 
   // Load media stream with metadata and subtitles onto connected Chromecast receiver
   const loadCastMedia = useCallback(async (compatible = false) => {
@@ -1438,6 +1491,41 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           ))}
         </video>
 
+        {/* Raised Customizable Subtitle Overlay */}
+        {!isCasting && activeCueLines.length > 0 && (
+          <div
+            className="absolute inset-x-0 z-20 pointer-events-none flex flex-col items-center px-6 text-center transition-all duration-200"
+            style={{ bottom: `${subtitleStyle.bottomPct}%` }}
+          >
+            {activeCueLines.map((line, i) => (
+              <span
+                key={i}
+                className={`inline-block max-w-3xl whitespace-pre-line font-medium leading-snug rounded px-3 py-1 my-0.5 ${
+                  subtitleStyle.size === 'sm'
+                    ? 'text-sm sm:text-base'
+                    : subtitleStyle.size === 'lg'
+                      ? 'text-xl sm:text-2xl'
+                      : subtitleStyle.size === 'xl'
+                        ? 'text-2xl sm:text-3xl'
+                        : 'text-base sm:text-xl'
+                }`}
+                style={{
+                  color: subtitleStyle.color,
+                  backgroundColor:
+                    subtitleStyle.bg === 'black'
+                      ? 'rgba(0,0,0,0.92)'
+                      : subtitleStyle.bg === 'pill'
+                        ? 'rgba(0,0,0,0.72)'
+                        : 'transparent',
+                  textShadow: '0 2px 6px rgba(0,0,0,0.95)',
+                }}
+              >
+                {line}
+              </span>
+            ))}
+          </div>
+        )}
+
         {/* Mid-Stream Buffering Overlay when waiting for data */}
         {isMidStreamBuffering && !isLoadingEpisode && !isLoadingStream && !isCasting && (
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none z-30">
@@ -2064,114 +2152,106 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
       {activeMenu === 'audio' && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setActiveMenu(null)}
+          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="Audio tracks"
         >
-          <div
-            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[75vh] overflow-y-auto animate-fade-in shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Audio tracks"
-          >
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <div className="flex items-center space-x-2 text-white font-bold text-base">
-                <AudioLines size={18} className="text-red-500" />
-                <span>Audio</span>
-              </div>
-              <button
-                onClick={() => setActiveMenu(null)}
-                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <AudioLines className="w-4 h-4 text-[#E50914]" />
+              <span className="text-sm font-bold text-white">Audio</span>
             </div>
+            <button
+              onClick={() => setActiveMenu(null)}
+              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-2 space-y-1">
+            <button
+              onClick={() => {
+                setVersionResumeSec(currentTimeRef.current);
+                setHasTriedFallbackTranscode(false);
+                setSelectedAudioIndex(undefined);
+                setActiveMenu(null);
+              }}
+              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                selectedAudioIndex === undefined
+                  ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
+                  : 'text-neutral-300 hover:bg-white/10 border border-transparent'
+              }`}
+            >
+              <span>Auto audio</span>
+              {selectedAudioIndex === undefined && <Check size={16} className="text-[#E50914]" />}
+            </button>
 
-            <div className="space-y-1.5">
+            {audioTracks.map((track) => (
               <button
+                key={track.index}
                 onClick={() => {
                   setVersionResumeSec(currentTimeRef.current);
                   setHasTriedFallbackTranscode(false);
-                  setSelectedAudioIndex(undefined);
+                  setSelectedAudioIndex(track.index);
                   setActiveMenu(null);
                 }}
-                className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                  selectedAudioIndex === undefined
-                    ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
-                    : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
+                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                  selectedAudioIndex === track.index
+                    ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
+                    : 'text-neutral-300 hover:bg-white/10 border border-transparent'
                 }`}
               >
-                <span>Auto audio</span>
-                {selectedAudioIndex === undefined && <Check size={18} />}
+                <span className="truncate pr-2">{track.title}</span>
+                {selectedAudioIndex === track.index && <Check size={16} className="text-[#E50914]" />}
               </button>
+            ))}
 
-              {audioTracks.map((track) => (
-                <button
-                  key={track.index}
-                  onClick={() => {
-                    setVersionResumeSec(currentTimeRef.current);
-                    setHasTriedFallbackTranscode(false);
-                    setSelectedAudioIndex(track.index);
-                    setActiveMenu(null);
-                  }}
-                  className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                    selectedAudioIndex === track.index
-                      ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
-                      : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
-                  }`}
-                >
-                  <span className="truncate pr-2">{track.title}</span>
-                  {selectedAudioIndex === track.index && <Check size={18} />}
-                </button>
-              ))}
-
-              {audioTracks.length === 0 && (
-                <div className="text-sm text-neutral-500 py-3 text-center italic">
-                  Using default audio track
-                </div>
-              )}
-            </div>
+            {audioTracks.length === 0 && (
+              <div className="text-xs text-neutral-500 py-3 text-center italic">
+                Using default audio track
+              </div>
+            )}
           </div>
         </div>
       )}
 
       {activeMenu === 'subtitles' && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setActiveMenu(null)}
+          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="Subtitles"
         >
-          <div
-            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[75vh] overflow-y-auto animate-fade-in shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Subtitles"
-          >
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <div className="flex items-center space-x-2 text-white font-bold text-base">
-                <Subtitles size={18} className="text-red-500" />
-                <span>Subtitles</span>
-              </div>
-              <button
-                onClick={() => setActiveMenu(null)}
-                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-              >
-                <X size={18} />
-              </button>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Subtitles className="w-4 h-4 text-[#E50914]" />
+              <span className="text-sm font-bold text-white">Subtitles</span>
             </div>
-
-            <div className="space-y-1.5">
+            <button
+              onClick={() => setActiveMenu(null)}
+              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-2 space-y-3">
+            <div className="space-y-1">
               <button
                 onClick={() => {
                   changeSubtitleTrack(null);
                   setActiveMenu(null);
                 }}
-                className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
                   selectedSubtitleId === null
-                    ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
-                    : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
+                    ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
+                    : 'text-neutral-300 hover:bg-white/10 border border-transparent'
                 }`}
               >
                 <span>Off</span>
-                {selectedSubtitleId === null && <Check size={18} />}
+                {selectedSubtitleId === null && <Check size={16} className="text-[#E50914]" />}
               </button>
 
               {subtitles.map((sub) => (
@@ -2181,29 +2261,108 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                     changeSubtitleTrack(sub.id);
                     setActiveMenu(null);
                   }}
-                  className={`w-full text-left px-4 py-3 rounded-lg text-sm flex items-center justify-between transition-colors ${
+                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
                     selectedSubtitleId === sub.id
-                      ? 'bg-red-600/20 text-red-400 font-bold border border-red-600/40'
-                      : 'text-neutral-300 hover:bg-neutral-800 border border-transparent'
+                      ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
+                      : 'text-neutral-300 hover:bg-white/10 border border-transparent'
                   }`}
                 >
                   <span className="truncate pr-2">{sub.title}</span>
-                  {selectedSubtitleId === sub.id && <Check size={18} />}
+                  {selectedSubtitleId === sub.id && <Check size={16} className="text-[#E50914]" />}
                 </button>
               ))}
 
               {subtitles.length === 0 && !isLoadingSubtitles && (
-                <div className="text-sm text-neutral-500 py-4 text-center italic">
+                <div className="text-xs text-neutral-500 py-3 text-center italic">
                   No subtitle tracks available for this title
                 </div>
               )}
 
               {isLoadingSubtitles && (
-                <div className="py-4 flex items-center justify-center space-x-2 text-neutral-400 text-sm">
-                  <div className="w-4 h-4 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                <div className="py-3 flex items-center justify-center space-x-2 text-neutral-400 text-xs">
+                  <div className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
                   <span>Loading subtitle tracks...</span>
                 </div>
               )}
+            </div>
+
+            {/* Subtitle Appearance Editor */}
+            <div className="border-t border-white/10 pt-3 px-1 space-y-2.5">
+              <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
+                Subtitle Appearance
+              </div>
+              <div className="grid grid-cols-4 gap-1">
+                {(['sm', 'md', 'lg', 'xl'] as const).map((sz) => (
+                  <button
+                    key={sz}
+                    onClick={() => updateSubtitleStyle({ size: sz })}
+                    className={`py-1.5 rounded text-xs font-semibold uppercase border transition ${
+                      subtitleStyle.size === sz
+                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                    }`}
+                  >
+                    {sz}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { label: 'White', value: '#ffffff' },
+                  { label: 'Yellow', value: '#fde047' },
+                  { label: 'Cyan', value: '#67e8f9' },
+                ].map((c) => (
+                  <button
+                    key={c.value}
+                    onClick={() => updateSubtitleStyle({ color: c.value })}
+                    className={`py-1.5 rounded text-xs font-semibold border transition ${
+                      subtitleStyle.color === c.value
+                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                    }`}
+                  >
+                    {c.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { label: 'Pill', value: 'pill' as const },
+                  { label: 'Black', value: 'black' as const },
+                  { label: 'Shadow', value: 'shadow' as const },
+                ].map((b) => (
+                  <button
+                    key={b.value}
+                    onClick={() => updateSubtitleStyle({ bg: b.value })}
+                    className={`py-1.5 rounded text-xs font-semibold border transition ${
+                      subtitleStyle.bg === b.value
+                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                    }`}
+                  >
+                    {b.label}
+                  </button>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-1">
+                {[
+                  { label: 'Low', value: 6 },
+                  { label: 'Raised', value: 12 },
+                  { label: 'High', value: 18 },
+                ].map((pos) => (
+                  <button
+                    key={pos.value}
+                    onClick={() => updateSubtitleStyle({ bottomPct: pos.value })}
+                    className={`py-1.5 rounded text-xs font-semibold border transition ${
+                      subtitleStyle.bottomPct === pos.value
+                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                    }`}
+                  >
+                    {pos.label}
+                  </button>
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -2345,28 +2504,25 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
       {activeMenu === 'settings' && (
         <div
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setActiveMenu(null)}
+          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+          role="dialog"
+          aria-label="Player settings"
         >
-          <div
-            className="w-full sm:max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-xl p-5 space-y-4 max-h-[80vh] overflow-y-auto animate-fade-in shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-            role="dialog"
-            aria-label="Player settings"
-          >
-            <div className="flex items-center justify-between border-b border-neutral-800 pb-3">
-              <div className="flex items-center space-x-2 text-white font-bold text-base">
-                <Settings size={18} className="text-red-500" />
-                <span>Settings</span>
-              </div>
-              <button
-                onClick={() => setActiveMenu(null)}
-                className="p-1.5 rounded-full hover:bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
-                aria-label="Close settings"
-              >
-                <X size={18} />
-              </button>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <Settings className="w-4 h-4 text-[#E50914]" />
+              <span className="text-sm font-bold text-white">Settings</span>
             </div>
+            <button
+              onClick={() => setActiveMenu(null)}
+              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
+              aria-label="Close settings"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-3 space-y-4">
 
             {/* Quality */}
             <div className="space-y-2">
