@@ -81,7 +81,7 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
     if (typeof EventSource !== 'undefined') {
       try {
         es = new EventSource(`/api/v1/sessions/commands?deviceId=${encodeURIComponent(getWebDeviceId())}`);
-        es.onmessage = (ev) => {
+        const handleEvent = (ev: MessageEvent) => {
           try {
             const parsed = JSON.parse(ev.data);
             const cmd = parsed?.command || parsed;
@@ -92,6 +92,8 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
             // Ignore malformed or heartbeat SSE payloads.
           }
         };
+        es.addEventListener('command', handleEvent);
+        es.onmessage = handleEvent;
       } catch {
         // Ignore EventSource errors when remote command stream is unavailable.
       }
@@ -102,5 +104,5 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
       es?.close();
       sendHeartbeat(true);
     };
-  }, [options.active, options.mediaId, options.mediaType, options.title, options.isPlaying]);
+  }, [options.active, options.mediaId, options.mediaType, options.title]);
 }
