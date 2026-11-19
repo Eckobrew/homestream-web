@@ -49,6 +49,20 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
   useEffect(() => {
     if (!options.active || !options.title) return;
 
+    const seenIds = new Set<string>();
+    const dispatchCommand = (cmd: SessionCommand & { id?: string }) => {
+      if (!cmd || typeof cmd.type !== 'string') return;
+      if (cmd.id) {
+        if (seenIds.has(cmd.id)) return;
+        seenIds.add(cmd.id);
+        if (seenIds.size > 100) {
+          const first = seenIds.values().next().value;
+          if (first) seenIds.delete(first);
+        }
+      }
+      latestRef.current.onCommand?.(cmd);
+    };
+
     const sendHeartbeat = (isStopped = false) => {
       const current = latestRef.current;
       apiFetch('/api/v1/sessions/heartbeat', {
@@ -71,11 +85,21 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
           canSkipPrev: Boolean(current.canSkipPrev),
           isStopped,
         }),
-      }).catch(() => {});
+      })
+        .then(async (res) => {
+          if (!res.ok || isStopped) return;
+          const data = await res.json().catch(() => null);
+          if (Array.isArray(data?.commands)) {
+            for (const cmd of data.commands) {
+              dispatchCommand(cmd);
+            }
+          }
+        })
+        .catch(() => {});
     };
 
     sendHeartbeat(false);
-    const interval = setInterval(() => sendHeartbeat(false), 5000);
+    const interval = setInterval(() => sendHeartbeat(false), 1500);
 
     let es: EventSource | null = null;
     if (typeof EventSource !== 'undefined') {
@@ -86,7 +110,7 @@ export function useSessionHeartbeat(options: SessionHeartbeatOptions) {
             const parsed = JSON.parse(ev.data);
             const cmd = parsed?.command || parsed;
             if (cmd && typeof cmd.type === 'string') {
-              latestRef.current.onCommand?.(cmd);
+              dispatchCommand(cmd);
             }
           } catch {
             // Ignore malformed or heartbeat SSE payloads.
