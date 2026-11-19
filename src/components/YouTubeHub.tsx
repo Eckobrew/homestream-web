@@ -366,22 +366,54 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
     }
   };
 
-  // Stream Resolution & Play (Direct via yt-dlp proxy stream)
-  const handlePlayVideo = (video: { id: string; title: string; thumbnailUrl?: string; durationSeconds?: number; channelTitle?: string; description?: string }) => {
+  // Stream Resolution & Play (Direct via yt-dlp proxy stream, with Mix playlist support)
+  const handlePlayVideo = async (video: { id: string; title: string; thumbnailUrl?: string; durationSeconds?: number; channelTitle?: string; description?: string; isMix?: boolean; mixPlaylistId?: string }) => {
     const videoStreamUrl = `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(video.id)}`;
 
+    let mixSeasons: MediaItem['seasons'];
+    if (video.isMix && video.mixPlaylistId) {
+      showToast('Loading YouTube Mix...');
+      try {
+        const res = await apiFetch(`/api/youtube/mix?listId=${encodeURIComponent(video.mixPlaylistId)}&seedId=${encodeURIComponent(video.id)}&profileId=${encodeURIComponent(profileId)}`);
+        if (res.ok) {
+          const data = await res.json();
+          const tracks = Array.isArray(data.items) ? data.items : [];
+          if (tracks.length > 0) {
+            mixSeasons = [{
+              id: video.mixPlaylistId,
+              seasonNumber: 1,
+              name: data.title || video.title,
+              episodeCount: tracks.length,
+              episodes: tracks.map((t: any, idx: number) => ({
+                id: `yt-${t.id}`,
+                name: t.title,
+                episodeNumber: idx + 1,
+                seasonNumber: 1,
+                overview: t.channelTitle || 'YouTube',
+                stillUrl: t.thumbnailUrl,
+                totalDurationTicks: t.durationSeconds ? t.durationSeconds * 10000000 : 0,
+                videoStreamUrl: `/api/v1/youtube/stream-video?videoId=${encodeURIComponent(t.id)}`,
+              })),
+            }];
+          }
+        }
+      } catch {}
+    }
+
+    const firstTrack = mixSeasons?.[0]?.episodes?.[0];
     const mediaItem: MediaItem = {
-      id: `yt-${video.id}`,
-      title: video.title,
+      id: firstTrack?.id || `yt-${video.id}`,
+      title: firstTrack?.name || video.title,
       overview: video.description || `Channel: ${video.channelTitle || 'YouTube'}`,
-      type: 'Movie',
+      type: mixSeasons ? 'Series' : 'Movie',
       posterUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
       backdropUrl: video.thumbnailUrl || `https://i.ytimg.com/vi/${video.id}/hqdefault.jpg`,
       durationMinutes: video.durationSeconds ? Math.round(video.durationSeconds / 60) : 0,
       genres: ['YouTube', video.channelTitle || 'YouTube'],
       source: 'youtube' as any,
       status: 'available',
-      videoStreamUrl,
+      videoStreamUrl: firstTrack?.videoStreamUrl || videoStreamUrl,
+      ...(mixSeasons ? { seasons: mixSeasons } : {}),
     };
 
     onPlay(mediaItem);

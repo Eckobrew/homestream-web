@@ -35,6 +35,7 @@ import {
   Cast,
   Download,
   Users,
+  ListVideo,
 } from 'lucide-react';
 import { MediaItem, Episode, SubtitleTrack } from '@/types';
 
@@ -95,7 +96,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [isLoadingEpisode, setIsLoadingEpisode] = useState(false);
   const [streamUrl, setStreamUrl] = useState(() => {
     if (item.videoStreamUrl?.includes('/api/youtube/') || item.downloadStreamUrl?.includes('/api/youtube/') || item.id?.startsWith('yt-')) {
-      return item.videoStreamUrl || item.downloadStreamUrl || '';
+      return activeEpisode?.videoStreamUrl || item.videoStreamUrl || item.downloadStreamUrl || '';
     }
     return '';
   });
@@ -116,7 +117,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
   const [syncRoomCode, setSyncRoomCode] = useState('');
   const [syncJoinCode, setSyncJoinCode] = useState('');
   const [syncParticipants, setSyncParticipants] = useState<Array<{ profileId: string; name: string }>>([]);
-  const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'syncplay' | 'settings' | null>(null);
+  const [activeMenu, setActiveMenu] = useState<'audio' | 'subtitles' | 'syncplay' | 'settings' | 'episodes' | null>(null);
 
   // Titles that are not in the library stream straight from the swarm via the in-process torrent engine.
   const isTorrentStream = [item.videoStreamUrl, item.downloadStreamUrl, episode?.videoStreamUrl].some(isTorrentStreamUrl);
@@ -1190,44 +1191,50 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     resetControlsTimer();
   };
 
+  const handleSelectEpisode = (targetEp: Episode) => {
+    reportProgress(true);
+    setActiveEpisode(targetEp);
+    setIsPlaying(true);
+    setCurrentTime(0);
+    setDuration(targetEp.totalDurationTicks ? targetEp.totalDurationTicks / 10000000 : 0);
+    setPlaybackDuration(0);
+
+    if (isTorrentStream) {
+      const nextUrl = torrentStreamUrl(item, targetEp);
+      if (nextUrl) {
+        setStreamUrl('');
+        setStreamDelivery(null);
+        setIsLoadingStream(true);
+        setActiveMenu(null);
+        resetControlsTimer();
+        return;
+      }
+    }
+
+    setActivePlayableId(targetEp.id);
+    setStreamUrl('');
+    setStreamDelivery({ url: '', type: '' });
+    setSkipSegments([]);
+    setVersions([]);
+    setSelectedVersionId(undefined);
+    setAudioTracks([]);
+    setSelectedAudioIndex(undefined);
+    setVersionResumeSec(null);
+    setTrickplayUrl(undefined);
+    setTrickplayCues([]);
+    setHasTriedFallbackTranscode(false);
+    setIsLoadingStream(true);
+    setActiveMenu(null);
+    resetControlsTimer();
+  };
+
   const handleNextEpisode = () => {
     if (onNextEpisode) {
       onNextEpisode();
       return;
     }
     if (nextEpisode) {
-      reportProgress(true);
-      setActiveEpisode(nextEpisode);
-      setIsPlaying(true);
-      setCurrentTime(0);
-      setDuration(nextEpisode.totalDurationTicks ? nextEpisode.totalDurationTicks / 10000000 : 0);
-      setPlaybackDuration(0);
-
-      if (isTorrentStream) {
-        const nextUrl = torrentStreamUrl(item, nextEpisode);
-        if (nextUrl) {
-          setStreamUrl('');
-          setStreamDelivery(null);
-          setIsLoadingStream(true);
-          resetControlsTimer();
-          return;
-        }
-      }
-
-      setActivePlayableId(nextEpisode.id);
-      setStreamUrl('');
-      setStreamDelivery({ url: '', type: '' });
-      setSkipSegments([]);
-      setVersions([]);
-      setSelectedVersionId(undefined);
-      setAudioTracks([]);
-      setSelectedAudioIndex(undefined);
-      setVersionResumeSec(null);
-      setTrickplayUrl(undefined);
-      setTrickplayCues([]);
-      setHasTriedFallbackTranscode(false);
-      setIsLoadingStream(true);
-      resetControlsTimer();
+      handleSelectEpisode(nextEpisode);
     }
   };
 
@@ -1913,6 +1920,21 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 )}
               </button>
 
+              {/* Episodes / Mix Playlist listing button */}
+              {seriesEpisodes.length > 0 && (
+                <button
+                  onClick={() => setActiveMenu((prev) => (prev === 'episodes' ? null : 'episodes'))}
+                  className={`flex items-center space-x-1 sm:space-x-1.5 transition-colors text-xs sm:text-sm font-semibold p-1.5 rounded-lg hover:bg-white/10 ${
+                    activeMenu === 'episodes' ? 'text-white bg-white/15' : 'text-neutral-300 hover:text-white'
+                  }`}
+                  title={item.id?.startsWith('yt-') ? 'Mix Playlist' : 'Episodes'}
+                  aria-label={item.id?.startsWith('yt-') ? 'Mix Playlist' : 'Episodes'}
+                >
+                  <ListVideo className="w-4 h-4 sm:w-5 sm:h-5" />
+                  <span className="hidden lg:inline">{item.id?.startsWith('yt-') ? 'Mix' : 'Episodes'}</span>
+                </button>
+              )}
+
               {/* Skip Forward / Next Episode on TV shows */}
               {(item.type === 'Series' || onNextEpisode || nextEpisode) && (
                 <button
@@ -1943,6 +1965,58 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
           </div>
         </div>
       </div>
+
+      {activeMenu === 'episodes' && seriesEpisodes.length > 0 && (
+        <div
+          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+            <div className="flex items-center gap-2">
+              <ListVideo className="w-4 h-4 text-[#E50914]" />
+              <span className="text-sm font-bold text-white">
+                {item.id?.startsWith('yt-') ? 'Mix Playlist' : 'Episodes'}
+              </span>
+              <span className="text-xs text-neutral-400">({seriesEpisodes.length})</span>
+            </div>
+            <button
+              onClick={() => setActiveMenu(null)}
+              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
+              aria-label="Close"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="overflow-y-auto p-2 space-y-1">
+            {seriesEpisodes.map((ep, idx) => {
+              const isCurrent = ep.id === activePlayableId || ep.id === activeEpisode?.id;
+              const isYouTube = item.id?.startsWith('yt-');
+              return (
+                <button
+                  key={ep.id}
+                  onClick={() => handleSelectEpisode(ep)}
+                  className={`w-full text-left flex items-center gap-3 p-2.5 rounded-lg transition ${
+                    isCurrent ? 'bg-[#E50914]/20 border border-[#E50914]/50' : 'hover:bg-white/10 border border-transparent'
+                  }`}
+                >
+                  <span className={`text-xs font-bold w-8 shrink-0 ${isCurrent ? 'text-[#E50914]' : 'text-neutral-400'}`}>
+                    {isYouTube ? `${idx + 1}.` : `S${ep.seasonNumber}E${ep.episodeNumber}`}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <p className={`text-sm font-semibold truncate ${isCurrent ? 'text-white' : 'text-neutral-200'}`}>
+                      {ep.name}
+                    </p>
+                    {ep.overview && (
+                      <p className="text-xs text-neutral-400 truncate mt-0.5">{ep.overview}</p>
+                    )}
+                  </div>
+                  {isCurrent && <Play className="w-3.5 h-3.5 text-[#E50914] shrink-0 fill-current" />}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Universal Subtitles Selection Sheet / Modal (Responsive: Mobile Bottom Sheet + Desktop Centered) */}
       {activeSkipSegment && (
