@@ -1973,52 +1973,429 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 {syncRoomCode && <span className="text-[11px] font-mono">{syncRoomCode}</span>}
               </button>
 
-              {/* Audio Button */}
-              <button
-                onClick={() => setActiveMenu((prev) => (prev === 'audio' ? null : 'audio'))}
-                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
-                  selectedAudioIndex !== undefined ? 'text-red-500' : 'text-neutral-300 hover:text-white'
-                }`}
-                title="Audio"
-                aria-label="Audio"
-              >
-                <AudioLines className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+              {/* Audio Button & Compact Popover */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenu((prev) => (prev === 'audio' ? null : 'audio'))}
+                  className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
+                    selectedAudioIndex !== undefined ? 'text-red-500' : 'text-neutral-300 hover:text-white'
+                  }`}
+                  title="Audio"
+                  aria-label="Audio"
+                >
+                  <AudioLines className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
 
-              {/* Subtitles Button */}
-              <button
-                onClick={() => setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'))}
-                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
-                  selectedSubtitleId ? 'text-red-500' : 'text-neutral-300 hover:text-white'
-                }`}
-                title="Subtitles (C)"
-                aria-label="Subtitles"
-              >
-                <Subtitles className="w-4 h-4 sm:w-5 sm:h-5" />
-              </button>
+                {activeMenu === 'audio' && (
+                  <div
+                    className="absolute bottom-full right-0 mb-2.5 z-50 w-56 sm:w-64 max-h-[45vh] flex flex-col bg-[#141414]/90 backdrop-blur-md border border-white/15 rounded-lg shadow-xl overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                    role="dialog"
+                    aria-label="Audio tracks"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                      <div className="flex items-center gap-1.5">
+                        <AudioLines className="w-3.5 h-3.5 text-[#E50914]" />
+                        <span className="text-xs font-semibold text-white">Audio</span>
+                      </div>
+                      <button
+                        onClick={() => setActiveMenu(null)}
+                        className="p-0.5 text-neutral-400 hover:text-white rounded hover:bg-white/10"
+                        aria-label="Close"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto p-1.5 space-y-0.5">
+                      <button
+                        onClick={() => {
+                          setVersionResumeSec(currentTimeRef.current);
+                          setHasTriedFallbackTranscode(false);
+                          setSelectedAudioIndex(undefined);
+                          setActiveMenu(null);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between transition-colors ${
+                          selectedAudioIndex === undefined
+                            ? 'bg-[#E50914]/20 text-white font-semibold border border-[#E50914]/50'
+                            : 'text-neutral-300 hover:bg-white/10 border border-transparent'
+                        }`}
+                      >
+                        <span>Auto audio</span>
+                        {selectedAudioIndex === undefined && <Check size={14} className="text-[#E50914]" />}
+                      </button>
 
-              {/* Settings Button (Quality, Video Version, Cast, Restart, Playback Info) */}
-              <button
-                onClick={() => setActiveMenu((prev) => (prev === 'settings' ? null : 'settings'))}
-                className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 relative ${
-                  activeMenu === 'settings' || isCasting
-                    ? 'text-white'
-                    : 'text-neutral-300 hover:text-white'
-                }`}
-                title="Settings"
-                aria-label="Settings"
-              >
-                <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
-                {(isCasting || isCastConnecting) && (
-                  <span
-                    className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-full ${
-                      isCasting
-                        ? 'bg-red-500'
-                        : 'bg-amber-400 animate-pulse'
-                    }`}
-                  />
+                      {audioTracks.map((track) => (
+                        <button
+                          key={track.index}
+                          onClick={() => {
+                            setVersionResumeSec(currentTimeRef.current);
+                            setHasTriedFallbackTranscode(false);
+                            setSelectedAudioIndex(track.index);
+                            setActiveMenu(null);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between transition-colors ${
+                            selectedAudioIndex === track.index
+                              ? 'bg-[#E50914]/20 text-white font-semibold border border-[#E50914]/50'
+                              : 'text-neutral-300 hover:bg-white/10 border border-transparent'
+                          }`}
+                        >
+                          <span className="truncate pr-2">{track.title}</span>
+                          {selectedAudioIndex === track.index && <Check size={14} className="text-[#E50914]" />}
+                        </button>
+                      ))}
+
+                      {audioTracks.length === 0 && (
+                        <div className="text-[11px] text-neutral-500 py-2 text-center italic">
+                          Using default audio track
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 )}
-              </button>
+              </div>
+
+              {/* Subtitles Button & Compact Popover */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenu((prev) => (prev === 'subtitles' ? null : 'subtitles'))}
+                  className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 ${
+                    selectedSubtitleId ? 'text-red-500' : 'text-neutral-300 hover:text-white'
+                  }`}
+                  title="Subtitles (C)"
+                  aria-label="Subtitles"
+                >
+                  <Subtitles className="w-4 h-4 sm:w-5 sm:h-5" />
+                </button>
+
+                {activeMenu === 'subtitles' && (
+                  <div
+                    className="absolute bottom-full right-0 mb-2.5 z-50 w-56 sm:w-64 max-h-[45vh] flex flex-col bg-[#141414]/90 backdrop-blur-md border border-white/15 rounded-lg shadow-xl overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                    role="dialog"
+                    aria-label="Subtitles"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                      <div className="flex items-center gap-1.5">
+                        <Subtitles className="w-3.5 h-3.5 text-[#E50914]" />
+                        <span className="text-xs font-semibold text-white">Subtitles</span>
+                      </div>
+                      <button
+                        onClick={() => setActiveMenu(null)}
+                        className="p-0.5 text-neutral-400 hover:text-white rounded hover:bg-white/10"
+                        aria-label="Close"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto p-1.5 space-y-2">
+                      <div className="space-y-0.5">
+                        <button
+                          onClick={() => {
+                            changeSubtitleTrack(null);
+                            setActiveMenu(null);
+                          }}
+                          className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between transition-colors ${
+                            selectedSubtitleId === null
+                              ? 'bg-[#E50914]/20 text-white font-semibold border border-[#E50914]/50'
+                              : 'text-neutral-300 hover:bg-white/10 border border-transparent'
+                          }`}
+                        >
+                          <span>Off</span>
+                          {selectedSubtitleId === null && <Check size={14} className="text-[#E50914]" />}
+                        </button>
+
+                        {subtitles.map((sub) => (
+                          <button
+                            key={sub.id}
+                            onClick={() => {
+                              changeSubtitleTrack(sub.id);
+                              setActiveMenu(null);
+                            }}
+                            className={`w-full text-left px-2.5 py-1.5 rounded text-xs flex items-center justify-between transition-colors ${
+                              selectedSubtitleId === sub.id
+                                ? 'bg-[#E50914]/20 text-white font-semibold border border-[#E50914]/50'
+                                : 'text-neutral-300 hover:bg-white/10 border border-transparent'
+                            }`}
+                          >
+                            <span className="truncate pr-2">{sub.title}</span>
+                            {selectedSubtitleId === sub.id && <Check size={14} className="text-[#E50914]" />}
+                          </button>
+                        ))}
+
+                        {subtitles.length === 0 && !isLoadingSubtitles && (
+                          <div className="text-[11px] text-neutral-500 py-2 text-center italic">
+                            No subtitle tracks available
+                          </div>
+                        )}
+
+                        {isLoadingSubtitles && (
+                          <div className="py-2 flex items-center justify-center space-x-1.5 text-neutral-400 text-[11px]">
+                            <div className="w-3 h-3 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
+                            <span>Loading subtitles...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Subtitle Appearance Editor */}
+                      <div className="border-t border-white/10 pt-2 px-0.5 space-y-1.5">
+                        <div className="text-[10px] font-semibold uppercase tracking-wider text-neutral-400">
+                          Appearance
+                        </div>
+                        <div className="grid grid-cols-4 gap-1">
+                          {(['sm', 'md', 'lg', 'xl'] as const).map((sz) => (
+                            <button
+                              key={sz}
+                              onClick={() => updateSubtitleStyle({ size: sz })}
+                              className={`py-1 rounded text-[11px] font-semibold uppercase border transition ${
+                                subtitleStyle.size === sz
+                                  ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                                  : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                              }`}
+                            >
+                              {sz}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { label: 'White', value: '#ffffff' },
+                            { label: 'Yellow', value: '#fde047' },
+                            { label: 'Cyan', value: '#67e8f9' },
+                          ].map((c) => (
+                            <button
+                              key={c.value}
+                              onClick={() => updateSubtitleStyle({ color: c.value })}
+                              className={`py-1 rounded text-[11px] font-semibold border transition ${
+                                subtitleStyle.color === c.value
+                                  ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                                  : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                              }`}
+                            >
+                              {c.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { label: 'Pill', value: 'pill' as const },
+                            { label: 'Black', value: 'black' as const },
+                            { label: 'Shadow', value: 'shadow' as const },
+                          ].map((b) => (
+                            <button
+                              key={b.value}
+                              onClick={() => updateSubtitleStyle({ bg: b.value })}
+                              className={`py-1 rounded text-[11px] font-semibold border transition ${
+                                subtitleStyle.bg === b.value
+                                  ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                                  : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                              }`}
+                            >
+                              {b.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="grid grid-cols-3 gap-1">
+                          {[
+                            { label: 'Low', value: 6 },
+                            { label: 'Raised', value: 12 },
+                            { label: 'High', value: 18 },
+                          ].map((pos) => (
+                            <button
+                              key={pos.value}
+                              onClick={() => updateSubtitleStyle({ bottomPct: pos.value })}
+                              className={`py-1 rounded text-[11px] font-semibold border transition ${
+                                subtitleStyle.bottomPct === pos.value
+                                  ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
+                                  : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
+                              }`}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Settings Button & Compact Popover */}
+              <div className="relative">
+                <button
+                  onClick={() => setActiveMenu((prev) => (prev === 'settings' ? null : 'settings'))}
+                  className={`transition-colors p-1.5 rounded-lg hover:bg-white/10 relative ${
+                    activeMenu === 'settings' || isCasting
+                      ? 'text-white'
+                      : 'text-neutral-300 hover:text-white'
+                  }`}
+                  title="Settings"
+                  aria-label="Settings"
+                >
+                  <Settings className="w-4 h-4 sm:w-5 sm:h-5" />
+                  {(isCasting || isCastConnecting) && (
+                    <span
+                      className={`absolute top-0.5 right-0.5 w-2 h-2 rounded-full ${
+                        isCasting
+                          ? 'bg-red-500'
+                          : 'bg-amber-400 animate-pulse'
+                      }`}
+                    />
+                  )}
+                </button>
+                {activeMenu === 'settings' && (
+                  <div
+                    className="absolute bottom-full right-0 mb-2.5 z-50 w-64 sm:w-72 max-h-[45vh] flex flex-col bg-[#141414]/90 backdrop-blur-md border border-white/15 rounded-lg shadow-xl overflow-hidden"
+                    onClick={(e) => e.stopPropagation()}
+                    role="dialog"
+                    aria-label="Player settings"
+                  >
+                    <div className="flex items-center justify-between px-3 py-2 border-b border-white/10">
+                      <div className="flex items-center gap-2">
+                        <Settings className="w-3.5 h-3.5 text-[#E50914]" />
+                        <span className="text-xs font-semibold text-white">Settings</span>
+                      </div>
+                      <button
+                        onClick={() => setActiveMenu(null)}
+                        className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
+                        aria-label="Close settings"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    <div className="overflow-y-auto p-2.5 space-y-2.5">
+
+                      {/* Quality */}
+                      <div className="space-y-2">
+                        <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                          Quality
+                        </div>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {(['auto', 'original', '1080p', '720p'] as QualityMode[]).map((mode) => (
+                            <button
+                              key={mode}
+                              onClick={() => {
+                                const cur = currentTimeRef.current;
+                                if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                                setHasTriedFallbackTranscode(false);
+                                setQualityMode(mode);
+                              }}
+                              className={`px-2.5 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
+                                qualityMode === mode
+                                  ? 'bg-red-600/20 text-red-400 border-red-600/40'
+                                  : 'bg-neutral-800/70 text-neutral-300 hover:bg-neutral-800 border-transparent'
+                              }`}
+                            >
+                              {mode === 'auto' ? 'Auto' : mode === 'original' ? 'Original' : mode}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Video Version */}
+                      {versions.length > 1 && (
+                        <div className="space-y-2">
+                          <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                            Video Version
+                          </div>
+                          <div className="space-y-1.5">
+                            {versions.map((v) => {
+                              const isSelected = (selectedVersionId || versions[0]?.id || '') === v.id;
+                              return (
+                                <button
+                                  key={v.id}
+                                  onClick={() => {
+                                    const cur = currentTimeRef.current;
+                                    if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
+                                    setHasTriedFallbackTranscode(false);
+                                    setSelectedAudioIndex(undefined);
+                                    setSelectedVersionId(v.id);
+                                  }}
+                                  className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors border ${
+                                    isSelected
+                                      ? 'bg-red-600/20 text-red-400 font-semibold border-red-600/40'
+                                      : 'text-neutral-300 hover:bg-neutral-800 border-transparent'
+                                  }`}
+                                >
+                                  <span className="truncate pr-2">{v.label}</span>
+                                  {isSelected && <Check size={16} />}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Other Controls: Cast, Restart */}
+                      <div className="space-y-1.5 pt-1 border-t border-neutral-800">
+                        <button
+                          onClick={() => {
+                            handleCastClick();
+                            setActiveMenu(null);
+                          }}
+                          className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <Cast
+                              size={16}
+                              className={
+                                isCasting
+                                  ? 'text-red-500'
+                                  : isCastConnecting
+                                  ? 'text-amber-400 animate-pulse'
+                                  : 'text-neutral-400'
+                              }
+                            />
+                            <span>
+                              {isCasting
+                                ? `Casting to ${castDeviceName || 'Chromecast'}`
+                                : isCastConnecting
+                                ? 'Connecting to Chromecast...'
+                                : 'Cast to Chromecast'}
+                            </span>
+                          </span>
+                          <span className="text-xs text-neutral-500">
+                            {isCasting ? 'Disconnect' : isCastAvailable ? 'Ready' : ''}
+                          </span>
+                        </button>
+
+                            <button
+                              onClick={() => {
+                                handleRestart();
+                                setActiveMenu(null);
+                              }}
+                              className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <RotateCcw size={16} className="text-neutral-400" />
+                                <span>Restart {activeEpisode ? 'Episode' : 'Movie'}</span>
+                              </span>
+                              <span className="text-xs text-neutral-500">0:00</span>
+                            </button>
+                          </div>
+
+                          {/* Playback Info */}
+                          {playbackDiag && (
+                            <div className="pt-2 border-t border-neutral-800 text-[11px] text-neutral-400 space-y-0.5">
+                              <div className="font-semibold text-neutral-300">Playback Info</div>
+                              <div>
+                                {[
+                                  playbackDiag.playMethod,
+                                  playbackDiag.resolution,
+                                  playbackDiag.sourceVideoCodec,
+                                  playbackDiag.sourceAudioCodec,
+                                ]
+                                  .filter(Boolean)
+                                  .join(' · ')}
+                              </div>
+                              {playbackDiag.transcodeReasons && (
+                                <div className="text-neutral-500">Reason: {playbackDiag.transcodeReasons}</div>
+                              )}
+                            </div>
+                          )}
+                    </div>
+                  </div>
+                )}
+              </div>
 
               {/* Episodes / Mix Playlist listing button */}
               {seriesEpisodes.length > 0 && (
@@ -2148,224 +2525,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
               ? 'Skip Recap →'
               : 'Skip Intro →'}
         </button>
-      )}
-
-      {activeMenu === 'audio' && (
-        <div
-          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-label="Audio tracks"
-        >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <AudioLines className="w-4 h-4 text-[#E50914]" />
-              <span className="text-sm font-bold text-white">Audio</span>
-            </div>
-            <button
-              onClick={() => setActiveMenu(null)}
-              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="overflow-y-auto p-2 space-y-1">
-            <button
-              onClick={() => {
-                setVersionResumeSec(currentTimeRef.current);
-                setHasTriedFallbackTranscode(false);
-                setSelectedAudioIndex(undefined);
-                setActiveMenu(null);
-              }}
-              className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                selectedAudioIndex === undefined
-                  ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
-                  : 'text-neutral-300 hover:bg-white/10 border border-transparent'
-              }`}
-            >
-              <span>Auto audio</span>
-              {selectedAudioIndex === undefined && <Check size={16} className="text-[#E50914]" />}
-            </button>
-
-            {audioTracks.map((track) => (
-              <button
-                key={track.index}
-                onClick={() => {
-                  setVersionResumeSec(currentTimeRef.current);
-                  setHasTriedFallbackTranscode(false);
-                  setSelectedAudioIndex(track.index);
-                  setActiveMenu(null);
-                }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                  selectedAudioIndex === track.index
-                    ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
-                    : 'text-neutral-300 hover:bg-white/10 border border-transparent'
-                }`}
-              >
-                <span className="truncate pr-2">{track.title}</span>
-                {selectedAudioIndex === track.index && <Check size={16} className="text-[#E50914]" />}
-              </button>
-            ))}
-
-            {audioTracks.length === 0 && (
-              <div className="text-xs text-neutral-500 py-3 text-center italic">
-                Using default audio track
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {activeMenu === 'subtitles' && (
-        <div
-          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-label="Subtitles"
-        >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <Subtitles className="w-4 h-4 text-[#E50914]" />
-              <span className="text-sm font-bold text-white">Subtitles</span>
-            </div>
-            <button
-              onClick={() => setActiveMenu(null)}
-              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
-              aria-label="Close"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="overflow-y-auto p-2 space-y-3">
-            <div className="space-y-1">
-              <button
-                onClick={() => {
-                  changeSubtitleTrack(null);
-                  setActiveMenu(null);
-                }}
-                className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                  selectedSubtitleId === null
-                    ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
-                    : 'text-neutral-300 hover:bg-white/10 border border-transparent'
-                }`}
-              >
-                <span>Off</span>
-                {selectedSubtitleId === null && <Check size={16} className="text-[#E50914]" />}
-              </button>
-
-              {subtitles.map((sub) => (
-                <button
-                  key={sub.id}
-                  onClick={() => {
-                    changeSubtitleTrack(sub.id);
-                    setActiveMenu(null);
-                  }}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors ${
-                    selectedSubtitleId === sub.id
-                      ? 'bg-[#E50914]/20 text-white font-bold border border-[#E50914]/50'
-                      : 'text-neutral-300 hover:bg-white/10 border border-transparent'
-                  }`}
-                >
-                  <span className="truncate pr-2">{sub.title}</span>
-                  {selectedSubtitleId === sub.id && <Check size={16} className="text-[#E50914]" />}
-                </button>
-              ))}
-
-              {subtitles.length === 0 && !isLoadingSubtitles && (
-                <div className="text-xs text-neutral-500 py-3 text-center italic">
-                  No subtitle tracks available for this title
-                </div>
-              )}
-
-              {isLoadingSubtitles && (
-                <div className="py-3 flex items-center justify-center space-x-2 text-neutral-400 text-xs">
-                  <div className="w-3.5 h-3.5 border-2 border-red-500 border-t-transparent rounded-full animate-spin" />
-                  <span>Loading subtitle tracks...</span>
-                </div>
-              )}
-            </div>
-
-            {/* Subtitle Appearance Editor */}
-            <div className="border-t border-white/10 pt-3 px-1 space-y-2.5">
-              <div className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">
-                Subtitle Appearance
-              </div>
-              <div className="grid grid-cols-4 gap-1">
-                {(['sm', 'md', 'lg', 'xl'] as const).map((sz) => (
-                  <button
-                    key={sz}
-                    onClick={() => updateSubtitleStyle({ size: sz })}
-                    className={`py-1.5 rounded text-xs font-semibold uppercase border transition ${
-                      subtitleStyle.size === sz
-                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
-                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
-                    }`}
-                  >
-                    {sz}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { label: 'White', value: '#ffffff' },
-                  { label: 'Yellow', value: '#fde047' },
-                  { label: 'Cyan', value: '#67e8f9' },
-                ].map((c) => (
-                  <button
-                    key={c.value}
-                    onClick={() => updateSubtitleStyle({ color: c.value })}
-                    className={`py-1.5 rounded text-xs font-semibold border transition ${
-                      subtitleStyle.color === c.value
-                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
-                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
-                    }`}
-                  >
-                    {c.label}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { label: 'Pill', value: 'pill' as const },
-                  { label: 'Black', value: 'black' as const },
-                  { label: 'Shadow', value: 'shadow' as const },
-                ].map((b) => (
-                  <button
-                    key={b.value}
-                    onClick={() => updateSubtitleStyle({ bg: b.value })}
-                    className={`py-1.5 rounded text-xs font-semibold border transition ${
-                      subtitleStyle.bg === b.value
-                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
-                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
-                    }`}
-                  >
-                    {b.label}
-                  </button>
-                ))}
-              </div>
-              <div className="grid grid-cols-3 gap-1">
-                {[
-                  { label: 'Low', value: 6 },
-                  { label: 'Raised', value: 12 },
-                  { label: 'High', value: 18 },
-                ].map((pos) => (
-                  <button
-                    key={pos.value}
-                    onClick={() => updateSubtitleStyle({ bottomPct: pos.value })}
-                    className={`py-1.5 rounded text-xs font-semibold border transition ${
-                      subtitleStyle.bottomPct === pos.value
-                        ? 'bg-[#E50914]/20 text-white border-[#E50914]/50'
-                        : 'bg-white/5 text-neutral-300 hover:bg-white/10 border-transparent'
-                    }`}
-                  >
-                    {pos.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
       )}
 
       {activeMenu === 'syncplay' && (
@@ -2502,159 +2661,6 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
         </div>
       )}
 
-      {activeMenu === 'settings' && (
-        <div
-          className="fixed inset-x-0 bottom-0 sm:inset-auto sm:bottom-24 sm:right-6 z-40 w-full sm:w-96 max-h-[75vh] flex flex-col bg-[#141414]/95 backdrop-blur-xl border-t sm:border border-white/15 rounded-t-2xl sm:rounded-xl shadow-2xl overflow-hidden"
-          onClick={(e) => e.stopPropagation()}
-          role="dialog"
-          aria-label="Player settings"
-        >
-          <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-            <div className="flex items-center gap-2">
-              <Settings className="w-4 h-4 text-[#E50914]" />
-              <span className="text-sm font-bold text-white">Settings</span>
-            </div>
-            <button
-              onClick={() => setActiveMenu(null)}
-              className="p-1 text-neutral-400 hover:text-white rounded-lg hover:bg-white/10"
-              aria-label="Close settings"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-          <div className="overflow-y-auto p-3 space-y-4">
-
-            {/* Quality */}
-            <div className="space-y-2">
-              <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                Quality
-              </div>
-              <div className="grid grid-cols-4 gap-1.5">
-                {(['auto', 'original', '1080p', '720p'] as QualityMode[]).map((mode) => (
-                  <button
-                    key={mode}
-                    onClick={() => {
-                      const cur = currentTimeRef.current;
-                      if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
-                      setHasTriedFallbackTranscode(false);
-                      setQualityMode(mode);
-                    }}
-                    className={`px-2.5 py-2 rounded-lg text-xs font-semibold capitalize transition-colors border ${
-                      qualityMode === mode
-                        ? 'bg-red-600/20 text-red-400 border-red-600/40'
-                        : 'bg-neutral-800/70 text-neutral-300 hover:bg-neutral-800 border-transparent'
-                    }`}
-                  >
-                    {mode === 'auto' ? 'Auto' : mode === 'original' ? 'Original' : mode}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Video Version */}
-            {versions.length > 1 && (
-              <div className="space-y-2">
-                <div className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                  Video Version
-                </div>
-                <div className="space-y-1.5">
-                  {versions.map((v) => {
-                    const isSelected = (selectedVersionId || versions[0]?.id || '') === v.id;
-                    return (
-                      <button
-                        key={v.id}
-                        onClick={() => {
-                          const cur = currentTimeRef.current;
-                          if (Number.isFinite(cur) && cur >= 0) setVersionResumeSec(cur);
-                          setHasTriedFallbackTranscode(false);
-                          setSelectedAudioIndex(undefined);
-                          setSelectedVersionId(v.id);
-                        }}
-                        className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm flex items-center justify-between transition-colors border ${
-                          isSelected
-                            ? 'bg-red-600/20 text-red-400 font-semibold border-red-600/40'
-                            : 'text-neutral-300 hover:bg-neutral-800 border-transparent'
-                        }`}
-                      >
-                        <span className="truncate pr-2">{v.label}</span>
-                        {isSelected && <Check size={16} />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Other Controls: Cast, Restart */}
-            <div className="space-y-1.5 pt-1 border-t border-neutral-800">
-              <button
-                onClick={() => {
-                  handleCastClick();
-                  setActiveMenu(null);
-                }}
-                className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
-              >
-                <span className="flex items-center gap-2.5">
-                  <Cast
-                    size={16}
-                    className={
-                      isCasting
-                        ? 'text-red-500'
-                        : isCastConnecting
-                        ? 'text-amber-400 animate-pulse'
-                        : 'text-neutral-400'
-                    }
-                  />
-                  <span>
-                    {isCasting
-                      ? `Casting to ${castDeviceName || 'Chromecast'}`
-                      : isCastConnecting
-                      ? 'Connecting to Chromecast...'
-                      : 'Cast to Chromecast'}
-                  </span>
-                </span>
-                <span className="text-xs text-neutral-500">
-                  {isCasting ? 'Disconnect' : isCastAvailable ? 'Ready' : ''}
-                </span>
-              </button>
-
-                  <button
-                    onClick={() => {
-                      handleRestart();
-                      setActiveMenu(null);
-                    }}
-                    className="w-full px-3.5 py-2.5 rounded-lg text-sm text-neutral-200 hover:bg-neutral-800 flex items-center justify-between transition-colors"
-                  >
-                    <span className="flex items-center gap-2.5">
-                      <RotateCcw size={16} className="text-neutral-400" />
-                      <span>Restart {activeEpisode ? 'Episode' : 'Movie'}</span>
-                    </span>
-                    <span className="text-xs text-neutral-500">0:00</span>
-                  </button>
-                </div>
-
-                {/* Playback Info */}
-                {playbackDiag && (
-                  <div className="pt-2 border-t border-neutral-800 text-[11px] text-neutral-400 space-y-0.5">
-                    <div className="font-semibold text-neutral-300">Playback Info</div>
-                    <div>
-                      {[
-                        playbackDiag.playMethod,
-                        playbackDiag.resolution,
-                        playbackDiag.sourceVideoCodec,
-                        playbackDiag.sourceAudioCodec,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </div>
-                    {playbackDiag.transcodeReasons && (
-                      <div className="text-neutral-500">Reason: {playbackDiag.transcodeReasons}</div>
-                    )}
-                  </div>
-                )}
-          </div>
-        </div>
-      )}
 
       {showEndOverlay && (
         <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-6 md:p-10 overflow-y-auto">
