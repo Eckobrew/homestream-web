@@ -51,7 +51,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const [trailerKey, setTrailerKey] = useState<string | null>(item?.trailerKey || null);
   const [isPlayingTrailer, setIsPlayingTrailer] = useState(false);
   const [recommendations, setRecommendations] = useState<MediaItem[]>([]);
-  const [isLoadingRecs, setIsLoadingRecs] = useState(false);
   const [collections, setCollections] = useState<Array<{ id: string; name: string; itemIds: string[] }>>([]);
   const [creatingCol, setCreatingCol] = useState(false);
   const [newColName, setNewColName] = useState('');
@@ -118,7 +117,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
       .catch(() => {});
 
     // 3. Fetch recommended movies / titles based on this particular film
-    setIsLoadingRecs(true);
     apiFetch(`/api/media/${item.id}/recommendations?type=${type}&tmdbId=${tmdb || ''}`)
       .then((res) => (res.ok ? res.json() : null))
       .then((data) => {
@@ -126,8 +124,7 @@ export const MediaModal: React.FC<MediaModalProps> = ({
           setRecommendations(data.recommendations);
         }
       })
-      .catch(() => {})
-      .finally(() => setIsLoadingRecs(false));
+      .catch(() => {});
   }, [item]);
 
   const currentItem = details || item;
@@ -145,9 +142,6 @@ export const MediaModal: React.FC<MediaModalProps> = ({
   const currentSeason = seasons[selectedSeasonIndex] || seasons[0];
   const totalEpisodesCount = allEpisodes.length;
   const watchedEpisodesCount = allEpisodes.filter((e) => e.played).length;
-  const inProgressEpisodesCount = allEpisodes.filter(
-    (e) => !e.played && typeof e.progressPercent === 'number' && e.progressPercent > 0
-  ).length;
 
   const handleRequestEpisode = async (ep: Episode) => {
     const sNum = currentSeason?.seasonNumber || 1;

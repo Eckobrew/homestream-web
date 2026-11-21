@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { apiFetch } from '@/api/client';
-import type { AdminDownloadManagerResponse, AdminTorrentItem, AdminTorrentFile, AdminSystemDownloadItem } from '@/types';
+import type { AdminDownloadManagerResponse, AdminTorrentItem, AdminTorrentFile } from '@/types';
 import {
   HardDriveDownload,
   RefreshCw,

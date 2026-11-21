@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, User, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks, Music, Disc, Mic2, ListMusic, BookOpen, Youtube, Layers, Settings2, PlaySquare, RefreshCw } from 'lucide-react';
+import { Search, X, Home, Tv, Film, Download, Users, ChevronDown, Plus, Server, LogOut, Menu, Compass, ShieldCheck, ListChecks, Music, Disc, Mic2, ListMusic, BookOpen, Youtube, Layers, Settings2, PlaySquare, RefreshCw } from 'lucide-react';
 import { useProfile } from '@/context/ProfileContext';
 
 export type NavHub = 'home' | 'movies' | 'series' | 'music' | 'books' | 'youtube' | 'admin';
@@ -33,7 +33,6 @@ export const Navbar: React.FC<NavbarProps> = ({
   onHubTabChange,
   onTabChange,
   onOpenServerSetup,
-  isExternal,
   onLogout,
   onToggleSidebar,
 }) => {

@@ -16,7 +16,6 @@ import {
   Trash2,
   ArrowLeft,
   Clock,
-  Sparkles,
   Shuffle,
   RefreshCw,
   Upload,

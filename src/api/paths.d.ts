@@ -866,6 +866,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/youtube/mix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their HomeStream account. */
+        get: operations["web_get_youtube_mix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/youtube/stream": {
         parameters: {
             query?: never;
@@ -1964,6 +1981,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/mobile/v1/youtube/mix": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Bearer household token, paired device credential, or signed mobile session. Profile policy is enforced on the server. */
+        get: operations["mobile_get_youtube_mix"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/mobile/v1/youtube/stream": {
         parameters: {
             query?: never;
@@ -2653,9 +2687,8 @@ export interface components {
             genres: string[];
             seasonsCount?: number;
             /** @enum {string} */
-            source: "demo" | "jellyfin" | "native" | "seerr" | "tmdb" | "youtube";
-            jellyfinId?: string;
-            seerrId?: number;
+            source: "demo" | "native" | "tmdb" | "youtube";
+            nativeId?: string;
             tmdbId?: number;
             playableEpisodeId?: string;
             versions?: components["schemas"]["MediaVersion"][];
@@ -2737,7 +2770,7 @@ export interface components {
             totalDurationTicks?: number;
             progressPercent?: number;
             played?: boolean;
-            jellyfinId?: string;
+            nativeId?: string;
             videoStreamUrl?: string;
             downloadStreamUrl?: string;
             airDate?: string;
@@ -2790,7 +2823,7 @@ export interface components {
             initials: string;
             avatarUrl?: string;
             isAdministrator?: boolean;
-            jellyfinUserId?: string;
+            historyUserId?: string;
             accountId?: string;
         };
         ProfilesResponse: {
@@ -2831,19 +2864,12 @@ export interface components {
         PublicConfig: {
             appName: string;
             isConfigured: boolean;
-            /** @enum {string} */
-            mediaEngine?: "jellyfin" | "native";
-            jellyfinUrl: string;
-            hasJellyfinKey: boolean;
-            jellyfinUserId: string;
-            seerrUrl: string;
-            hasSeerrKey: boolean;
+            /** @constant */
+            mediaEngine?: "native";
             qbittorrentUrl?: string;
             qbittorrentUsername?: string;
             hasQbittorrentPassword: boolean;
             downloadsPath: string;
-            isJellyfinConfigured: boolean;
-            isSeerrConfigured: boolean;
             isQbittorrentConfigured: boolean;
             isSetupNeeded: boolean;
             profilesCount: number;
@@ -2852,7 +2878,6 @@ export interface components {
             apiVersion: number;
             appName: string;
             cast: boolean;
-            jellyfinLogin?: boolean;
             canManageIntegrations?: boolean;
         };
         RequestMediaPayload: {
@@ -2962,7 +2987,7 @@ export interface components {
             /** @enum {string} */
             kind: "movie" | "music" | "tv";
             /** @enum {string} */
-            source: "bookshelf" | "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "tmdb";
+            source: "bookshelf" | "qbittorrent" | "radarr" | "slskd" | "sonarr" | "tmdb";
             status: string;
             artist?: string;
             posterUrl?: string;
@@ -2980,7 +3005,7 @@ export interface components {
         };
         IntegrationSummary: {
             /** @enum {string} */
-            id: "bookshelf" | "jellyfin" | "qbittorrent" | "radarr" | "seerr" | "slskd" | "sonarr" | "spotify" | "tmdb";
+            id: "bookshelf" | "qbittorrent" | "radarr" | "slskd" | "sonarr" | "spotify" | "tmdb";
             name: string;
             url: string;
             configured: boolean;
@@ -3014,6 +3039,8 @@ export interface components {
             description?: string;
             isShort: boolean;
             isDownloaded?: boolean;
+            isMix?: boolean;
+            mixPlaylistId?: string;
         };
         YouTubeSearchResponse: {
             results: components["schemas"]["YouTubeSearchResult"][];
@@ -3668,7 +3695,7 @@ export interface operations {
         parameters: {
             query?: {
                 userId?: string;
-                action?: "save" | "test-jellyfin" | "test-seerr" | "test-qbittorrent" | "test-radarr" | "test-sonarr" | "test-tmdb";
+                action?: "save" | "test-qbittorrent" | "test-radarr" | "test-sonarr" | "test-tmdb";
             };
             header?: never;
             path?: never;
@@ -3678,11 +3705,6 @@ export interface operations {
             content: {
                 "application/json": {
                     appName?: string;
-                    jellyfinUrl?: string;
-                    jellyfinApiKey?: string;
-                    jellyfinUserId?: string;
-                    seerrUrl?: string;
-                    seerrApiKey?: string;
                     qbittorrentUrl?: string;
                     qbittorrentUsername?: string;
                     qbittorrentPassword?: string;
@@ -5023,13 +5045,10 @@ export interface operations {
                     profileId?: string;
                     name?: string;
                     userIds?: string[];
-                    jellyfinUserIds?: string[];
-                    jellyfinUserId?: string;
                     paletteIndex?: number;
                     avatarId?: string;
                     /** @enum {string} */
                     mode?: "existing" | "new" | "native";
-                    jellyfinName?: string;
                     password?: string;
                     isKids?: boolean;
                     kidsDateOfBirth?: string;
@@ -15706,7 +15725,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb" | "spotify";
+                    integration: "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb" | "spotify";
                     /** @enum {string} */
                     action: "save" | "test";
                     url?: string;
@@ -15921,6 +15940,197 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["YouTubeSearchResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    web_get_youtube_mix: {
+        parameters: {
+            query: {
+                userId?: string;
+                listId: string;
+                seedId?: string;
+                profileId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        title?: string;
+                        items?: {
+                            [key: string]: unknown;
+                        }[];
+                    } & {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Invalid input */
@@ -33061,7 +33271,7 @@ export interface operations {
             content: {
                 "application/json": {
                     /** @enum {string} */
-                    integration: "jellyfin" | "seerr" | "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb" | "spotify";
+                    integration: "qbittorrent" | "slskd" | "bookshelf" | "radarr" | "sonarr" | "tmdb" | "spotify";
                     /** @enum {string} */
                     action: "save" | "test";
                     url?: string;
@@ -33276,6 +33486,197 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["YouTubeSearchResponse"];
+                };
+            };
+            /** @description Invalid input */
+            400: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Authentication required */
+            401: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Policy denied or parent PIN required */
+            403: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Resource not found */
+            404: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Rate limit reached */
+            429: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Internal failure */
+            500: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Upstream rejected request */
+            502: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+            /** @description Service unavailable or conversion capacity reached */
+            503: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    "Retry-After"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: string;
+                        pinRequired?: boolean;
+                    } & {
+                        [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    mobile_get_youtube_mix: {
+        parameters: {
+            query: {
+                userId?: string;
+                listId: string;
+                seedId?: string;
+                profileId?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    /** @description Request correlation identifier */
+                    "X-Request-Id"?: string;
+                    "X-HomeStream-Profile"?: string;
+                    "X-HomeStream-Policy"?: string;
+                    "X-HomeStream-Kids"?: string;
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        title?: string;
+                        items?: {
+                            [key: string]: unknown;
+                        }[];
+                    } & {
+                        [key: string]: unknown;
+                    };
                 };
             };
             /** @description Invalid input */
@@ -40009,7 +40410,6 @@ export interface operations {
                         cast?: boolean;
                         pairing?: string;
                         localPairing?: boolean;
-                        jellyfinLogin?: boolean;
                     } & {
                         [key: string]: unknown;
                     };
@@ -41158,13 +41558,10 @@ export interface operations {
                     profileId?: string;
                     name?: string;
                     userIds?: string[];
-                    jellyfinUserIds?: string[];
-                    jellyfinUserId?: string;
                     paletteIndex?: number;
                     avatarId?: string;
                     /** @enum {string} */
                     mode?: "existing" | "new" | "native";
-                    jellyfinName?: string;
                     password?: string;
                     isKids?: boolean;
                     kidsDateOfBirth?: string;

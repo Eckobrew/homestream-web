@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { apiFetch } from '@/api/client';
 import {
   Play,
@@ -11,7 +11,6 @@ import {
   Trash2,
   Plus,
   Sliders,
-  Clock,
   Radio,
   HardDrive,
   AlertCircle,
@@ -23,7 +22,6 @@ import {
   UserCheck,
   LogIn,
   Key,
-  Flame,
   Film,
   History,
   Volume2,
@@ -206,14 +204,13 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Subscriptions State
   const [subscriptions, setSubscriptions] = useState<YouTubeSubscription[]>([]);
-  const [isLoadingSubs, setIsLoadingSubs] = useState(false);
   const [isAddSubModalOpen, setIsAddSubModalOpen] = useState(false);
   const [newSubChannelInput, setNewSubChannelInput] = useState('');
   const [newSubMinDuration, setNewSubMinDuration] = useState(30);
-  const [newSubExcludeKeywords, setNewSubExcludeKeywords] = useState('shorts,clip,teaser,trailer,highlight');
-  const [newSubIncludeKeywords, setNewSubIncludeKeywords] = useState('');
+  const newSubExcludeKeywords = 'shorts,clip,teaser,trailer,highlight';
+  const newSubIncludeKeywords = '';
   const [newSubAutoDownload, setNewSubAutoDownload] = useState(true);
-  const [newSubIgnoreShorts, setNewSubIgnoreShorts] = useState(true);
+  const newSubIgnoreShorts = true;
   const [isSubmittingSub, setIsSubmittingSub] = useState(false);
   const [subModalError, setSubModalError] = useState<string | null>(null);
   const [checkingChannelId, setCheckingChannelId] = useState<string | null>(null);
@@ -226,7 +223,6 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Archive State
   const [archiveItems, setArchiveItems] = useState<YouTubeArchiveItem[]>([]);
-  const [isLoadingArchive, setIsLoadingArchive] = useState(false);
 
   // YouTube Account Auth State
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
@@ -283,7 +279,6 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Fetch Subscriptions
   const loadSubscriptions = useCallback(async () => {
-    setIsLoadingSubs(true);
     try {
       const res = await apiFetch('/api/youtube/subscriptions');
       if (res.ok) {
@@ -292,8 +287,6 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
       }
     } catch (err) {
       console.error('Failed fetching subscriptions:', err);
-    } finally {
-      setIsLoadingSubs(false);
     }
   }, []);
 
@@ -310,16 +303,13 @@ export const YouTubeHub: React.FC<YouTubeHubProps> = ({ onPlay, onBackToHome, ac
 
   // Fetch Archive
   const loadArchive = useCallback(async () => {
-    setIsLoadingArchive(true);
     try {
       const res = await apiFetch('/api/youtube/archive');
       if (res.ok) {
         const data = await res.json();
         setArchiveItems(data.items || []);
       }
-    } catch {} finally {
-      setIsLoadingArchive(false);
-    }
+    } catch {}
   }, []);
 
   // Initial load

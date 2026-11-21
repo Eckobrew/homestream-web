@@ -1423,8 +1423,6 @@
               "type": "string",
               "enum": [
                 "save",
-                "test-jellyfin",
-                "test-seerr",
                 "test-qbittorrent",
                 "test-radarr",
                 "test-sonarr",
@@ -1441,26 +1439,6 @@
                 "type": "object",
                 "properties": {
                   "appName": {
-                    "type": "string",
-                    "maxLength": 8192
-                  },
-                  "jellyfinUrl": {
-                    "type": "string",
-                    "maxLength": 8192
-                  },
-                  "jellyfinApiKey": {
-                    "type": "string",
-                    "maxLength": 8192
-                  },
-                  "jellyfinUserId": {
-                    "type": "string",
-                    "maxLength": 8192
-                  },
-                  "seerrUrl": {
-                    "type": "string",
-                    "maxLength": 8192
-                  },
-                  "seerrApiKey": {
                     "type": "string",
                     "maxLength": 8192
                   },
@@ -4783,21 +4761,6 @@
                       "pattern": "^[a-zA-Z0-9_-]+$"
                     }
                   },
-                  "jellyfinUserIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128,
-                      "pattern": "^[a-zA-Z0-9_-]+$"
-                    }
-                  },
-                  "jellyfinUserId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128,
-                    "pattern": "^[a-zA-Z0-9_-]+$"
-                  },
                   "paletteIndex": {
                     "type": "integer",
                     "minimum": 0,
@@ -4814,10 +4777,6 @@
                       "new",
                       "native"
                     ]
-                  },
-                  "jellyfinName": {
-                    "type": "string",
-                    "maxLength": 8192
                   },
                   "password": {
                     "type": "string",
@@ -31275,8 +31234,6 @@
                   "integration": {
                     "type": "string",
                     "enum": [
-                      "jellyfin",
-                      "seerr",
                       "qbittorrent",
                       "slskd",
                       "bookshelf",
@@ -31797,6 +31754,487 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/YouTubeSearchResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Policy denied or parent PIN required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream rejected request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable or conversion capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/youtube/mix": {
+      "get": {
+        "operationId": "web_get_youtube_mix",
+        "description": "Signed web session, authorized setup/webhook bearer credential, or trusted local access. Remote sessions are bound to their HomeStream account.",
+        "security": [
+          {
+            "session": []
+          },
+          {
+            "bearer": []
+          },
+          {}
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          {
+            "name": "listId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 8192
+            }
+          },
+          {
+            "name": "seedId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          {
+            "name": "profileId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": true
                 }
               }
             },
@@ -73719,8 +74157,6 @@
                   "integration": {
                     "type": "string",
                     "enum": [
-                      "jellyfin",
-                      "seerr",
                       "qbittorrent",
                       "slskd",
                       "bookshelf",
@@ -74237,6 +74673,483 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/YouTubeSearchResponse"
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Policy denied or parent PIN required",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Resource not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Rate limit reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal failure",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "Upstream rejected request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service unavailable or conversion capacity reached",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "pinRequired": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ],
+                  "additionalProperties": true
+                }
+              }
+            },
+            "headers": {
+              "X-Request-Id": {
+                "description": "Request correlation identifier",
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Profile": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Policy": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "X-HomeStream-Kids": {
+                "schema": {
+                  "type": "string"
+                }
+              },
+              "Retry-After": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/mobile/v1/youtube/mix": {
+      "get": {
+        "operationId": "mobile_get_youtube_mix",
+        "description": "Bearer household token, paired device credential, or signed mobile session. Profile policy is enforced on the server.",
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "userId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          {
+            "name": "listId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "maxLength": 8192
+            }
+          },
+          {
+            "name": "seedId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          },
+          {
+            "name": "profileId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "pattern": "^[a-zA-Z0-9_-]+$"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 8192
+                    },
+                    "items": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {},
+                        "required": [],
+                        "additionalProperties": true
+                      }
+                    }
+                  },
+                  "required": [],
+                  "additionalProperties": true
                 }
               }
             },
@@ -90379,9 +91292,6 @@
                     },
                     "localPairing": {
                       "type": "boolean"
-                    },
-                    "jellyfinLogin": {
-                      "type": "boolean"
                     }
                   },
                   "required": [],
@@ -93172,21 +94082,6 @@
                       "pattern": "^[a-zA-Z0-9_-]+$"
                     }
                   },
-                  "jellyfinUserIds": {
-                    "type": "array",
-                    "items": {
-                      "type": "string",
-                      "minLength": 1,
-                      "maxLength": 128,
-                      "pattern": "^[a-zA-Z0-9_-]+$"
-                    }
-                  },
-                  "jellyfinUserId": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 128,
-                    "pattern": "^[a-zA-Z0-9_-]+$"
-                  },
                   "paletteIndex": {
                     "type": "integer",
                     "minimum": 0,
@@ -93203,10 +94098,6 @@
                       "new",
                       "native"
                     ]
-                  },
-                  "jellyfinName": {
-                    "type": "string",
-                    "maxLength": 8192
                   },
                   "password": {
                     "type": "string",
@@ -100485,19 +101376,14 @@
           "source": {
             "enum": [
               "demo",
-              "jellyfin",
               "native",
-              "seerr",
               "tmdb",
               "youtube"
             ],
             "type": "string"
           },
-          "jellyfinId": {
+          "nativeId": {
             "type": "string"
-          },
-          "seerrId": {
-            "type": "number"
           },
           "tmdbId": {
             "type": "number"
@@ -100793,7 +101679,7 @@
           "played": {
             "type": "boolean"
           },
-          "jellyfinId": {
+          "nativeId": {
             "type": "string"
           },
           "videoStreamUrl": {
@@ -101009,7 +101895,7 @@
           "isAdministrator": {
             "type": "boolean"
           },
-          "jellyfinUserId": {
+          "historyUserId": {
             "type": "string"
           },
           "accountId": {
@@ -101168,26 +102054,8 @@
             "type": "boolean"
           },
           "mediaEngine": {
-            "enum": [
-              "jellyfin",
-              "native"
-            ],
+            "const": "native",
             "type": "string"
-          },
-          "jellyfinUrl": {
-            "type": "string"
-          },
-          "hasJellyfinKey": {
-            "type": "boolean"
-          },
-          "jellyfinUserId": {
-            "type": "string"
-          },
-          "seerrUrl": {
-            "type": "string"
-          },
-          "hasSeerrKey": {
-            "type": "boolean"
           },
           "qbittorrentUrl": {
             "type": "string"
@@ -101200,12 +102068,6 @@
           },
           "downloadsPath": {
             "type": "string"
-          },
-          "isJellyfinConfigured": {
-            "type": "boolean"
-          },
-          "isSeerrConfigured": {
-            "type": "boolean"
           },
           "isQbittorrentConfigured": {
             "type": "boolean"
@@ -101220,18 +102082,11 @@
         "required": [
           "appName",
           "downloadsPath",
-          "hasJellyfinKey",
           "hasQbittorrentPassword",
-          "hasSeerrKey",
           "isConfigured",
-          "isJellyfinConfigured",
           "isQbittorrentConfigured",
-          "isSeerrConfigured",
           "isSetupNeeded",
-          "jellyfinUrl",
-          "jellyfinUserId",
-          "profilesCount",
-          "seerrUrl"
+          "profilesCount"
         ]
       },
       "Capabilities": {
@@ -101244,9 +102099,6 @@
             "type": "string"
           },
           "cast": {
-            "type": "boolean"
-          },
-          "jellyfinLogin": {
             "type": "boolean"
           },
           "canManageIntegrations": {
@@ -101690,7 +102542,6 @@
               "bookshelf",
               "qbittorrent",
               "radarr",
-              "seerr",
               "slskd",
               "sonarr",
               "tmdb"
@@ -101764,10 +102615,8 @@
           "id": {
             "enum": [
               "bookshelf",
-              "jellyfin",
               "qbittorrent",
               "radarr",
-              "seerr",
               "slskd",
               "sonarr",
               "spotify",
@@ -101894,6 +102743,12 @@
           },
           "isDownloaded": {
             "type": "boolean"
+          },
+          "isMix": {
+            "type": "boolean"
+          },
+          "mixPlaylistId": {
+            "type": "string"
           }
         },
         "required": [

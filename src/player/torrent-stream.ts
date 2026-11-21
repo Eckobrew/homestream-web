@@ -3,10 +3,10 @@ import type { MediaItem } from '@/api/models';
 type StreamTarget = Pick<MediaItem, 'id' | 'tmdbId' | 'type' | 'title'> & { seriesName?: string; seasonNumber?: number; episodeNumber?: number };
 type EpisodeTarget = { seasonNumber?: number; episodeNumber?: number };
 
-/** TMDB id for an item, from its explicit field or a `tmdb-`/`seerr-` prefixed id. */
+/** TMDB id for an item, from its explicit field or a `tmdb-` prefixed id. */
 export function tmdbIdFor(item: Pick<MediaItem, 'id' | 'tmdbId'>): number | undefined {
   if (Number.isInteger(item.tmdbId) && Number(item.tmdbId) > 0) return Number(item.tmdbId);
-  const match = /^(?:tmdb|seerr)-(?:movie-|tv-|ep-)?(\d+)(?:-\d+-\d+)?$/.exec(item.id || '');
+  const match = /^tmdb-(?:movie-|tv-|ep-)?(\d+)(?:-\d+-\d+)?$/.exec(item.id || '');
   return match ? Number(match[1]) : undefined;
 }
 

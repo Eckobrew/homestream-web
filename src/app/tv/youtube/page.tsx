@@ -16,7 +16,7 @@ export default async function TvYouTubePage({
 }) {
   const { tab = 'home', q = '' } = await searchParams;
   const youtubeData = await fetchTvYouTube(tab, q);
-  const { hero, sections, items } = youtubeData;
+  const { sections, items } = youtubeData;
   const isHome = tab === 'home' && !q;
 
   return (
