@@ -1454,7 +1454,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                 const res = await apiFetch(`/api/media/${encodeURIComponent(item.id)}/recommendations`);
                 if (!res.ok) return;
                 const data = (await res.json()) as { items?: MediaItem[] };
-                const recs = (data.items || []).slice(0, 8);
+                const recs = (data.items || []).slice(0, 10);
                 setEndRecommendations(recs);
                 const lead = recs[0];
                 if (lead) {
@@ -2663,12 +2663,27 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
 
 
       {showEndOverlay && (
-        <div className="fixed inset-0 z-50 bg-black/95 backdrop-blur-md flex flex-col justify-between p-6 md:p-10 overflow-y-auto">
-          <div className="flex items-center justify-between gap-4">
+        <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between p-6 md:p-10 overflow-y-auto">
+          {endTrailerKey && (
+            <>
+              <video
+                key={endTrailerKey}
+                src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(endTrailerKey)}`}
+                autoPlay
+                muted
+                loop
+                playsInline
+                className="fixed inset-0 w-full h-full object-cover pointer-events-none"
+              />
+              <div className="fixed inset-0 bg-gradient-to-t from-black/95 via-black/35 to-black/75 pointer-events-none" />
+            </>
+          )}
+
+          <div className="relative z-10 flex items-center justify-between gap-4">
             <div>
               <p className="text-xs uppercase tracking-widest text-neutral-400">Up Next</p>
               <h2 className="text-xl md:text-2xl font-bold text-white">
-                {endRecommendations[0]?.title ? `Trailer: ${endRecommendations[0].title}` : `More Like ${item.title}`}
+                {endRecommendations[0]?.title || `More Like ${item.title}`}
               </h2>
             </div>
             <div className="flex items-center gap-3">
@@ -2681,7 +2696,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
                     void videoRef.current.play();
                   }
                 }}
-                className="px-4 py-2 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-white text-sm font-semibold transition"
+                className="px-4 py-2 rounded-lg bg-neutral-800/80 hover:bg-neutral-700 text-white text-sm font-semibold transition backdrop-blur-sm"
               >
                 Replay
               </button>
@@ -2698,24 +2713,10 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
             </div>
           </div>
 
-          {endTrailerKey && (
-            <div className="my-5 w-full max-w-4xl mx-auto aspect-video rounded-xl overflow-hidden border border-neutral-800 bg-black shadow-2xl">
-              <video
-                key={endTrailerKey}
-                src={`/api/v1/youtube/stream-video?videoId=${encodeURIComponent(endTrailerKey)}`}
-                controls
-                autoPlay
-                muted
-                playsInline
-                className="w-full h-full object-contain bg-black"
-              />
-            </div>
-          )}
-
           {endRecommendations.length > 0 && (
-            <div className="space-y-2.5">
+            <div className="relative z-10 space-y-2.5 mt-auto">
               <h3 className="text-xs font-semibold uppercase tracking-wider text-neutral-400">More Like This</h3>
-              <div className="flex gap-3 overflow-x-auto pb-2">
+              <div className="flex gap-3 overflow-x-auto pb-2 [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
                 {endRecommendations.map((rec) => (
                   <a
                     key={rec.id}
