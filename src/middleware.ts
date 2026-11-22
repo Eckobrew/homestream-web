@@ -13,7 +13,8 @@ export function middleware(request: NextRequest) {
   if (proto === 'http' && !isLocalHost) {
     const httpsUrl = request.nextUrl.clone();
     httpsUrl.protocol = 'https:';
-    httpsUrl.host = host;
+    httpsUrl.host = hostname;
+    httpsUrl.port = '';
     return NextResponse.redirect(httpsUrl, 308);
   }
 
