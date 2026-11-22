@@ -2,6 +2,21 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export function middleware(request: NextRequest) {
+  const proto = request.headers.get('x-forwarded-proto');
+  const host = request.headers.get('host') || request.nextUrl.host;
+  const hostname = host.split(':')[0];
+  const isLocalHost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
+
+  if (proto === 'http' && !isLocalHost) {
+    const httpsUrl = request.nextUrl.clone();
+    httpsUrl.protocol = 'https:';
+    httpsUrl.host = host;
+    return NextResponse.redirect(httpsUrl, 308);
+  }
+
   const { pathname } = request.nextUrl;
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set('x-pathname', pathname);
@@ -27,5 +42,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/', '/tv/:path*'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|api/).*)'],
 };
