@@ -10,7 +10,7 @@ export function middleware(request: NextRequest) {
     hostname === '127.0.0.1' ||
     /^192\.168\.|^10\.|^172\.(1[6-9]|2\d|3[01])\./.test(hostname);
 
-  if (proto === 'http' && !isLocalHost) {
+  if (process.env.HOMESTREAM_FORCE_HTTPS === 'true' && proto === 'http' && !isLocalHost) {
     const httpsUrl = request.nextUrl.clone();
     httpsUrl.protocol = 'https:';
     httpsUrl.host = hostname;
