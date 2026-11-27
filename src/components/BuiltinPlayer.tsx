@@ -5,6 +5,7 @@ import { apiFetch } from '@/api/client';
 import { usePlaybackFallback } from '@/player/usePlaybackFallback';
 import { useMediaDelivery } from '@/player/useMediaDelivery';
 import { useCastSession } from '@/player/useCastSession';
+import { controlCastBridge, fetchCastBridgeDevices, loadCastBridgeMedia } from '@/player/castBridge';
 import { useSubtitles } from '@/player/useSubtitles';
 import { useProgress } from '@/player/useProgress';
 import { useMediaSession } from '@/player/useMediaSession';
@@ -547,6 +548,7 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
     if (video && (video as any).remote?.state === 'connected') {
       (video as any).remote.prompt().catch(() => {});
     }
+    void controlCastBridge('stop').catch(() => {});
     setIsCasting(false);
     setIsCastConnecting(false);
     setCastDeviceName('');
@@ -628,11 +630,46 @@ export const BuiltinPlayer: React.FC<BuiltinPlayerProps> = ({
       }
     }
 
+    // 4. LAN Chromecast Bridge (iOS Safari / iOS PWA / non-Chrome browsers on home Wi-Fi)
+    const bridgeDevices = await fetchCastBridgeDevices();
+    if (bridgeDevices.length > 0 && streamUrl) {
+      const target =
+        bridgeDevices.length === 1
+          ? bridgeDevices[0]
+          : (() => {
+              const list = bridgeDevices.map((d, i) => `${i + 1}. ${d.name}`).join('\n');
+              const choice = window.prompt(`Cast to Chromecast:\n${list}\n\nEnter number:`, '1');
+              const idx = choice ? Number(choice) - 1 : -1;
+              return idx >= 0 && idx < bridgeDevices.length ? bridgeDevices[idx] : null;
+            })();
+      if (!target) {
+        setIsCastConnecting(false);
+        return;
+      }
+      const absUrl = new URL(streamUrl, window.location.origin).href;
+      const artUrl = item.posterUrl ? new URL(item.posterUrl, window.location.origin).href : undefined;
+      const status = await loadCastBridgeMedia({
+        deviceId: target.id,
+        contentUrl: absUrl,
+        contentType: streamUrl.includes('.m3u8') ? 'application/x-mpegURL' : 'video/mp4',
+        title: item.title,
+        artworkUrl: artUrl,
+        currentTime: videoRef.current?.currentTime || currentTime || 0,
+      });
+      setIsCastConnecting(false);
+      if (status?.connected) {
+        videoRef.current?.pause();
+        setIsCasting(true);
+        setCastDeviceName(target.name);
+        return;
+      }
+    }
+
     setIsCastConnecting(false);
     alert(
-      'To cast to Chromecast or Google TV:\n• Open HomeStream using your server’s HTTPS address\n• Ensure your phone/Mac is on the same Wi-Fi as your Chromecast.\n• Use Google Chrome or Samsung Internet.'
+      'To cast to Chromecast or Google TV:\n• Open HomeStream using your server’s HTTPS address\n• Ensure your phone/Mac is on the same Wi-Fi as your Chromecast.\n• On iOS PWA, set CAST_BRIDGE_DEVICES in your backend .env.'
     );
-  }, [isCasting, handleDisconnectCast]);
+  }, [isCasting, handleDisconnectCast, streamUrl, item.posterUrl, item.title, currentTime]);
 
   useCastSession({videoRef, loadCastMedia: castLoadRef, cancelCastLoad, inspectCastStartup, syncCastVolume, setIsCastConnecting, setIsCasting, setIsCastAvailable, setCastDeviceName, lastCastedUrlRef, lastCastedKeyRef, isCasting, isScrubbing, setCurrentTime, castCompatibilityRef, castLoadRef, castFinishedItem, autoplayEpisodes, nextEpisodeHandler, setIsPlaying});
 
