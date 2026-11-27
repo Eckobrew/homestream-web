@@ -1,8 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import "./globals.css";
 import { ProfileProvider } from "@/context/ProfileContext";
 import { ProfileSelectorModal } from "@/components/ProfileSelectorModal";
+import { PwaRegistrar } from "@/components/PwaRegistrar";
 
 const geistSans = localFont({
   src: "./fonts/GeistVF.woff",
@@ -79,9 +80,24 @@ export const metadata: Metadata = {
     },
   },
   icons: {
-    icon: '/favicon.ico',
-    apple: '/favicon.ico',
+    icon: [
+      { url: '/favicon.ico', sizes: 'any' },
+      { url: '/icons/icon-192x192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512x512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [
+      { url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' },
+    ],
   },
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'black-translucent',
+    title: appName,
+  },
+};
+
+export const viewport: Viewport = {
+  themeColor: '#141414',
 };
 
 export default function RootLayout({
@@ -156,6 +172,7 @@ export default function RootLayout({
         style={{ backgroundColor: '#141414', color: '#ffffff' }}
       >
         <ProfileProvider>
+          <PwaRegistrar />
           {children}
           <ProfileSelectorModal />
         </ProfileProvider>
